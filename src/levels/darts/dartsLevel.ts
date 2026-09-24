@@ -47,8 +47,10 @@ const DART_COLORS = [
 const HAND_START = { hover: 2.6, follow: 1.2, slam: 0.4, sweep: 12 };
 const HAND_STEP = { hover: 0.3, follow: 0.45, slam: 0.04, sweep: 1.5 };
 const HAND_MIN = { hover: 1.0, slam: 0.22 };
-/** Share of the hover time the hand spends lowering (the rest it hovers at full height). */
+/** Share of the hover time the hand would spend lowering at normal speed. */
 const REACH_SHARE = 0.55;
+/** The descent runs this many times faster; the hover gets the saved time, so pacing is unchanged. */
+const REACH_SPEEDUP = 2;
 /** During the reach the hand keeps tracking the player for this fraction, then locks its landing spot. */
 const REACH_TRACK = 0.5;
 /** A sweeping hand grabs a dart within this distance, and the player within the smaller one. */
@@ -106,7 +108,7 @@ export class DartsLevel implements Level {
   }
 
   update(dt: number) {
-    const { player, camera, hud } = this.ctx;
+    const { player, camera } = this.ctx;
     this.phaseT += dt;
     this.giant.time += dt;
 
@@ -129,7 +131,6 @@ export class DartsLevel implements Level {
         if (this.phaseT > 2 && this.darts.every((d) => d.state !== 'falling')) {
           this.setPhase('hunt');
           this.startHover();
-          hud.hint('Survive: bait the hand onto all 5 darts.');
         }
         break;
       case 'hunt':
@@ -140,7 +141,7 @@ export class DartsLevel implements Level {
         this.giant.root[1] = lerp(0, -80, k);
         this.giant.headShake = 1 - k;
         camera.addShake(0.2);
-        if (this.phaseT > 4.2) this.finish('won', 'SURVIVED', 'He threw all five darts and lost interest.');
+        if (this.phaseT > 4.2) this.finish('won', 'SURVIVED', pick(QUIPS.outOfDarts));
         break;
       }
     }
@@ -151,7 +152,9 @@ export class DartsLevel implements Level {
     g.leanTarget = throwing || this.handState === 'rest'
       ? 0.06
       : clamp(0.12 + ((14 - this.grasp[2]) / 26) * 0.5, 0.1, 0.62);
-    g.lookTarget = player.mode === 'control' || player.mode === 'held'
+    // He sights down the dart at the board while aiming and throwing; otherwise he watches the player.
+    const aiming = this.handState === 'windup' || this.handState === 'throw';
+    g.lookTarget = !aiming && (player.mode === 'control' || player.mode === 'held')
       ? add(player.pos, [0, 1, 0])
       : BOARD_CENTER;
     g.update(dt, this.grasp);
@@ -200,15 +203,14 @@ export class DartsLevel implements Level {
         this.trackPlayer(dt, 1);
         this.grasp = [this.handXZ[0], HOVER_Y + Math.sin(this.handT * 3) * 0.5, this.handXZ[1]];
         g.rightCurl = Math.max(0, g.rightCurl - dt * 2);
-        if (this.handT >= this.hoverTime * (1 - REACH_SHARE)) {
+        if (this.handT >= this.hoverTime + this.slamTime - this.reachTime()) {
           this.from = [...this.grasp];
           this.setHand('reach');
         }
         break;
       }
       case 'reach': {
-        const duration = this.hoverTime * REACH_SHARE + this.slamTime;
-        const u = Math.min(1, this.handT / duration);
+        const u = Math.min(1, this.handT / this.reachTime());
         // Keep tracking early in the reach, then commit to a landing spot the player can read.
         this.trackPlayer(dt, clamp(1 - u / REACH_TRACK, 0, 1));
         const y = lerp(this.from[1], 0.9, u * u * (3 - 2 * u));
@@ -261,7 +263,7 @@ export class DartsLevel implements Level {
       }
       case 'windup': {
         const u = Math.min(1, this.handT / 0.4);
-        this.grasp = add(this.windupPoint(), scale([0, 1, 3], easeInOut(u)));
+        this.grasp = add(this.windupPoint(), scale([0, 0.5, 2.5], easeInOut(u))); // small draw back toward the face
         if (this.handT >= 0.45) {
           this.from = [...this.grasp];
           this.setHand('throw');
@@ -298,6 +300,11 @@ export class DartsLevel implements Level {
     }
   }
 
+  /** How long the hand takes to lower from hover height to the floor. */
+  private reachTime() {
+    return (this.hoverTime * REACH_SHARE + this.slamTime) / REACH_SPEEDUP;
+  }
+
   /** Eases the hand's floor position toward the player; `strength` 0 freezes it. */
   private trackPlayer(dt: number, strength: number) {
     const { player } = this.ctx;
@@ -322,12 +329,14 @@ export class DartsLevel implements Level {
     this.setHand('close');
   }
 
+  /** Aiming position: held up in front of his right eye, so he lines the shot up by eye. */
   private windupPoint(): Vec3 {
-    return add(this.giant.shoulder(1), [4, 14, 12]);
+    return add(this.giant.headCenter(), [4, 0.5, -13]);
   }
 
+  /** Where the throwing motion ends and the dart (or player) leaves his hand. */
   private releasePoint(): Vec3 {
-    return add(this.giant.shoulder(1), [-2, 8, -18]);
+    return add(this.giant.headCenter(), [1.5, -3, -26]);
   }
 
   private pickGrabTarget(): Dart | 'player' | null {
@@ -355,7 +364,7 @@ export class DartsLevel implements Level {
   }
 
   private release() {
-    const { player, hud } = this.ctx;
+    const { player } = this.ctx;
     const start = [...this.giant.graspPoint] as Vec3;
     const aimAt = (radius: number) => {
       const a = Math.random() * Math.PI * 2;
@@ -371,15 +380,12 @@ export class DartsLevel implements Level {
       player.facing = 0;
       this.flightVel = ballistic(start, aimAt(3 + Math.random() * 3), FLIGHT_TIME, FLIGHT_G);
       this.passedBoard = false;
-      hud.hint('Steer with WASD — hit the bullseye!');
     } else if (this.held) {
       const dart = this.held;
       dart.state = 'flying';
       dart.vel = ballistic(dart.tip, aimAt(Math.random() * 4), 1.7, G);
       this.thrown++;
       this.speedUp();
-      const left = DART_COUNT - this.thrown;
-      hud.hint(left > 0 ? `${left} dart${left === 1 ? '' : 's'} left. The hand is getting faster.` : '');
     }
     this.held = null;
   }
@@ -452,13 +458,13 @@ export class DartsLevel implements Level {
       player.pos[1] = 0.3;
       player.mode = 'splat';
       camera.addShake(0.6);
-      this.finish('lost', 'MISSED', 'You sailed clean past the board.');
+      this.finish('lost', 'MISSED', pick(QUIPS.missedBoard));
     }
   }
 
   private boardResult(r: number) {
     if (r <= BULLSEYE_R) {
-      this.finish('won', 'BULLSEYE!', 'The giant is impressed. You survived.');
+      this.finish('won', 'BULLSEYE!', pick(QUIPS.bullseye));
       return;
     }
     const mm = (r / SCORING_R) * 170;
@@ -467,13 +473,13 @@ export class DartsLevel implements Level {
       mm < 107 ? 'treble ring' :
       mm < 162 ? 'single' :
       mm <= 170 ? 'double ring' : 'black rim';
-    this.finish('lost', 'SPLAT', `You hit the ${ring}. Only the bullseye saves you.`);
+    this.finish('lost', 'SPLAT', pick(QUIPS.wrongRing)(ring));
   }
 
   private finish(status: LevelStatus, big: string, small: string) {
     this.status = status;
     this.phase = 'over';
-    this.ctx.hud.show(big, `${small}\nPress R to ${status === 'won' ? 'play again' : 'try again'}`);
+    this.ctx.hud.show(big, `${small}\n${pick(status === 'won' ? QUIPS.againWon : QUIPS.againLost)}`);
     this.ctx.hud.hint('');
   }
 
@@ -542,6 +548,36 @@ export class DartsLevel implements Level {
         return null;
     }
   }
+}
+
+// End-screen lines. The game is about surprise and humour, so keep any text dry and joking.
+const QUIPS = {
+  outOfDarts: [
+    'He ran out of darts. Somewhere, a pub league weeps.',
+    'Five darts thrown, zero of them you. Mum would be so proud.',
+    'The giant has left the building.',
+  ],
+  bullseye: [
+    'One hundred and eightyyy! (It is fifty. Nobody tell him.)',
+    'You are the dart now. Congratulations?',
+    'Nailed it. Mostly with your face.',
+  ],
+  missedBoard: [
+    'Houston, we have a problem.',
+    'To infinity and... the floor.',
+    'Physics: 1. You: 0.',
+  ],
+  wrongRing: [
+    (ring: string) => `The ${ring}. Close, but no cigar. Actually, not that close.`,
+    (ring: string) => `The ${ring}. Great for the scoreboard, terrible for your spine.`,
+    (ring: string) => `The ${ring}. He only keeps bullseyes. You are going in the bin.`,
+  ],
+  againWon: ['Press R to tempt fate again', 'Press R. You know you want to.'],
+  againLost: ['Press R to respawn. Cheaper than therapy.', 'Press R. Try being a better dart.'],
+};
+
+function pick<T>(options: T[]): T {
+  return options[Math.floor(Math.random() * options.length)];
 }
 
 function ballistic(start: Vec3, target: Vec3, time: number, gravity: number): Vec3 {

@@ -44,6 +44,10 @@ export class Giant {
     return transformPoint(this.torso, [SHOULDER_WIDTH * side, SHOULDER_HEIGHT, 0]);
   }
 
+  headCenter(): Vec3 {
+    return transformPoint(this.torso, [0, HEAD_HEIGHT, 0]);
+  }
+
   /** Poses the body so the right hand's grasp point reaches toward `grasp`. */
   update(dt: number, grasp: Vec3) {
     this.lean += (this.leanTarget - this.lean) * (1 - Math.exp(-dt * 3));
