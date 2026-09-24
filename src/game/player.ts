@@ -1,6 +1,6 @@
 import type { Input } from '../engine/input';
 import {
-  approachAngle, clamp, mul, rotationX, rotationY, scaling, translation,
+  approachAngle, basis, clamp, cross, dot, mul, normalize, rotationX, rotationY, scale, scaling, sub, translation,
   type Mat4, type Vec3,
 } from '../engine/math';
 import type { DrawItem } from '../engine/renderer';
@@ -35,6 +35,8 @@ export class Player {
   pos: Vec3 = [0, 0, 6];
   vel: Vec3 = [0, 0, 0];
   facing = 0;
+  /** Head direction while flying; the body keeps it when it lands (stuck / splat). */
+  flightDir: Vec3 = [0, 0, -1];
   mode: PlayerMode = 'control';
   onGround = true;
   private walk = 0;
@@ -44,6 +46,7 @@ export class Player {
     this.pos = [...pos];
     this.vel = [0, 0, 0];
     this.facing = facing;
+    this.flightDir = [0, 0, -1];
     this.mode = 'control';
     this.onGround = true;
   }
@@ -103,7 +106,7 @@ export class Player {
   draw(out: DrawItem[], time: number) {
     const horizontal = this.mode === 'flying' || this.mode === 'stuck' || this.mode === 'splat';
     const root = horizontal
-      ? mul(translation(this.pos), rotationY(this.facing), rotationX(-Math.PI / 2), translation([0, -0.9, 0]))
+      ? mul(translation(this.pos), alongDirection(this.flightDir), translation([0, -0.9, 0]))
       : mul(translation(this.pos), rotationY(this.facing));
 
     let armL = 0, armR = 0, legL = 0, legR = 0;
@@ -137,4 +140,16 @@ export class Player {
     limb([-0.14, 0.86, 0], legL, [0.21, 0.86, 0.25], PANTS);
     limb([0.14, 0.86, 0], legR, [0.21, 0.86, 0.25], PANTS);
   }
+}
+
+/**
+ * Rotation that points the body's head (+y) along `dir`, with the back (+z) kept as close
+ * to world up as possible, so the player flies belly-down like a thrown dart.
+ */
+function alongDirection(dir: Vec3): Mat4 {
+  const y = normalize(dir);
+  const up: Vec3 = Math.abs(y[1]) > 0.99 ? [0, 0, 1] : [0, 1, 0];
+  const z = normalize(sub(up, scale(y, dot(up, y))));
+  const x = cross(y, z);
+  return basis(x, y, z, [0, 0, 0]);
 }

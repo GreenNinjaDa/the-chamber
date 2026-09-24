@@ -152,9 +152,10 @@ export class DartsLevel implements Level {
     g.leanTarget = throwing || this.handState === 'rest'
       ? 0.06
       : clamp(0.12 + ((14 - this.grasp[2]) / 26) * 0.5, 0.1, 0.62);
-    // He sights down the dart at the board while aiming and throwing; otherwise he watches the player.
-    const aiming = this.handState === 'windup' || this.handState === 'throw';
-    g.lookTarget = !aiming && (player.mode === 'control' || player.mode === 'held')
+    // From the moment he grabs something until shortly after he throws it, he stares at the
+    // board like a man concentrating on his shot; otherwise he watches the player.
+    const focusing = this.held !== null || (this.handState === 'recover' && this.handT < 0.5);
+    g.lookTarget = !focusing && player.mode === 'control'
       ? add(player.pos, [0, 1, 0])
       : BOARD_CENTER;
     g.update(dt, this.grasp);
@@ -378,6 +379,7 @@ export class DartsLevel implements Level {
       player.mode = 'flying';
       player.pos = start;
       player.facing = 0;
+      player.flightDir = normalize(this.flightVel);
       this.flightVel = ballistic(start, aimAt(3 + Math.random() * 3), FLIGHT_TIME, FLIGHT_G);
       this.passedBoard = false;
     } else if (this.held) {
@@ -442,6 +444,7 @@ export class DartsLevel implements Level {
     if (input.isDown('KeyS')) v[1] -= STEER_ACCEL * dt;
     v[1] -= FLIGHT_G * dt;
     player.pos = add(player.pos, scale(v, dt));
+    player.flightDir = normalize(v);
 
     if (!this.passedBoard && player.pos[2] <= BOARD_FACE_Z + 0.5) {
       const r = Math.hypot(player.pos[0] - BOARD_CENTER[0], player.pos[1] - BOARD_CENTER[1]);
