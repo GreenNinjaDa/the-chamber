@@ -10,7 +10,10 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   nondescript Portal-style test chamber with four white panelled walls and no roof.
 - **Level 1 — Darts** (`src/levels/darts/`): a giant rises over the south wall and blocks the sun. Five
   player-sized darts drop into the chamber and his hand hunts the player. The player survives by luring the
-  hand onto darts until he has thrown **all five**; the hand gets faster after every grab. If the giant grabs
+  hand onto darts until he has thrown **all five**; the hand gets faster after every grab. Each grab is a
+  hover that tracks the player, then a gradual descent that locks its landing spot halfway down. If it lands
+  on nothing, it immediately sweeps sideways along the floor at the player: a dart in its path is grabbed
+  instead, otherwise the player is caught. If the giant grabs
   the player instead, they are thrown at the dartboard and must steer mid-flight (WASD) into the bullseye to
   survive — anything else is a loss.
 

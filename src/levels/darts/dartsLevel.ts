@@ -44,12 +44,21 @@ const DART_COLORS = [
 ];
 
 // Hand speed at the first grab, and how much each grab speeds it up.
-const HAND_START = { hover: 2.6, follow: 1.2, slam: 0.4 };
-const HAND_STEP = { hover: 0.3, follow: 0.45, slam: 0.04 };
+const HAND_START = { hover: 2.6, follow: 1.2, slam: 0.4, sweep: 12 };
+const HAND_STEP = { hover: 0.3, follow: 0.45, slam: 0.04, sweep: 1.5 };
 const HAND_MIN = { hover: 1.0, slam: 0.22 };
+/** Share of the hover time the hand spends lowering (the rest it hovers at full height). */
+const REACH_SHARE = 0.55;
+/** During the reach the hand keeps tracking the player for this fraction, then locks its landing spot. */
+const REACH_TRACK = 0.5;
+/** A sweeping hand grabs a dart within this distance, and the player within the smaller one. */
+const SWEEP_DART_R = 2.2;
+const SWEEP_PLAYER_R = 1.6;
+const SWEEP_PAUSE = 0.15;
+const SWEEP_MAX_TIME = 3;
 
 type Phase = 'intro' | 'rise' | 'drop' | 'hunt' | 'sink' | 'over';
-type HandState = 'rest' | 'hover' | 'slam' | 'close' | 'lift' | 'carry' | 'windup' | 'throw' | 'recover';
+type HandState = 'rest' | 'hover' | 'reach' | 'sweep' | 'close' | 'carry' | 'windup' | 'throw' | 'recover';
 
 interface Dart {
   tip: Vec3;
@@ -79,6 +88,7 @@ export class DartsLevel implements Level {
   private hoverTime = HAND_START.hover;
   private follow = HAND_START.follow;
   private slamTime = HAND_START.slam;
+  private sweepSpeed = HAND_START.sweep;
   private held: Dart | 'player' | null = null;
   private thrown = 0;
 
@@ -179,42 +189,60 @@ export class DartsLevel implements Level {
   }
 
   private updateHand(dt: number) {
-    const { player, camera, hud } = this.ctx;
+    const { player, camera } = this.ctx;
     const g = this.giant;
     this.handT += dt;
 
     switch (this.handState) {
+      // The time from the start of the hover to the hand touching the floor is always
+      // hoverTime + slamTime; the hand spends the last part of it lowering gradually.
       case 'hover': {
-        if (player.mode === 'control') {
-          const k = 1 - Math.exp(-dt * this.follow);
-          this.handXZ[0] += (player.pos[0] - this.handXZ[0]) * k;
-          this.handXZ[1] += (player.pos[2] - this.handXZ[1]) * k;
-        }
-        this.handXZ[0] = clamp(this.handXZ[0], -HAND_LIMIT, HAND_LIMIT);
-        this.handXZ[1] = clamp(this.handXZ[1], -HAND_LIMIT, HAND_LIMIT);
+        this.trackPlayer(dt, 1);
         this.grasp = [this.handXZ[0], HOVER_Y + Math.sin(this.handT * 3) * 0.5, this.handXZ[1]];
         g.rightCurl = Math.max(0, g.rightCurl - dt * 2);
-        if (this.handT >= this.hoverTime) {
+        if (this.handT >= this.hoverTime * (1 - REACH_SHARE)) {
           this.from = [...this.grasp];
-          this.to = [this.handXZ[0], 0.9, this.handXZ[1]];
-          this.setHand('slam');
+          this.setHand('reach');
         }
         break;
       }
-      case 'slam': {
-        const u = Math.min(1, this.handT / this.slamTime);
-        this.grasp = lerp3(this.from, this.to, u * u);
+      case 'reach': {
+        const duration = this.hoverTime * REACH_SHARE + this.slamTime;
+        const u = Math.min(1, this.handT / duration);
+        // Keep tracking early in the reach, then commit to a landing spot the player can read.
+        this.trackPlayer(dt, clamp(1 - u / REACH_TRACK, 0, 1));
+        const y = lerp(this.from[1], 0.9, u * u * (3 - 2 * u));
+        this.grasp = [this.handXZ[0], y, this.handXZ[1]];
+        g.rightCurl = u * 0.25;
         if (u >= 1) {
-          camera.addShake(0.8);
+          this.to = [...this.grasp];
+          camera.addShake(0.5);
           const target = this.pickGrabTarget();
-          this.held = target;
-          if (target === 'player') {
-            player.mode = 'held';
-            hud.hint('');
-          } else if (target) {
-            target.state = 'held';
+          if (target) this.grab(target);
+          else this.setHand('sweep');
+        }
+        break;
+      }
+      case 'sweep': {
+        // Missed: sweep along the floor straight at the player. A dart in the way is grabbed
+        // instead; otherwise the hand catches the player.
+        if (this.handT > SWEEP_PAUSE && player.mode === 'control') {
+          const dx = player.pos[0] - this.grasp[0], dz = player.pos[2] - this.grasp[2];
+          const d = Math.hypot(dx, dz);
+          const step = Math.min(d, this.sweepSpeed * dt);
+          if (d > 1e-4) {
+            this.grasp = [this.grasp[0] + (dx / d) * step, 0.9, this.grasp[2] + (dz / d) * step];
           }
-          this.setHand(target ? 'close' : 'lift');
+        }
+        const dart = this.darts.find((x) => x.state === 'stuck' && distXZ(x.tip, this.grasp) < SWEEP_DART_R);
+        if (dart) {
+          this.grab(dart);
+        } else if (player.mode === 'control' &&
+          (distXZ(player.pos, this.grasp) < SWEEP_PLAYER_R || this.handT > SWEEP_MAX_TIME)) {
+          this.grab('player');
+        } else if (player.mode !== 'control') {
+          this.setHand('recover');
+          this.from = [...this.grasp];
         }
         break;
       }
@@ -225,12 +253,6 @@ export class DartsLevel implements Level {
           this.setHand('carry');
         }
         break;
-      case 'lift': {
-        const u = easeInOut(Math.min(1, this.handT / 0.8));
-        this.grasp = lerp3(this.to, [this.to[0], HOVER_Y, this.to[2]], u);
-        if (u >= 1) this.startHover();
-        break;
-      }
       case 'carry': {
         const u = easeInOut(Math.min(1, this.handT / 1.1));
         this.grasp = lerp3(this.from, this.windupPoint(), u);
@@ -276,6 +298,30 @@ export class DartsLevel implements Level {
     }
   }
 
+  /** Eases the hand's floor position toward the player; `strength` 0 freezes it. */
+  private trackPlayer(dt: number, strength: number) {
+    const { player } = this.ctx;
+    if (player.mode === 'control' && strength > 0) {
+      const k = 1 - Math.exp(-dt * this.follow * strength);
+      this.handXZ[0] += (player.pos[0] - this.handXZ[0]) * k;
+      this.handXZ[1] += (player.pos[2] - this.handXZ[1]) * k;
+    }
+    this.handXZ[0] = clamp(this.handXZ[0], -HAND_LIMIT, HAND_LIMIT);
+    this.handXZ[1] = clamp(this.handXZ[1], -HAND_LIMIT, HAND_LIMIT);
+  }
+
+  private grab(target: Dart | 'player') {
+    this.held = target;
+    if (target === 'player') {
+      this.ctx.player.mode = 'held';
+      this.ctx.hud.hint('');
+    } else {
+      target.state = 'held';
+    }
+    this.ctx.camera.addShake(0.4);
+    this.setHand('close');
+  }
+
   private windupPoint(): Vec3 {
     return add(this.giant.shoulder(1), [4, 14, 12]);
   }
@@ -300,11 +346,12 @@ export class DartsLevel implements Level {
     return best;
   }
 
-  /** Each grab makes the hand hover less, track tighter and slam quicker. */
+  /** Each grab makes the hand hover less, track tighter and reach quicker and sweep faster. */
   private speedUp() {
     this.hoverTime = Math.max(HAND_MIN.hover, this.hoverTime - HAND_STEP.hover);
     this.follow += HAND_STEP.follow;
     this.slamTime = Math.max(HAND_MIN.slam, this.slamTime - HAND_STEP.slam);
+    this.sweepSpeed += HAND_STEP.sweep;
   }
 
   private release() {
@@ -453,7 +500,7 @@ export class DartsLevel implements Level {
     for (const d of this.darts) drawDart(out, dartMatrix(d.tip, d.dir), d.color);
 
     // Contact shadow under the hunting hand so the player can read where it will land.
-    if (this.handState === 'hover' || this.handState === 'slam') {
+    if (this.handState === 'hover' || this.handState === 'reach' || this.handState === 'sweep') {
       const s = this.giant.graspPoint;
       const nearness = 1 - clamp(s[1] / HOVER_Y, 0, 1);
       const radius = GRAB_R * (1.2 - nearness * 0.2);
