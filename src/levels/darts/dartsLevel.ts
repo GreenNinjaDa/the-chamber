@@ -19,8 +19,13 @@ import { Giant } from './giant';
  */
 
 const G = 20;
+/** Weaker gravity while the player is thrown, for a flatter flight with time to steer. */
+const FLIGHT_G = 6;
+const FLIGHT_TIME = 4.2;
 const DART_COUNT = 5;
-const BOARD_CENTER: Vec3 = [0, 22, -50];
+const BOARD_CENTER: Vec3 = [0, 34, -75];
+/** How far below its final height the board waits, hidden, until the giant rises. */
+const BOARD_HIDDEN_DROP = 45;
 const BOARD_R = 9;
 const BOARD_FACE_Z = BOARD_CENTER[2] + 0.5;
 const SCORING_R = BOARD_R * 0.8;
@@ -29,7 +34,7 @@ const BULLSEYE_R = 1.1;
 const GRAB_R = 2.8;
 const HOVER_Y = 18;
 const HAND_LIMIT = CHAMBER_HALF - 1;
-const STEER_ACCEL = 7;
+const STEER_ACCEL = 5;
 const DART_COLORS = [
   [0.9, 0.1, 0.1],
   [0.1, 0.35, 0.9],
@@ -79,11 +84,14 @@ export class DartsLevel implements Level {
 
   private flightVel: Vec3 = [0, 0, 0];
   private passedBoard = false;
+  private boardDrop = BOARD_HIDDEN_DROP;
 
   constructor(private ctx: LevelContext) {
     ctx.hud.setLevel(`The Chamber · Level ${this.number}`);
-    ctx.hud.show(`LEVEL ${this.number}`, this.title, 2.5);
+    ctx.hud.show(`LEVEL ${this.number}`, "", 2.5); // no hint of the theme up front
     ctx.hud.hint('');
+    // Pose the giant once so he starts hidden below ground rather than at the origin.
+    this.giant.update(0, [0, 0, 0]);
     this.grasp = this.restPoint();
   }
 
@@ -97,7 +105,9 @@ export class DartsLevel implements Level {
         if (this.phaseT > 1.5) this.setPhase('rise');
         break;
       case 'rise': {
-        this.giant.root[1] = lerp(-80, 0, easeInOut(Math.min(1, this.phaseT / 4.5)));
+        const k = easeInOut(Math.min(1, this.phaseT / 4.5));
+        this.giant.root[1] = lerp(-80, 0, k);
+        this.boardDrop = lerp(BOARD_HIDDEN_DROP, 0, k);
         if (this.phaseT < 4.5) camera.addShake(0.3);
         if (this.phaseT > 5) {
           this.spawnDarts();
@@ -312,13 +322,13 @@ export class DartsLevel implements Level {
       player.mode = 'flying';
       player.pos = start;
       player.facing = 0;
-      this.flightVel = ballistic(start, aimAt(3 + Math.random() * 2.5), 2.3);
+      this.flightVel = ballistic(start, aimAt(3 + Math.random() * 3), FLIGHT_TIME, FLIGHT_G);
       this.passedBoard = false;
       hud.hint('Steer with WASD — hit the bullseye!');
     } else if (this.held) {
       const dart = this.held;
       dart.state = 'flying';
-      dart.vel = ballistic(dart.tip, aimAt(Math.random() * 4), 1.3);
+      dart.vel = ballistic(dart.tip, aimAt(Math.random() * 4), 1.7, G);
       this.thrown++;
       this.speedUp();
       const left = DART_COUNT - this.thrown;
@@ -377,7 +387,7 @@ export class DartsLevel implements Level {
     if (input.isDown('KeyD')) v[0] += STEER_ACCEL * dt;
     if (input.isDown('KeyW')) v[1] += STEER_ACCEL * dt;
     if (input.isDown('KeyS')) v[1] -= STEER_ACCEL * dt;
-    v[1] -= G * dt;
+    v[1] -= FLIGHT_G * dt;
     player.pos = add(player.pos, scale(v, dt));
 
     if (!this.passedBoard && player.pos[2] <= BOARD_FACE_Z + 0.5) {
@@ -423,15 +433,18 @@ export class DartsLevel implements Level {
   draw(out: DrawItem[]) {
     this.giant.draw(out);
 
-    // Dartboard on a backing wall past the north side of the chamber.
+    // Dartboard on a backing wall past the north side of the chamber. It stays hidden below
+    // ground until the giant rises, so nothing gives the level's theme away up front.
     const wood = [0.16, 0.1, 0.06];
-    out.push({ mesh: 'box', model: mul(translation([0, 22, -51.2]), scaling([22, 22, 1.4])), color: wood });
+    const [bx, by, bz] = BOARD_CENTER;
+    const drop = this.boardDrop;
+    out.push({ mesh: 'box', model: mul(translation([bx, by - drop, bz - 1.2]), scaling([22, 22, 1.4])), color: wood });
     for (const x of [-7, 7]) {
-      out.push({ mesh: 'box', model: mul(translation([x, 11, -52.4]), scaling([1.5, 22, 1.5])), color: wood });
+      out.push({ mesh: 'box', model: mul(translation([bx + x, by / 2 - drop, bz - 2.4]), scaling([1.5, by, 1.5])), color: wood });
     }
     out.push({
       mesh: 'cylinder',
-      model: mul(translation(BOARD_CENTER), rotationX(Math.PI / 2), scaling([BOARD_R, 1, BOARD_R])),
+      model: mul(translation([bx, by - drop, bz]), rotationX(Math.PI / 2), scaling([BOARD_R, 1, BOARD_R])),
       color: [1, 1, 1],
       pattern: Pattern.dartboard,
       spec: 0.02,
@@ -473,7 +486,7 @@ export class DartsLevel implements Level {
         return { pos: add(target, [-10, 3, -8]), target, sharpness: 3 };
       }
       case 'flying':
-        return { pos: add(p, [0, 1.6, 6.5]), target: add(p, [0, 0, -12]), sharpness: 12 };
+        return { pos: add(p, [0, 1.3, 5]), target: add(p, [0, 0, -12]), sharpness: 12 };
       case 'stuck':
         return { pos: add(p, [4, 2, 13]), target: p, sharpness: 2 };
       case 'splat':
@@ -484,8 +497,8 @@ export class DartsLevel implements Level {
   }
 }
 
-function ballistic(start: Vec3, target: Vec3, time: number): Vec3 {
+function ballistic(start: Vec3, target: Vec3, time: number, gravity: number): Vec3 {
   const v = scale(sub(target, start), 1 / time);
-  v[1] += 0.5 * G * time;
+  v[1] += 0.5 * gravity * time;
   return v;
 }

@@ -5,8 +5,8 @@ import { CHAMBER_HALF } from './chamber';
 import type { Player } from './player';
 
 const MOUSE_SENSITIVITY = 0.0022;
-const SHOULDER_OFFSET = 0.7;
-const DISTANCE = 4.2;
+const SHOULDER_OFFSET = 0.6;
+const DISTANCE = 3.2;
 
 /** Over-the-shoulder third-person camera that levels can temporarily take over. */
 export class ThirdPersonCamera {

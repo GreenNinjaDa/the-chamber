@@ -59,8 +59,8 @@ const MSAA = 4;
 const DEPTH_FORMAT: GPUTextureFormat = 'depth24plus';
 
 // Region of the world covered by the sun's shadow map.
-const SHADOW_CENTER: Vec3 = [0, 15, -8];
-const SHADOW_EXTENT = 78;
+const SHADOW_CENTER: Vec3 = [0, 15, -20];
+const SHADOW_EXTENT = 88;
 
 export class Renderer {
   readonly device: GPUDevice;
