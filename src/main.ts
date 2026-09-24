@@ -1,5 +1,14 @@
-import shaderCode from './shaders/scene.wgsl?raw';
-import { lookAt, multiply, perspective, rotationY } from './math';
+import { Input } from './engine/input';
+import { mul, scaling, translation, type Vec3 } from './engine/math';
+import { Pattern, Renderer, type DrawItem } from './engine/renderer';
+import { ThirdPersonCamera } from './game/camera';
+import { drawChamber } from './game/chamber';
+import { Hud } from './game/hud';
+import { Player } from './game/player';
+import { DartsLevel } from './levels/darts/dartsLevel';
+import type { Level, LevelContext } from './levels/level';
+
+const SPAWN: Vec3 = [0, 0, 6];
 
 function showError(message: string) {
   const el = document.getElementById('error')!;
@@ -7,139 +16,99 @@ function showError(message: string) {
   el.style.display = 'grid';
 }
 
-// Unit cube: 6 faces x 4 verts, interleaved position (3) + normal (3).
-function cubeMesh() {
-  const faces = [
-    { n: [1, 0, 0], u: [0, 0, -1], v: [0, 1, 0] },
-    { n: [-1, 0, 0], u: [0, 0, 1], v: [0, 1, 0] },
-    { n: [0, 1, 0], u: [1, 0, 0], v: [0, 0, -1] },
-    { n: [0, -1, 0], u: [1, 0, 0], v: [0, 0, 1] },
-    { n: [0, 0, 1], u: [1, 0, 0], v: [0, 1, 0] },
-    { n: [0, 0, -1], u: [-1, 0, 0], v: [0, 1, 0] },
-  ];
-  const verts: number[] = [];
-  const indices: number[] = [];
-  faces.forEach(({ n, u, v }, f) => {
-    for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
-      verts.push(
-        (n[0] + a * u[0] + b * v[0]) * 0.5,
-        (n[1] + a * u[1] + b * v[1]) * 0.5,
-        (n[2] + a * u[2] + b * v[2]) * 0.5,
-        ...n,
-      );
-    }
-    const o = f * 4;
-    indices.push(o, o + 1, o + 2, o, o + 2, o + 3);
-  });
-  return { verts: new Float32Array(verts), indices: new Uint16Array(indices) };
-}
-
 async function main() {
-  if (!navigator.gpu) return showError('WebGPU is not available. Use a recent Chrome or Edge.');
-  const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
-  if (!adapter) return showError('No WebGPU adapter found.');
-  const device = await adapter.requestDevice();
-  device.lost.then((info) => showError(`GPU device lost: ${info.message}`));
-
   const canvas = document.getElementById('gfx') as HTMLCanvasElement;
-  const context = canvas.getContext('webgpu')!;
-  const format = navigator.gpu.getPreferredCanvasFormat();
-  context.configure({ device, format, alphaMode: 'opaque' });
+  const renderer = await Renderer.create(canvas);
+  renderer.device.lost.then((info) => showError(`GPU device lost: ${info.message}`));
 
-  const mesh = cubeMesh();
-  const vertexBuffer = device.createBuffer({
-    size: mesh.verts.byteLength,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-  });
-  device.queue.writeBuffer(vertexBuffer, 0, mesh.verts);
-  const indexBuffer = device.createBuffer({
-    size: mesh.indices.byteLength,
-    usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-  });
-  device.queue.writeBuffer(indexBuffer, 0, mesh.indices);
+  const hud = new Hud();
+  const input = new Input(canvas);
+  const player = new Player();
+  const camera = new ThirdPersonCamera();
+  const ctx: LevelContext = { player, camera, hud, input };
 
-  const uniformBuffer = device.createBuffer({
-    size: 16 * 4 * 2 + 16 * 2,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-  });
+  let playing = false;
+  let level: Level = new DartsLevel(ctx);
+  hud.show('THE CHAMBER', 'Click to begin\nWASD move · Mouse look · Shift sprint · Space jump · R restart');
+  hud.setLevel('');
 
-  const module = device.createShaderModule({ code: shaderCode });
-  const pipeline = device.createRenderPipeline({
-    layout: 'auto',
-    vertex: {
-      module,
-      entryPoint: 'vs',
-      buffers: [{
-        arrayStride: 24,
-        attributes: [
-          { shaderLocation: 0, offset: 0, format: 'float32x3' },
-          { shaderLocation: 1, offset: 12, format: 'float32x3' },
-        ],
-      }],
-    },
-    fragment: { module, entryPoint: 'fs', targets: [{ format }] },
-    primitive: { topology: 'triangle-list', cullMode: 'back' },
-    depthStencil: { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less' },
-  });
-
-  const bindGroup = device.createBindGroup({
-    layout: pipeline.getBindGroupLayout(0),
-    entries: [{ binding: 0, resource: { buffer: uniformBuffer } }],
-  });
-
-  let depthTexture: GPUTexture | null = null;
-  function resize() {
-    const dpr = Math.min(window.devicePixelRatio, 2);
-    const w = Math.max(1, Math.floor(canvas.clientWidth * dpr));
-    const h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
-    if (canvas.width === w && canvas.height === h && depthTexture) return;
-    canvas.width = w;
-    canvas.height = h;
-    depthTexture?.destroy();
-    depthTexture = device.createTexture({
-      size: [w, h],
-      format: 'depth24plus',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT,
-    });
+  function startLevel() {
+    player.reset(SPAWN);
+    camera.reset(0);
+    level = new DartsLevel(ctx);
   }
 
-  const uniforms = new Float32Array(16 * 2 + 8);
-  function frame(ms: number) {
-    resize();
-    const t = ms / 1000;
-    const proj = perspective(Math.PI / 4, canvas.width / canvas.height, 0.1, 100);
-    const view = lookAt([2.2, 1.6, 2.8], [0, 0, 0], [0, 1, 0]);
-    uniforms.set(multiply(proj, view), 0);
-    uniforms.set(rotationY(t * 0.6), 16);
-    uniforms.set([0.5, 0.9, 0.3, 0], 32);
-    uniforms.set([t, 0, 0, 0], 36);
-    device.queue.writeBuffer(uniformBuffer, 0, uniforms);
+  canvas.addEventListener('click', () => {
+    input.lock();
+    if (!playing) {
+      playing = true;
+      startLevel();
+    }
+  });
 
-    const encoder = device.createCommandEncoder();
-    const pass = encoder.beginRenderPass({
-      colorAttachments: [{
-        view: context.getCurrentTexture().createView(),
-        clearValue: { r: 0.05, g: 0.07, b: 0.1, a: 1 },
-        loadOp: 'clear',
-        storeOp: 'store',
-      }],
-      depthStencilAttachment: {
-        view: depthTexture!.createView(),
-        depthClearValue: 1,
-        depthLoadOp: 'clear',
-        depthStoreOp: 'store',
-      },
+  const draws: DrawItem[] = [];
+  let last = performance.now();
+  let time = 0;
+
+  function tick(dt: number) {
+    time += dt;
+    if (playing) {
+      if (input.wasPressed('KeyR')) startLevel();
+      camera.look(dt, input);
+      if (player.mode === 'control') player.update(dt, input, camera.yaw, level.obstacles());
+      level.update(dt);
+      const shot = level.cameraShot();
+      if (shot) camera.moveTo(shot.pos, shot.target, dt, shot.sharpness);
+      else camera.follow(dt, player);
+    } else {
+      // Title screen: slow orbit around the empty chamber.
+      const a = time * 0.1;
+      camera.moveTo([Math.sin(a) * 26, 24, Math.cos(a) * 26], [0, 2, 0], dt, 2);
+    }
+    hud.update(dt);
+    input.endFrame();
+  }
+
+  function draw(dt: number) {
+    const view = camera.view(renderer.aspect, dt);
+    draws.length = 0;
+    draws.push({
+      mesh: 'sphere',
+      model: mul(translation(view.pos), scaling([-700, 700, 700])),
+      color: [0, 0, 0],
+      pattern: Pattern.sky,
+      shadow: false,
     });
-    pass.setPipeline(pipeline);
-    pass.setBindGroup(0, bindGroup);
-    pass.setVertexBuffer(0, vertexBuffer);
-    pass.setIndexBuffer(indexBuffer, 'uint16');
-    pass.drawIndexed(mesh.indices.length);
-    pass.end();
-    device.queue.submit([encoder.finish()]);
+    drawChamber(draws);
+    player.draw(draws, time);
+    level.draw(draws, time);
+
+    renderer.render(draws, view, level.environment(), time);
+  }
+
+  function frame(now: number) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    tick(dt);
+    draw(dt);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
+
+  // Dev-only hook for automated play-testing: advance the simulation in fixed steps.
+  if (import.meta.env.DEV) {
+    Object.assign(window, {
+      __game: {
+        step(seconds: number) {
+          for (let t = 0; t < seconds; t += 1 / 60) tick(1 / 60);
+          draw(1 / 60);
+        },
+        get level() { return level; },
+        player,
+        camera,
+      },
+    });
+  }
 }
 
-main().catch((e) => showError(String(e)));
+main().catch((e) => showError(String(e instanceof Error ? e.message : e)));

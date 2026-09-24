@@ -1,7 +1,18 @@
-# My Game
+# The Chamber
 
-A real-time 3D browser game built directly on WebGPU + WGSL with a small custom engine (no Three.js / Babylon).
-Modeled on the approach of dgreenheck/tidewater.
+A level-based 3D survival game in the browser, built directly on WebGPU + WGSL with a small custom engine
+(no Three.js / Babylon). Modeled on the approach of dgreenheck/tidewater.
+
+## Game design
+
+- Each level is a different, very novel situation the player must survive. There is no fixed rule, but most
+  levels start the same way: over-the-shoulder third-person camera (Fortnite-like), WASD movement, inside a
+  nondescript Portal-style test chamber with four white panelled walls and no roof.
+- **Level 1 — Darts** (`src/levels/darts/`): a giant rises over the south wall and blocks the sun. Five
+  player-sized darts drop into the chamber and his hand hunts the player. The player survives by luring the
+  hand onto darts until he has thrown **all five**; the hand gets faster after every grab. If the giant grabs
+  the player instead, they are thrown at the dartboard and must steer mid-flight (WASD) into the bullseye to
+  survive — anything else is a loss.
 
 ## Commands
 
@@ -11,10 +22,25 @@ Modeled on the approach of dgreenheck/tidewater.
 
 ## Layout
 
-- `src/main.ts` — device setup, render loop
-- `src/math.ts` — matrix helpers (column-major, WebGPU clip space z ∈ [0,1])
-- `src/shaders/*.wgsl` — shaders, imported with `?raw`
-- As the project grows, split into folders like `src/engine/`, `src/world/`, `src/game/`, `src/post/`, `src/ui/`, `src/audio/`
+- `src/main.ts` — game loop, title screen, level start/restart, dev hook
+- `src/engine/` — renderer (primitive meshes, sun shadow map, MSAA, patterns), math (column-major,
+  WebGPU clip space z ∈ [0,1]), input
+- `src/shaders/*.wgsl` — shaders, imported with `?raw`. Surface patterns (panels, dartboard, blob, skin, sky)
+  are ids in `Pattern` (renderer.ts) that must match the constants in scene.wgsl
+- `src/game/` — shared pieces every level uses: chamber, player, over-the-shoulder camera, HUD
+- `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
+
+## Adding a level
+
+Implement `Level` (update / draw / environment / obstacles / cameraShot), set `status` to `won` or `lost`
+when it ends, and show the result with `hud.show(...)`. Levels can take over the camera by returning a
+`CameraShot`, and take over the player by changing `player.mode`.
+
+## Testing without a visible browser
+
+In dev builds `window.__game` exposes `step(seconds)` (fixed 60 Hz simulation steps, then one render),
+`level`, `player` and `camera`. The browser pane throttles animation frames while hidden, so drive
+play-tests through `__game.step` from the JS tool, and dispatch `KeyboardEvent`s on `window` for input.
 
 ## How to work on this project
 
