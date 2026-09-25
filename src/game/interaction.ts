@@ -15,7 +15,7 @@ const MAX_HOLD_SPEED = 14;
 const THROW_SPEED = 14;
 /** Objects lighter than this (kg) are thrown faster, up to MAX_LIGHT_BOOST times the normal speed. */
 const LIGHT_THROW_MASS = 1;
-const MAX_LIGHT_BOOST = 1.8;
+const MAX_LIGHT_BOOST = 1.15;
 
 /**
  * Crosshair targeting plus the controls for things in the world: E uses what you're aiming

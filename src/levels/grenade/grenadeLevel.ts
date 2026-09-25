@@ -29,7 +29,7 @@ const SECOND_GRENADE_DELAY = 1;
 const RESULT_DELAY = 1.4;
 /** The hole in the north wall (centre height and radius, m). The grenades' radii are 0.16 and 0.24. */
 // High enough that you can't just carry a grenade up to it (you have to throw).
-const HOLE = { x: 0, y: 8.5, radius: 0.36 };
+const HOLE = { x: 0, y: 6.75, radius: 0.36 };
 /** The chamber floor's diagonal (m), for distances like "80% of the way across". */
 const CHAMBER_DIAGONAL = CHAMBER_HALF * 2 * Math.SQRT2;
 /** Damage at or above this (but below 1) knocks you flat instead of killing you. */
@@ -73,7 +73,7 @@ const GRENADES: GrenadeSpec[] = [
   {
     // 1.5x the size and much heavier. Behind any one object you live only from 80% of the way
     // across the chamber (safeDistance), and the steep falloff makes closer cover hopeless.
-    radius: 0.24, mass: 0.6, throwScale: 0.95, fuse: 10, safeDistance: CHAMBER_DIAGONAL * 0.8, falloff: 3, shrapnel: 450, scorchRange: 5.5, scorchSize: 3.8,
+    radius: 0.24, mass: 0.6, throwScale: 0.93, fuse: 10, safeDistance: CHAMBER_DIAGONAL * 0.8, falloff: 3, shrapnel: 450, scorchRange: 5.5, scorchSize: 3.8,
     push: 2200, maxSpeed: 24, pushRange: 30, color: [0.09, 0.1, 0.05],
   },
 ];

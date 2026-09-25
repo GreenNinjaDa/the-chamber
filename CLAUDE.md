@@ -26,7 +26,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   per-junk pass-through,
   heavier = better cover); ≥1 kills, ≥0.35 knocks you down. Shrapnel (300 / 450 fragments) flies in straight lines,
   sticks in walls, junk and bodies, shoves what it hits, and kills the player on any hit. A red-rimmed hole (r 0.36 m, centre
-  8.5 m up, above carrying reach) in the north wall lets you throw grenades out. Survive the first and 1 s later a second
+  6.75 m up, above carrying reach) in the north wall lets you throw grenades out; throw speeds are tuned so
+  neither grenade can be thrown over the 10 m walls from the floor. Survive the first and 1 s later a second
   grenade 1.5× the size arrives:
   behind even the flimsiest object you only live from 80% of the chamber's diagonal away. Survive both to win.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall.
