@@ -112,19 +112,19 @@ export type CompanionShape = 'sphere' | 'cylinder' | 'cone' | 'capsule' | 'wheel
 
 export const COMPANION_SHAPES: CompanionShape[] = ['sphere', 'cylinder', 'cone', 'capsule', 'wheel'];
 
-/** Adds a companion shape as a loose, carryable object (about 15 kg). */
+/** Adds a companion shape as a loose, carryable object: about the size of a real Companion Cube (~1 m), 25 kg. */
 export function spawnCompanion(physics: Physics, shape: CompanionShape, pos: Vec3, rotation?: Quat): Body {
-  const opts = { mass: 15, rotation, color: BODY };
+  const opts = { mass: 25, rotation, color: BODY };
   switch (shape) {
     case 'sphere':
-      return physics.addBall(pos, 0.42, { ...opts, model: sphereModel(0.42) });
+      return physics.addBall(pos, 0.55, { ...opts, model: sphereModel(0.55) });
     case 'cylinder':
-      return physics.addCylinder(pos, 0.36, 0.8, { ...opts, model: cylinderModel(0.36, 0.8, 4) });
+      return physics.addCylinder(pos, 0.5, 1.0, { ...opts, model: cylinderModel(0.5, 1.0, 4) });
     case 'cone':
-      return physics.addCone(pos, 0.48, 0.95, { ...opts, model: coneModel(0.48, 0.95) });
+      return physics.addCone(pos, 0.62, 1.2, { ...opts, model: coneModel(0.62, 1.2) });
     case 'capsule':
-      return physics.addCapsule(pos, 0.3, 0.5, { ...opts, model: capsuleModel(0.3, 0.5) });
+      return physics.addCapsule(pos, 0.42, 0.55, { ...opts, model: capsuleModel(0.42, 0.55) });
     case 'wheel':
-      return physics.addCylinder(pos, 0.5, 0.3, { ...opts, model: cylinderModel(0.5, 0.3, 6) });
+      return physics.addCylinder(pos, 0.66, 0.42, { ...opts, model: cylinderModel(0.66, 0.42, 6) });
   }
 }

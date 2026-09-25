@@ -60,7 +60,7 @@ export class CakeLevel implements Level {
     for (const shape of COMPANION_SHAPES) {
       let pos: Vec3 = [0, 0, 0];
       for (let tries = 0; tries < 60; tries++) {
-        pos = [(Math.random() * 2 - 1) * 9, 0.8, (Math.random() * 2 - 1) * 9];
+        pos = [(Math.random() * 2 - 1) * 9, 1.0, (Math.random() * 2 - 1) * 9];
         const clear = Math.hypot(pos[0], pos[2]) > 3 &&
           Math.hypot(pos[0] - PLATE_POS[0], pos[2] - PLATE_POS[2]) > 3.5 &&
           spots.every((s) => Math.hypot(s[0] - pos[0], s[2] - pos[2]) > 2.5);

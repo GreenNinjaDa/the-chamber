@@ -51,7 +51,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   opens 5 s after it lands, with 5 s left on its fuse.
 - **Level 3 — Piece of Cake** (`src/levels/cake/`; meant to become a secret level reached by an easter egg): a
   black forest cake on a pedestal with one slice cut and pulled out (E eats it, with a quip; E again gets refused).
-  Companion shapes (`entities/companions.ts`: sphere, cylinder, cone, capsule, wheel — never a cube) lie around;
+  Companion shapes (`entities/companions.ts`: sphere, cylinder, cone, capsule, wheel — never a cube; ~1 m like the
+  real cube, 25 kg) lie around;
   putting one on the floor button (`entities/pressurePlate.ts`) opens the exit.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall.
 
