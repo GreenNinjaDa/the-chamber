@@ -106,6 +106,50 @@ export function cone(segments = 24): MeshData {
   return b.build();
 }
 
+/**
+ * A wedge (like a slice of cake): the sector of a unit cylinder between angles 0 and `angle`
+ * (radians, measured from +x toward +z), y in [-0.5, 0.5], with its point on the y axis.
+ */
+export function wedge(angle = Math.PI / 4, segments = 8): MeshData {
+  const b = new Builder();
+  const at = (j: number) => (j / segments) * angle;
+  // Curved outer side.
+  for (let j = 0; j < segments; j++) {
+    const p0 = at(j), p1 = at(j + 1);
+    const q = [p0, p1].flatMap((p) => [
+      b.vert(Math.cos(p), -0.5, Math.sin(p), Math.cos(p), 0, Math.sin(p)),
+      b.vert(Math.cos(p), 0.5, Math.sin(p), Math.cos(p), 0, Math.sin(p)),
+    ]);
+    b.tri(q[0], q[1], q[2]);
+    b.tri(q[1], q[3], q[2]);
+  }
+  // Top and bottom fans.
+  for (const y of [0.5, -0.5]) {
+    const c = b.vert(0, y, 0, 0, Math.sign(y), 0);
+    for (let j = 0; j < segments; j++) {
+      const a0 = b.vert(Math.cos(at(j)), y, Math.sin(at(j)), 0, Math.sign(y), 0);
+      const a1 = b.vert(Math.cos(at(j + 1)), y, Math.sin(at(j + 1)), 0, Math.sign(y), 0);
+      if (y > 0) b.tri(c, a1, a0);
+      else b.tri(c, a0, a1);
+    }
+  }
+  // The two flat cut faces.
+  for (const [p, n] of [[0, [0, 0, -1]], [angle, [-Math.sin(angle), 0, Math.cos(angle)]]] as [number, number[]][]) {
+    const c0 = b.vert(0, -0.5, 0, n[0], n[1], n[2]);
+    const c1 = b.vert(0, 0.5, 0, n[0], n[1], n[2]);
+    const e0 = b.vert(Math.cos(p), -0.5, Math.sin(p), n[0], n[1], n[2]);
+    const e1 = b.vert(Math.cos(p), 0.5, Math.sin(p), n[0], n[1], n[2]);
+    if (p === 0) {
+      b.tri(c0, e1, e0);
+      b.tri(c0, c1, e1);
+    } else {
+      b.tri(c0, e0, e1);
+      b.tri(c0, e1, c1);
+    }
+  }
+  return b.build();
+}
+
 function capRing(b: Builder, segments: number, y: number, dir: 1 | -1) {
   const center = b.vert(0, y, 0, 0, dir, 0);
   const first = b.v.length / 6;

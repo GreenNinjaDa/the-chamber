@@ -1,12 +1,12 @@
 import sceneCode from '../shaders/scene.wgsl?raw';
 import shadowCode from '../shaders/shadow.wgsl?raw';
-import { box, cone, cylinder, holePlate, roundBox, sphere, tube, type MeshData } from './meshes';
+import { box, cone, cylinder, holePlate, roundBox, sphere, tube, wedge, type MeshData } from './meshes';
 import {
   add, lookAt, multiply, normalMatrix, normalize, ortho, scale,
   type Mat4, type Vec3,
 } from './math';
 
-export type MeshName = 'box' | 'sphere' | 'cylinder' | 'cone' | 'roundbox' | 'bevelbox' | 'holeplate' | 'tube';
+export type MeshName = 'box' | 'sphere' | 'cylinder' | 'cone' | 'roundbox' | 'bevelbox' | 'holeplate' | 'tube' | 'wedge';
 
 /** Surface patterns understood by scene.wgsl. */
 export const Pattern = {
@@ -114,6 +114,7 @@ export class Renderer {
       bevelbox: this.upload(roundBox(12)),
       holeplate: this.upload(holePlate(HOLE_PLATE_RATIO)),
       tube: this.upload(tube(TUBE_INNER_RATIO)),
+      wedge: this.upload(wedge()),
     };
 
     this.frameBuffer = device.createBuffer({

@@ -129,6 +129,13 @@ export class Physics {
     return this.world.createCollider(desc);
   }
 
+  /** Static, invisible upright cylinder; returns the collider so it can be moved (e.g. a plate that sinks). */
+  addStaticCylinder(center: Vec3, radius: number, height: number): RAPIER.Collider {
+    return this.world.createCollider(
+      RAPIER.ColliderDesc.cylinder(height / 2, radius).setTranslation(center[0], center[1], center[2]),
+    );
+  }
+
   addBox(center: Vec3, size: Vec3, opts: BodyOptions = {}): Body {
     const desc = RAPIER.ColliderDesc.cuboid(size[0] / 2, size[1] / 2, size[2] / 2);
     return this.addBody(desc, center, 'box', size, opts);
@@ -143,12 +150,27 @@ export class Physics {
     return this.addBody(desc, center, 'cylinder', [radius, height, radius], opts);
   }
 
+  /** Cone along y: base (radius) at the bottom, apex at the top, centred on its mid-height. */
+  addCone(center: Vec3, radius: number, height: number, opts: BodyOptions = {}): Body {
+    const desc = RAPIER.ColliderDesc.cone(height / 2, radius);
+    return this.addBody(desc, center, 'cone', [radius, height, radius], opts);
+  }
+
+  /**
+   * Capsule along y (`length` is the straight part). There's no capsule mesh, so give it a
+   * `model`; its size is [radius, full length, radius].
+   */
+  addCapsule(center: Vec3, radius: number, length: number, opts: BodyOptions = {}): Body {
+    const desc = RAPIER.ColliderDesc.capsule(length / 2, radius);
+    return this.addBody(desc, center, 'cylinder', [radius, length + radius * 2, radius], opts);
+  }
+
   private addBody(desc: RAPIER.ColliderDesc, center: Vec3, mesh: MeshName, size: Vec3, opts: BodyOptions): Body {
     const rbDesc = RAPIER.RigidBodyDesc.dynamic()
       .setTranslation(center[0], center[1], center[2])
       .setCcdEnabled(true);
     if (opts.rotation) rbDesc.setRotation(opts.rotation);
-    const angularDamping = mesh === 'sphere' || mesh === 'cylinder' ? ROLLING_DAMPING : 0;
+    const angularDamping = mesh === 'sphere' || mesh === 'cylinder' || mesh === 'cone' ? ROLLING_DAMPING : 0;
     rbDesc.setAngularDamping(angularDamping);
     const rb = this.world.createRigidBody(rbDesc);
     desc.setMass(opts.mass ?? 20)

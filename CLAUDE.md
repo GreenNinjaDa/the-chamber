@@ -49,6 +49,10 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   behind any single object you only live from 80% of the chamber's diagonal away (closer needs much more weight). Survive that
   and a third, comically huge grenade (5× the first) drops (400 kg, too heavy to pick up); it kills you wherever you are, but the exit
   opens 5 s after it lands, with 5 s left on its fuse.
+- **Level 3 — Piece of Cake** (`src/levels/cake/`; meant to become a secret level reached by an easter egg): a
+  black forest cake on a pedestal with one slice cut and pulled out (E eats it, with a quip; E again gets refused).
+  Companion shapes (`entities/companions.ts`: sphere, cylinder, cone, capsule, wheel — never a cube) lie around;
+  putting one on the floor button (`entities/pressurePlate.ts`) opens the exit.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall.
 
 ## Commands
@@ -74,7 +78,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   and `PhysBody`, the active ragdoll that follows the animation with joint motors and per-part pose matching)
 - `src/entities/` — things that can appear in more than one level (or the lobby / sandbox), each with its model:
   `junk.ts` (28 pieces of household junk; `spawnJunk(physics, junk('fridge'), pos)`), `grenade.ts` (pineapple
-  model), `giant.ts`, `dart.ts`, `portal.ts` (entrance / exit portals), `props.ts` (Lever, Button). Put new
+  model), `giant.ts`, `dart.ts`, `portal.ts` (entrance / exit portals), `props.ts` (Lever, Button), `cake.ts`, `companions.ts`,
+  `pressurePlate.ts`. Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
@@ -88,7 +93,8 @@ put an `ExitPortal` somewhere; its `target()` makes a good `trackedTargets()` en
 `CameraShot`, and take over the player by changing `player.mode`.
 
 Shared mechanics available to levels (via `ctx`):
-- `ctx.physics.addBox / addBall / addCylinder` — loose objects. Carried things are held 0.9–1.8 m in front of the
+- `ctx.physics.addBox / addBall / addCylinder / addCone / addCapsule` — loose objects (`addStaticBox` /
+  `addStaticCylinder` for fixed ones). Carried things are held 0.9–1.8 m in front of the
   chest with at most ~95 kg of lifting force (`MAX_CARRY_FORCE` in interaction.ts): light things are carried, a
   120 kg fridge can be tipped upright by one end but only dragged, never lifted clear. Pass `grabbable: false`
   for things the player shouldn't pick up.
