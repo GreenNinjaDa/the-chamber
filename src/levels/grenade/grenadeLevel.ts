@@ -31,8 +31,6 @@ const HOLE = { x: 0, y: 5, radius: 0.36 };
 const CHAMBER_DIAGONAL = CHAMBER_HALF * 2 * Math.SQRT2;
 /** Damage at or above this (but below 1) knocks you flat instead of killing you. */
 const KNOCKDOWN_DAMAGE = 0.35;
-/** Fraction of the blast a chamber wall lets through (the grenade went out through the hole). */
-const WALL_PASS = 0.05;
 /** Fraction of the blast a loose object without its own value lets through. */
 const DEFAULT_PASS = 0.8;
 /** Shrapnel: how far fragments fly (m), and the impulse each gives what it hits (kg·m/s). */
@@ -273,11 +271,15 @@ export class GrenadeLevel implements Level {
     this.grenade = null;
     camera.addShake(spec === GRENADES[0] ? 1.2 : 1.6);
 
-    // Shove loose objects away from the blast.
+    // Shove loose objects away from the blast, unless a wall hides them from it completely.
     for (const b of physics.bodies) {
       const p = b.rb.translation();
       const d = length(sub([p.x, p.y, p.z], pos));
       if (d > spec.pushRange) continue;
+      const reach = Math.max(b.size[0], b.size[1], b.size[2]) * 0.45;
+      const samples: Vec3[] = [[0, 0, 0], [reach, 0, 0], [-reach, 0, 0], [0, reach, 0], [0, -reach, 0], [0, 0, reach], [0, 0, -reach]]
+        .map((o) => add([p.x, p.y, p.z], o as Vec3));
+      if (!samples.some((q) => this.clearOfWalls(pos, q))) continue;
       const dir = normalize(add(sub([p.x, p.y, p.z], pos), [0, 0.6, 0]));
       const mass = b.rb.mass();
       const speed = Math.min(spec.maxSpeed, spec.push / (d + 1) / mass);
@@ -388,7 +390,21 @@ export class GrenadeLevel implements Level {
     }
   }
 
-  /** Fraction of the blast that reaches `point` after passing through everything in the way. */
+  /** True if no wall or other static geometry blocks the straight line from `from` to `to`. */
+  private clearOfWalls(from: Vec3, to: Vec3): boolean {
+    const delta = sub(to, from);
+    const dist = length(delta);
+    if (dist < 1e-3) return true;
+    const dir = scale(delta, 1 / dist);
+    const ray = new RAPIER.Ray({ x: from[0], y: from[1], z: from[2] }, { x: dir[0], y: dir[1], z: dir[2] });
+    const hit = this.ctx.physics.world.castRay(ray, dist, true, RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC, GROUPS_QUERY_WORLD);
+    return hit === null;
+  }
+
+  /**
+   * Fraction of the blast that reaches `point` after passing through everything in the way.
+   * Loose objects soak up part of it; a wall or other static geometry blocks it completely.
+   */
   private exposure(from0: Vec3, point: Vec3): number {
     const { physics } = this.ctx;
     const from = add(from0, [0, 0.15, 0]);
@@ -403,10 +419,11 @@ export class GrenadeLevel implements Level {
       const c = hit.collider;
       if (seen.has(c.handle)) return true;
       seen.add(c.handle);
-      const known = this.pass.get(c.handle);
-      if (known !== undefined) pass *= known;
-      else if (c.parent()?.isDynamic()) pass *= DEFAULT_PASS;
-      else pass *= WALL_PASS;
+      if (!c.parent()?.isDynamic()) {
+        pass = 0;
+        return false; // a wall: nothing gets through
+      }
+      pass *= this.pass.get(c.handle) ?? DEFAULT_PASS;
       return true;
     }, undefined, GROUPS_QUERY_WORLD);
     return pass;
