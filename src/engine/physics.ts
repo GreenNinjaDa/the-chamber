@@ -1,5 +1,5 @@
 import RAPIER from '@dimforge/rapier3d-compat';
-import { add, clamp, fromQuat, mul, scale, scaling, type Quat, type Vec3 } from './math';
+import { add, fromQuat, mul, scale, scaling, type Quat, type Vec3 } from './math';
 import type { DrawItem, MeshName } from './renderer';
 
 export { RAPIER };
@@ -12,6 +12,21 @@ export function initPhysics() {
 }
 
 export const GRAVITY = 20;
+/** Physics runs at a fixed 120 Hz, independent of frame rate, for stable joints and motors. */
+export const FIXED_STEP = 1 / 120;
+const MAX_SUBSTEPS = 8;
+
+// Collision groups: (membership << 16) | filter. Everything else uses the default (all/all).
+const BODY_BIT = 0x0002; // the player's physical body parts
+const CAPSULE_BIT = 0x0004; // the player's movement capsule
+/** Player body parts: collide with the world and props, not with each other or the capsule. */
+export const GROUPS_PLAYER_BODY = (BODY_BIT << 16) | (0xffff & ~BODY_BIT & ~CAPSULE_BIT);
+/** Movement capsule: takes part in no contacts at all; only the character controller queries use it. */
+export const GROUPS_PLAYER_CAPSULE = CAPSULE_BIT << 16;
+/** For queries that should see the world and props but not the player. */
+export const GROUPS_QUERY_WORLD = (0xffff << 16) | (0xffff & ~BODY_BIT & ~CAPSULE_BIT);
+
+
 
 /** A dynamic physics object that draws itself as one primitive. */
 export interface Body {
@@ -64,14 +79,26 @@ export class Physics {
   private byCollider = new Map<number, Body>();
   private usables = new Map<number, Usable>();
   private drawables: Drawable[] = [];
+  private accumulator = 0;
+  /** Called before every fixed physics step with the step length (for motors, active ragdolls...). */
+  readonly substepHooks: ((h: number) => void)[] = [];
+  /** Called after every fixed physics step (for reacting to contacts). */
+  readonly postStepHooks: (() => void)[] = [];
 
   constructor() {
     this.world = new RAPIER.World({ x: 0, y: -GRAVITY, z: 0 });
+    this.world.timestep = FIXED_STEP;
   }
 
+  /** Advances the simulation by `dt` in fixed steps. */
   step(dt: number) {
-    this.world.timestep = clamp(dt, 1 / 240, 1 / 30);
-    this.world.step();
+    this.accumulator = Math.min(this.accumulator + dt, FIXED_STEP * MAX_SUBSTEPS);
+    while (this.accumulator >= FIXED_STEP) {
+      this.accumulator -= FIXED_STEP;
+      for (const hook of this.substepHooks) hook(FIXED_STEP);
+      this.world.step();
+      for (const hook of this.postStepHooks) hook();
+    }
   }
 
   /** Static, invisible collision box (level geometry draws itself separately). */
@@ -146,12 +173,12 @@ export class Physics {
     return this.usables.get(collider.handle);
   }
 
-  raycast(origin: Vec3, dir: Vec3, maxDist: number, exclude?: RAPIER.Collider): RayHit | null {
+  raycast(origin: Vec3, dir: Vec3, maxDist: number, exclude?: RAPIER.Collider, groups = GROUPS_QUERY_WORLD): RayHit | null {
     const ray = new RAPIER.Ray(
       { x: origin[0], y: origin[1], z: origin[2] },
       { x: dir[0], y: dir[1], z: dir[2] },
     );
-    const hit = this.world.castRayAndGetNormal(ray, maxDist, true, undefined, undefined, exclude);
+    const hit = this.world.castRayAndGetNormal(ray, maxDist, true, undefined, groups, exclude);
     if (!hit) return null;
     return {
       collider: hit.collider,

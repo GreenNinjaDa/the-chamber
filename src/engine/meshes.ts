@@ -118,3 +118,42 @@ function capRing(b: Builder, segments: number, y: number, dir: 1 | -1) {
     else b.tri(center, first + j, first + j + 1);
   }
 }
+
+/**
+ * Unit box with rounded edges and corners (a superellipsoid, |x|^n + |y|^n + |z|^n = 1),
+ * spanning [-0.5, 0.5]. Lower `n` is rounder; ~4 reads as a soft-cornered box.
+ */
+export function roundBox(n = 4, res = 10): MeshData {
+  const b = new Builder();
+  const faces = [
+    { n: [1, 0, 0], u: [0, 0, -1], v: [0, 1, 0] },
+    { n: [-1, 0, 0], u: [0, 0, 1], v: [0, 1, 0] },
+    { n: [0, 1, 0], u: [1, 0, 0], v: [0, 0, -1] },
+    { n: [0, -1, 0], u: [1, 0, 0], v: [0, 0, 1] },
+    { n: [0, 0, 1], u: [1, 0, 0], v: [0, 1, 0] },
+    { n: [0, 0, -1], u: [-1, 0, 0], v: [0, 1, 0] },
+  ];
+  for (const f of faces) {
+    const first = b.v.length / 6;
+    for (let i = 0; i <= res; i++)
+      for (let j = 0; j <= res; j++) {
+        const a = (i / res) * 2 - 1, c = (j / res) * 2 - 1;
+        const d = [0, 1, 2].map((k) => f.n[k] + a * f.u[k] + c * f.v[k]);
+        const len = Math.hypot(d[0], d[1], d[2]);
+        const dir = d.map((x) => x / len);
+        const r = Math.pow(dir.reduce((s, x) => s + Math.pow(Math.abs(x), n), 0), -1 / n);
+        const p = dir.map((x) => x * r);
+        const g = p.map((x) => Math.sign(x) * Math.pow(Math.abs(x), n - 1));
+        const gl = Math.hypot(g[0], g[1], g[2]) || 1;
+        b.vert(p[0] * 0.5, p[1] * 0.5, p[2] * 0.5, g[0] / gl, g[1] / gl, g[2] / gl);
+      }
+    for (let i = 0; i < res; i++)
+      for (let j = 0; j < res; j++) {
+        const a = first + i * (res + 1) + j;
+        const c = a + res + 1;
+        b.tri(a, c, c + 1);
+        b.tri(a, c + 1, a + 1);
+      }
+  }
+  return b.build();
+}

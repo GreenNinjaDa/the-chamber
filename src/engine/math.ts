@@ -118,6 +118,39 @@ export function fromQuat(q: Quat, t: Vec3): Mat4 {
   ]);
 }
 
+/** Rotation part of a rigid transform (orthonormal columns) as a unit quaternion. */
+export function toQuat(m: Mat4): Quat {
+  const m00 = m[0], m10 = m[1], m20 = m[2];
+  const m01 = m[4], m11 = m[5], m21 = m[6];
+  const m02 = m[8], m12 = m[9], m22 = m[10];
+  const tr = m00 + m11 + m22;
+  if (tr > 0) {
+    const s = Math.sqrt(tr + 1) * 2;
+    return { w: s / 4, x: (m21 - m12) / s, y: (m02 - m20) / s, z: (m10 - m01) / s };
+  }
+  if (m00 > m11 && m00 > m22) {
+    const s = Math.sqrt(1 + m00 - m11 - m22) * 2;
+    return { w: (m21 - m12) / s, x: s / 4, y: (m01 + m10) / s, z: (m02 + m20) / s };
+  }
+  if (m11 > m22) {
+    const s = Math.sqrt(1 + m11 - m00 - m22) * 2;
+    return { w: (m02 - m20) / s, x: (m01 + m10) / s, y: s / 4, z: (m12 + m21) / s };
+  }
+  const s = Math.sqrt(1 + m22 - m00 - m11) * 2;
+  return { w: (m10 - m01) / s, x: (m02 + m20) / s, y: (m12 + m21) / s, z: s / 4 };
+}
+
+export function quatMul(a: Quat, b: Quat): Quat {
+  return {
+    w: a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
+    x: a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+    y: a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+    z: a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+  };
+}
+
+export const quatConj = (q: Quat): Quat => ({ x: -q.x, y: -q.y, z: -q.z, w: q.w });
+
 /** Rotates `v` by the unit quaternion `q`. */
 export function rotateByQuat(q: Quat, v: Vec3): Vec3 {
   const u: Vec3 = [q.x, q.y, q.z];

@@ -1,17 +1,18 @@
 import type { Input } from '../engine/input';
 import {
-  approachAngle, basis, cross, dot, mul, normalize, rotationX, rotationY, scale, scaling, sub, translation,
+  approachAngle, basis, cross, dot, length, mul, normalize, scale, sub, translation,
   type Mat4, type Vec3,
 } from '../engine/math';
-import { RAPIER, type Physics } from '../engine/physics';
+import { GROUPS_PLAYER_CAPSULE, GROUPS_QUERY_WORLD, RAPIER, type Body, type Physics } from '../engine/physics';
 import type { DrawItem } from '../engine/renderer';
-import { Ragdoll } from './ragdoll';
+import { drawBody, PhysBody, poseFrames, REST_POSE, standingRoot, type Pose } from './body';
 
 /**
- * control: walking around under player control (pos = feet)
+ * control: walking around under player control (pos = feet); the physical body follows the
+ *          animation (active ragdoll) and reacts to hard hits
  * held:    in the giant's hand (pos = feet)
  * flying / stuck / splat: body along `flightDir` (pos = body centre)
- * ragdoll: dead and limp; pos follows the ragdoll (≈ feet) so cameras keep working
+ * ragdoll: dead and limp; pos follows the body (≈ feet) so cameras keep working
  */
 export type PlayerMode = 'control' | 'held' | 'flying' | 'stuck' | 'splat' | 'ragdoll';
 
@@ -28,11 +29,12 @@ const SPRINT_SPEED = 8.5;
 const JUMP_SPEED = 7.5;
 const GRAVITY = 22;
 
-const SUIT = [0.95, 0.4, 0.07];
-const PANTS = [0.18, 0.19, 0.22];
-const SKIN = [0.8, 0.58, 0.45];
-const HAIR = [0.12, 0.08, 0.05];
-const PACK = [0.35, 0.37, 0.4];
+/** A hit knocks you loose if the other object's relative speed and momentum are at least this. */
+const KNOCK_MIN_SPEED = 5;
+const KNOCK_MIN_MOMENTUM = 25;
+/** After a knock, muscles stay at this strength for the stun time, then recover over `RECOVER_TIME`. */
+const STUNNED_MUSCLE = 0;
+const RECOVER_TIME = 1.0;
 
 export class Player {
   pos: Vec3 = [0, 0, 6];
@@ -42,13 +44,24 @@ export class Player {
   flightDir: Vec3 = [0, 0, -1];
   mode: PlayerMode = 'control';
   onGround = true;
-  ragdoll: Ragdoll | null = null;
-  /** The player's capsule; exclude it from ray casts. */
+  /** The player's movement capsule; exclude it from ray casts. */
   collider: RAPIER.Collider | null = null;
+  body: PhysBody | null = null;
+  /** The collider of whatever the player is carrying (it never knocks them over). */
+  carrying: RAPIER.Collider | null = null;
+  /** Seconds left before muscles start recovering from a knock. */
+  stun = 0;
   private physics: Physics | null = null;
   private controller: RAPIER.KinematicCharacterController | null = null;
   private walk = 0;
   private moveAmount = 0;
+  private time = 0;
+  private pose: Pose = REST_POSE;
+  // The pelvis target advances smoothly through the physics substeps of each frame.
+  private driveFeet: Vec3 = [0, 0, 0];
+  private driveVel: Vec3 = [0, 0, 0];
+  /** Loose objects near the player and their velocity just before the current physics step. */
+  private incoming = new Map<Body, Vec3>();
 
   reset(pos: Vec3, facing = 0) {
     this.pos = [...pos];
@@ -57,22 +70,29 @@ export class Player {
     this.flightDir = [0, 0, -1];
     this.mode = 'control';
     this.onGround = true;
-    this.ragdoll = null;
+    this.stun = 0;
+    this.pose = REST_POSE;
   }
 
-  /** Gives the player a capsule and character controller in a (new) physics world. */
+  /** Gives the player a capsule, character controller and physical body in a (new) physics world. */
   attach(physics: Physics) {
     this.physics = physics;
     const c = this.center();
-    // A parentless collider: dynamic objects collide with it, and the controller moves it.
     this.collider = physics.world.createCollider(
-      RAPIER.ColliderDesc.capsule(CAPSULE_HALF, PLAYER_RADIUS).setTranslation(c[0], c[1], c[2]),
+      RAPIER.ColliderDesc.capsule(CAPSULE_HALF, PLAYER_RADIUS)
+        .setTranslation(c[0], c[1], c[2])
+        .setCollisionGroups(GROUPS_PLAYER_CAPSULE),
     );
     this.controller = physics.world.createCharacterController(0.02);
     this.controller.enableAutostep(0.35, 0.2, true);
     this.controller.enableSnapToGround(0.3);
     this.controller.setApplyImpulsesToDynamicBodies(true);
     this.controller.setCharacterMass(80);
+
+    this.body = new PhysBody(physics, poseFrames(standingRoot(this.pos, this.facing), REST_POSE));
+    this.driveFeet = [...this.pos];
+    physics.substepHooks.push((h) => this.substep(h));
+    physics.postStepHooks.push(() => this.checkHits());
   }
 
   private center(): Vec3 {
@@ -80,29 +100,45 @@ export class Player {
   }
 
   update(dt: number, input: Input, camYaw: number, obstacles: Circle[]) {
+    this.time += dt;
+    const stunned = this.stun > 0 || (this.body !== null && this.body.muscle < 0.5);
+    this.stun = Math.max(0, this.stun - dt);
+    if (this.body && this.stun <= 0 && this.body.muscle < 1) {
+      this.body.muscle = Math.min(1, this.body.muscle + dt / RECOVER_TIME);
+    }
+
     const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw);
     const rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
     let mx = 0, mz = 0;
-    if (input.isDown('KeyW')) { mx += fx; mz += fz; }
-    if (input.isDown('KeyS')) { mx -= fx; mz -= fz; }
-    if (input.isDown('KeyD')) { mx += rx; mz += rz; }
-    if (input.isDown('KeyA')) { mx -= rx; mz -= rz; }
+    if (!stunned) {
+      if (input.isDown('KeyW')) { mx += fx; mz += fz; }
+      if (input.isDown('KeyS')) { mx -= fx; mz -= fz; }
+      if (input.isDown('KeyD')) { mx += rx; mz += rz; }
+      if (input.isDown('KeyA')) { mx -= rx; mz -= rz; }
+    }
     const len = Math.hypot(mx, mz);
     if (len > 0) { mx /= len; mz /= len; }
 
     const sprint = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
     const speed = sprint ? SPRINT_SPEED : WALK_SPEED;
-    const k = 1 - Math.exp(-dt * (this.onGround ? 14 : 4));
+    const k = 1 - Math.exp(-dt * (stunned ? 3 : this.onGround ? 14 : 4));
     this.vel[0] += (mx * speed - this.vel[0]) * k;
     this.vel[2] += (mz * speed - this.vel[2]) * k;
 
-    if (this.onGround && input.wasPressed('Space')) {
+    if (this.onGround && !stunned && input.wasPressed('Space')) {
       this.vel[1] = JUMP_SPEED;
       this.onGround = false;
     }
     this.vel[1] -= GRAVITY * dt;
 
-    this.move(scale(this.vel, dt), dt);
+    const before: Vec3 = [...this.pos];
+    let delta = scale(this.vel, dt);
+    if (stunned && this.body) {
+      // While knocked loose, the capsule is dragged along by the tumbling body.
+      const p = this.body.position('pelvis');
+      delta = [(p[0] - this.pos[0]) * Math.min(1, dt * 8), delta[1], (p[2] - this.pos[2]) * Math.min(1, dt * 8)];
+    }
+    this.move(delta, dt);
 
     const p = this.pos;
     for (const c of obstacles) {
@@ -119,6 +155,9 @@ export class Player {
     this.moveAmount = Math.min(1, hs / WALK_SPEED);
     if (len > 0) this.facing = approachAngle(this.facing, Math.atan2(-mx, -mz), dt * 12);
     this.walk += dt * hs * 1.6;
+
+    this.driveFeet = before;
+    this.driveVel = dt > 0 ? scale(sub(this.pos, before), 1 / dt) : [0, 0, 0];
   }
 
   /** Moves by `delta`, sliding along walls, stepping up small ledges and pushing loose objects. */
@@ -133,7 +172,7 @@ export class Player {
     // `pos` is the source of truth (levels may teleport the player), so sync the capsule first.
     const c = this.center();
     col.setTranslation({ x: c[0], y: c[1], z: c[2] });
-    ctrl.computeColliderMovement(col, { x: delta[0], y: delta[1], z: delta[2] });
+    ctrl.computeColliderMovement(col, { x: delta[0], y: delta[1], z: delta[2] }, undefined, GROUPS_QUERY_WORLD);
     const m = ctrl.computedMovement();
     this.pos = [this.pos[0] + m.x, this.pos[1] + m.y, this.pos[2] + m.z];
     this.onGround = ctrl.computedGrounded();
@@ -146,87 +185,176 @@ export class Player {
 
   /** Call once per tick before the physics step. */
   syncCollider() {
+    if (this.mode !== 'control') {
+      this.driveFeet = [...this.pos];
+      this.driveVel = [0, 0, 0];
+    }
+    this.pose = this.computePose();
     if (!this.collider) return;
-    this.collider.setEnabled(this.mode === 'control');
     if (this.mode === 'control') {
       const c = this.center();
       this.collider.setTranslation({ x: c[0], y: c[1], z: c[2] });
     }
   }
 
+  /** Runs every physics substep: the active ragdoll follows the animation. */
+  private substep(h: number) {
+    const body = this.body;
+    if (!body) return;
+    this.recordIncoming();
+    if (this.mode === 'ragdoll') {
+      body.drive(h, poseFrames(standingRoot(this.pos, this.facing), this.pose), [0, 0, 0], this.pose);
+      return;
+    }
+    if (this.mode !== 'control') {
+      body.setEnabled(false); // scripted poses are drawn directly
+      return;
+    }
+    this.driveFeet = [
+      this.driveFeet[0] + this.driveVel[0] * h,
+      this.driveFeet[1] + this.driveVel[1] * h,
+      this.driveFeet[2] + this.driveVel[2] * h,
+    ];
+    const targets = poseFrames(standingRoot(this.driveFeet, this.facing), this.pose);
+    if (!body.isEnabled) {
+      body.teleport(targets, this.driveVel);
+      body.setEnabled(true);
+    }
+    body.drive(h, targets, this.driveVel, this.pose);
+  }
+
+  /** Before a step: remember how fast nearby loose objects were moving. */
+  private recordIncoming() {
+    this.incoming.clear();
+    if (this.mode !== 'control' || !this.physics) return;
+    for (const b of this.physics.bodies) {
+      const t = b.rb.translation();
+      if (Math.hypot(t.x - this.pos[0], t.y - this.pos[1] - 1, t.z - this.pos[2]) > 4) continue;
+      const v = b.rb.linvel();
+      this.incoming.set(b, [v.x, v.y, v.z]);
+    }
+  }
+
+  /** After a step: anything that just hit the body fast and heavy enough knocks the player loose. */
+  private checkHits() {
+    const body = this.body, physics = this.physics;
+    if (!body || !physics || this.mode !== 'control' || this.stun > 0) return;
+    for (const [b, v] of this.incoming) {
+      if (this.carrying && b.collider.handle === this.carrying.handle) continue;
+      const rel: Vec3 = [v[0] - this.vel[0], v[1] - this.vel[1], v[2] - this.vel[2]];
+      const speed = length(rel);
+      const momentum = speed * b.rb.mass();
+      if (speed < KNOCK_MIN_SPEED || momentum < KNOCK_MIN_MOMENTUM) continue;
+      let touching = false;
+      physics.world.contactPairsWith(b.collider, (other) => {
+        if (touching || !body.owns(other)) return;
+        // Pairs are listed while merely close; require actual contact points.
+        physics.world.contactPair(b.collider, other, (manifold) => {
+          if (manifold.numContacts() > 0) touching = true;
+        });
+      });
+      if (!touching) continue;
+      this.knock(scale(normalize(rel), Math.min(9, momentum / 12)), 0.3 + Math.min(1.2, momentum / 150));
+      return;
+    }
+  }
+
+  /**
+   * Knocks the player loose: muscles go slack for `stunSeconds`, the body is shoved by
+   * `velocity` (m/s), then the player pulls themselves together.
+   */
+  knock(velocity: Vec3, stunSeconds: number) {
+    if (this.mode !== 'control' || !this.body) return;
+    this.body.muscle = STUNNED_MUSCLE;
+    this.stun = stunSeconds;
+    this.body.addVelocity(velocity);
+    this.vel = [this.vel[0] + velocity[0] * 0.6, Math.max(this.vel[1], velocity[1] * 0.3), this.vel[2] + velocity[2] * 0.6];
+  }
+
   /** Call once per tick after the physics step. */
   afterPhysics() {
-    if (this.ragdoll) {
-      const t = this.ragdoll.position('torso');
-      this.pos = [t[0], t[1] - 1.2, t[2]];
+    if (this.mode === 'ragdoll' && this.body) {
+      const p = this.body.position('pelvis');
+      this.pos = [p[0], p[1] - 0.98, p[2]];
     }
   }
 
   /** Goes limp with the given extra velocity (m/s). Comic deaths use this. */
   kill(launch: Vec3 = [0, 0, 0]) {
-    if (!this.physics || this.mode === 'ragdoll') return;
-    const feet: Vec3 = this.mode === 'control' || this.mode === 'held' ? this.pos : sub(this.pos, [0, 0.9, 0]);
-    this.ragdoll = new Ragdoll(this.physics, feet, this.facing, [
-      this.vel[0] + launch[0],
-      this.vel[1] + launch[1],
-      this.vel[2] + launch[2],
-    ]);
+    const body = this.body;
+    if (!body || this.mode === 'ragdoll') return;
+    if (!body.isEnabled || this.mode !== 'control') {
+      body.teleport(poseFrames(this.scriptedRoot(), this.pose));
+      body.setEnabled(true);
+    }
+    body.muscle = 0;
+    body.addVelocity([this.vel[0] + launch[0], this.vel[1] + launch[1], this.vel[2] + launch[2]]);
+    // A little tumble so deaths don't all look the same.
+    body.parts.chest.setAngvel({ x: (Math.random() - 0.5) * 8, y: (Math.random() - 0.5) * 5, z: (Math.random() - 0.5) * 8 }, true);
     this.mode = 'ragdoll';
     this.collider?.setEnabled(false);
   }
 
-  draw(out: DrawItem[], time: number) {
-    if (this.ragdoll) {
-      this.drawRagdoll(out, this.ragdoll);
-      return;
-    }
+  private scriptedRoot(): Mat4 {
     const horizontal = this.mode === 'flying' || this.mode === 'stuck' || this.mode === 'splat';
-    const root = horizontal
+    return horizontal
       ? mul(translation(this.pos), alongDirection(this.flightDir), translation([0, -0.9, 0]))
-      : mul(translation(this.pos), rotationY(this.facing));
+      : standingRoot(this.pos, this.facing);
+  }
 
-    let armL = 0, armR = 0, legL = 0, legR = 0;
-    if (this.mode === 'control') {
-      const s = Math.sin(this.walk) * 0.8 * this.moveAmount;
-      armL = s; armR = -s; legL = -s; legR = s;
-      if (!this.onGround) { armL = armR = -0.6; legL = 0.5; legR = -0.2; }
-    } else if (this.mode === 'held') {
-      armL = Math.PI * 0.7 + Math.sin(time * 14) * 0.6;
-      armR = Math.PI * 0.7 + Math.cos(time * 13) * 0.6;
-      legL = Math.sin(time * 16) * 0.7;
-      legR = -legL;
-    } else if (this.mode === 'flying') {
-      armL = armR = Math.PI;
-      legL = Math.sin(time * 10) * 0.15;
-      legR = -legL;
-    } else {
-      armL = armR = Math.PI;
+  private computePose(): Pose {
+    const t = this.time;
+    switch (this.mode) {
+      case 'control': {
+        if (!this.onGround) {
+          return {
+            lean: -0.1, headPitch: 0.1, shoulderL: -0.5, shoulderR: -0.5, armOut: 0.5, elbowL: 0.7, elbowR: 0.7,
+            hipL: 0.7, hipR: -0.1, kneeL: -1.1, kneeR: -0.35,
+          };
+        }
+        const a = this.moveAmount, s = Math.sin(this.walk), c = Math.cos(this.walk);
+        return {
+          lean: -0.12 * a,
+          headPitch: 0.1 * a,
+          shoulderL: s * 0.55 * a,
+          shoulderR: -s * 0.55 * a,
+          armOut: 0.08,
+          elbowL: 0.2 + 0.45 * a,
+          elbowR: 0.2 + 0.45 * a,
+          hipL: -s * 0.6 * a,
+          hipR: s * 0.6 * a,
+          kneeL: -0.05 - (0.1 + 1.0 * Math.max(0, -c)) * a,
+          kneeR: -0.05 - (0.1 + 1.0 * Math.max(0, c)) * a,
+        };
+      }
+      case 'held':
+        return {
+          lean: 0.1, headPitch: -0.2,
+          shoulderL: 2.3 + Math.sin(t * 14) * 0.6, shoulderR: 2.3 + Math.cos(t * 13) * 0.6, armOut: 0.4,
+          elbowL: 0.6 + Math.sin(t * 11) * 0.5, elbowR: 0.6 + Math.cos(t * 12) * 0.5,
+          hipL: Math.sin(t * 16) * 0.7, hipR: -Math.sin(t * 16) * 0.7,
+          kneeL: -0.7 - Math.sin(t * 15) * 0.5, kneeR: -0.7 + Math.sin(t * 15) * 0.5,
+        };
+      case 'flying':
+        return {
+          lean: 0, headPitch: 0.3, shoulderL: Math.PI, shoulderR: Math.PI, armOut: 0.05, elbowL: 0, elbowR: 0,
+          hipL: 0.05, hipR: 0.05, kneeL: -0.1 - Math.sin(t * 10) * 0.15, kneeR: -0.1 + Math.sin(t * 10) * 0.15,
+        };
+      case 'stuck':
+      case 'splat':
+        return { ...REST_POSE, shoulderL: Math.PI, shoulderR: Math.PI, armOut: 0.3, elbowL: 0.2, elbowR: 0.2 };
+      default:
+        return REST_POSE;
     }
-
-    const limb = (pivot: Vec3, angle: number, size: Vec3, color: number[]) =>
-      out.push({ mesh: 'box', model: mul(root, translation(pivot), rotationX(angle), translation([0, -size[1] / 2, 0]), scaling(size)), color });
-
-    this.drawTorsoAndHead(out, mul(root, translation([0, 1.2, 0])), mul(root, translation([0, 1.74, 0])));
-    limb([-0.37, 1.5, 0], armL, [0.15, 0.66, 0.17], SUIT);
-    limb([0.37, 1.5, 0], armR, [0.15, 0.66, 0.17], SUIT);
-    limb([-0.14, 0.86, 0], legL, [0.21, 0.86, 0.25], PANTS);
-    limb([0.14, 0.86, 0], legR, [0.21, 0.86, 0.25], PANTS);
   }
 
-  /** `torso` and `head` are the frames at the torso centre and head centre. */
-  private drawTorsoAndHead(out: DrawItem[], torso: Mat4, head: Mat4) {
-    out.push({ mesh: 'box', model: mul(torso, scaling([0.56, 0.72, 0.3])), color: SUIT });
-    out.push({ mesh: 'box', model: mul(torso, translation([0, 0.02, 0.2]), scaling([0.42, 0.5, 0.14])), color: PACK });
-    out.push({ mesh: 'sphere', model: mul(head, scaling([0.21, 0.23, 0.21])), color: SKIN });
-    out.push({ mesh: 'sphere', model: mul(head, translation([0, 0.06, 0.03]), scaling([0.22, 0.2, 0.22])), color: HAIR });
-  }
-
-  private drawRagdoll(out: DrawItem[], r: Ragdoll) {
-    this.drawTorsoAndHead(out, r.transform('torso'), r.transform('head'));
-    out.push({ mesh: 'box', model: mul(r.transform('armL'), scaling([0.15, 0.66, 0.17])), color: SUIT });
-    out.push({ mesh: 'box', model: mul(r.transform('armR'), scaling([0.15, 0.66, 0.17])), color: SUIT });
-    out.push({ mesh: 'box', model: mul(r.transform('legL'), scaling([0.21, 0.86, 0.25])), color: PANTS });
-    out.push({ mesh: 'box', model: mul(r.transform('legR'), scaling([0.21, 0.86, 0.25])), color: PANTS });
+  draw(out: DrawItem[], _time: number) {
+    const body = this.body;
+    if (body && body.isEnabled && (this.mode === 'control' || this.mode === 'ragdoll')) {
+      drawBody(out, body.frames());
+    } else {
+      drawBody(out, poseFrames(this.scriptedRoot(), this.pose));
+    }
   }
 }
 

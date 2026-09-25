@@ -34,10 +34,12 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
 - `src/shaders/*.wgsl` — shaders, imported with `?raw`. Surface patterns (panels, dartboard, blob, skin, sky)
   are ids in `Pattern` (renderer.ts) that must match the constants in scene.wgsl
 - `src/engine/physics.ts` — Rapier wrapper: one `Physics` world per level attempt (created in main.ts with the
-  chamber colliders), dynamic bodies that draw themselves, usables, ray casts
+  chamber colliders), fixed 120 Hz stepping with pre/post-step hooks, dynamic bodies that draw themselves,
+  usables, ray casts, collision groups (the player's body parts and capsule are excluded from queries)
 - `src/game/` — shared pieces every level uses: chamber, player (Rapier character controller), over-the-shoulder
   camera, HUD (with crosshair), `interaction.ts` (crosshair targeting, E to use, hold E to carry/drag, click to
-  throw), `props.ts` (Lever, Button), `ragdoll.ts` (limp death ragdoll)
+  throw), `props.ts` (Lever, Button), `body.ts` (11-part rounded player body: skeleton + poses for drawing,
+  and `PhysBody`, the active ragdoll that follows the animation with joint motors and per-part pose matching)
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
 
@@ -53,6 +55,10 @@ Shared mechanics available to levels (via `ctx`):
 - `new Lever(physics, pos, yaw, onToggle)` and `new Button(physics, pos, color, onPress)` for E-usable props;
   implement `Usable` and call `physics.registerUsable(collider, thing)` for custom ones.
 - `player.kill(launchVelocity)` — comic death: the player goes limp as a ragdoll (don't use it for Darts).
+- `player.knock(velocity, stunSeconds)` — shove the player loose; they go limp, tumble, then get back up.
+  Loose objects that hit the body fast and heavy enough do this automatically.
+- In scripted modes (`held`, `flying`, `stuck`, `splat`) the physical body is switched off and the pose is drawn
+  directly; in `control` and `ragdoll` the body is drawn from physics.
 
 ## Testing without a visible browser
 

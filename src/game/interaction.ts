@@ -31,6 +31,12 @@ export class Interaction {
   }
 
   update(dt: number, input: Input, camera: ThirdPersonCamera, player: Player, physics: Physics) {
+    this.updateTargeting(dt, input, camera, player, physics);
+    // Whatever you carry never knocks you over.
+    player.carrying = this.held?.collider ?? null;
+  }
+
+  private updateTargeting(dt: number, input: Input, camera: ThirdPersonCamera, player: Player, physics: Physics) {
     if (this.highlighted) this.highlighted.highlight = 0;
     this.highlighted = null;
     if (this.held && !physics.bodies.includes(this.held)) this.held = null;
