@@ -131,6 +131,33 @@ const QUIPS = {
 
 const pick = <T>(options: T[]): T => options[Math.floor(Math.random() * options.length)];
 
+/** Death-screen hints for how the last blast got you, plus the controls that matter here. */
+function deathTips(blast: { byShrapnel: boolean; inSight: boolean; big: boolean }): [string, string][] {
+  let hint: string;
+  if (blast.byShrapnel) {
+    hint = pick([
+      'Shrapnel flies in straight lines. Keep ALL of you behind something; heads poke out.',
+      "One fragment is all it takes. If you can see the grenade, the grenade's shrapnel can see you.",
+    ]);
+  } else if (blast.inSight) {
+    hint = pick([
+      'It saw you, so you are now a fine mist. Put anything between you and it. Even the gnome.',
+      'Distance alone does not cut it. Get something solid between you and the grenade.',
+    ]);
+  } else if (blast.big) {
+    hint = 'The big one reaches the whole room. Get to the far side AND behind something heavy.';
+  } else {
+    hint = pick([
+      'Cover helps. Distance helps. Both help more. Heavier junk soaks up more of the blast.',
+      'That was not enough cover. Stack more between you, or drag the fridge over.',
+    ]);
+  }
+  const tips: [string, string][] = [['Hint', hint]];
+  if (Math.random() < 0.5) tips.push(['Also', "That red-rimmed hole in the wall isn't decorative. Grenades fit through it."]);
+  tips.push(['Controls', 'Hold left click to grab and drag junk (or the grenade). Right-click to throw; aim above the hole, it arcs.']);
+  return tips;
+}
+
 function randomRotation(): Quat {
   const yaw = Math.random() * Math.PI * 2;
   const tiltAxis = normalize([Math.random() - 0.5, 0, Math.random() - 0.5]);
@@ -199,7 +226,7 @@ export class GrenadeLevel implements Level {
   private nextGrenade = 0;
   private nextGrenadeAt = FIRST_GRENADE_AT;
   private grenade: LiveGrenade | null = null;
-  private lastBlast: { at: number; pos: Vec3; thrownOut: boolean; byShrapnel: boolean } | null = null;
+  private lastBlast: { at: number; pos: Vec3; thrownOut: boolean; byShrapnel: boolean; inSight: boolean; big: boolean } | null = null;
   private fragments: Fragment[] = [];
   private tracers: Tracer[] = [];
   private scorches: Scorch[] = [];
@@ -233,7 +260,7 @@ export class GrenadeLevel implements Level {
     if (blast && !this.grenade && this.status === 'playing') {
       const since = this.t - blast.at;
       if (player.mode === 'ragdoll') {
-        if (since > RESULT_DELAY) this.finish('lost', 'BOOM', pick(blast.byShrapnel ? QUIPS.shrapnel : QUIPS.died));
+        if (since > RESULT_DELAY) this.finish('lost', 'BOOM', pick(blast.byShrapnel ? QUIPS.shrapnel : QUIPS.died), deathTips(blast));
       } else if (this.nextGrenade >= GRENADES.length) {
         if (since > RESULT_DELAY) this.finish('won', 'SURVIVED', pick(blast.thrownOut ? QUIPS.thrownOut : QUIPS.survived));
       } else if (this.nextGrenadeAt === Infinity) {
@@ -328,7 +355,7 @@ export class GrenadeLevel implements Level {
       }
       player.tearApart(violence, pos);
     }
-    this.lastBlast = { at: this.t, pos, thrownOut, byShrapnel };
+    this.lastBlast = { at: this.t, pos, thrownOut, byShrapnel, inSight, big: spec !== GRENADES[0] };
   }
 
   /**
@@ -444,9 +471,10 @@ export class GrenadeLevel implements Level {
     return pass;
   }
 
-  private finish(status: LevelStatus, big: string, small: string) {
+  private finish(status: LevelStatus, big: string, small: string, tips: [string, string][] = []) {
     this.status = status;
     this.ctx.hud.show(big, `${small}\n${pick(status === 'won' ? QUIPS.againWon : QUIPS.againLost)}`);
+    this.ctx.hud.tips(tips);
   }
 
   draw(out: DrawItem[]) {

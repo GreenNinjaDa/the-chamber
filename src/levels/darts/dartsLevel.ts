@@ -461,7 +461,10 @@ export class DartsLevel implements Level {
       player.pos[1] = 0.3;
       player.mode = 'splat';
       camera.addShake(0.6);
-      this.finish('lost', 'MISSED', pick(QUIPS.missedBoard));
+      this.finish('lost', 'MISSED', pick(QUIPS.missedBoard), [
+        ['Hint', pick([...TIPS.missedBoard, TIPS.dodge])],
+        ['Controls', TIPS.controls],
+      ]);
     }
   }
 
@@ -476,13 +479,17 @@ export class DartsLevel implements Level {
       mm < 107 ? 'treble ring' :
       mm < 162 ? 'single' :
       mm <= 170 ? 'double ring' : 'black rim';
-    this.finish('lost', 'SPLAT', pick(QUIPS.wrongRing)(ring));
+    this.finish('lost', 'SPLAT', pick(QUIPS.wrongRing)(ring), [
+      ['Hint', pick([...TIPS.wrongRing, TIPS.dodge])],
+      ['Controls', TIPS.controls],
+    ]);
   }
 
-  private finish(status: LevelStatus, big: string, small: string) {
+  private finish(status: LevelStatus, big: string, small: string, tips: [string, string][] = []) {
     this.status = status;
     this.phase = 'over';
     this.ctx.hud.show(big, `${small}\n${pick(status === 'won' ? QUIPS.againWon : QUIPS.againLost)}`);
+    this.ctx.hud.tips(tips);
     this.ctx.hud.hint('');
   }
 
@@ -582,6 +589,20 @@ const QUIPS = {
 function pick<T>(options: T[]): T {
   return options[Math.floor(Math.random() * options.length)];
 }
+
+/** Death-screen hints: how you died, and what might work instead. */
+const TIPS = {
+  wrongRing: [
+    'Only the bullseye counts. You can steer mid-flight: you are more aerodynamic than you look.',
+    'Close is not good enough. Keep adjusting all the way in; the board gets big fast.',
+  ],
+  missedBoard: [
+    'The board is the big round thing. Steer toward it while you fly.',
+    "You can steer in the air. Try pointing yourself at the board next time. It helps.",
+  ],
+  dodge: "Better yet, don't get caught: stand by a dart, then dodge as the hand comes down. It grabs whatever's closest.",
+  controls: 'In the air: W/S up and down, A/D left and right. On the ground: Shift to sprint.',
+};
 
 function ballistic(start: Vec3, target: Vec3, time: number, gravity: number): Vec3 {
   const v = scale(sub(target, start), 1 / time);

@@ -70,6 +70,10 @@ export class Sandbox implements Level {
     player.kill([(Math.random() - 0.5) * 6, 26, (Math.random() - 0.5) * 6]);
     this.status = 'lost';
     hud.show('WHY', 'It was a big red button. What did you expect?\nPress R to un-die.');
+    hud.tips([
+      ['Hint', 'Do not press the big red button.'],
+      ['Controls', 'E uses levers and buttons (evidently). Hold left click to carry things, right-click to throw.'],
+    ]);
   }
 
   update(dt: number) {

@@ -9,8 +9,9 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   levels start the same way: over-the-shoulder third-person camera (Fortnite-like), WASD movement, inside a
   nondescript Portal-style test chamber with four white panelled walls and no roof.
 - The core of the design is **surprise and humour**. Don't explain levels or give instructions up front
-  (no theme names, no hint lines for now). Any on-screen text — end screens, and hints if they come back — is
-  sarcastic or joking, may hint a little at the mechanics, and pop-culture references are welcome.
+  (no theme names, no hint lines during play). Death screens do show a hint for how you died plus the controls
+  that matter in that level (`hud.tips`). Any on-screen text is sarcastic or joking, may hint at the mechanics,
+  and pop-culture references are welcome.
 - **Level 1 — Darts** (`src/levels/darts/`): a giant rises over the south wall and blocks the sun. Five
   player-sized darts drop into the chamber and his hand hunts the player. The player survives by luring the
   hand onto darts until he has thrown **all five**; the hand gets faster after every grab. Each grab is a

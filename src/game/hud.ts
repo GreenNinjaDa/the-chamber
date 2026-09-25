@@ -8,6 +8,9 @@ const STYLE = `
               transition: opacity .4s; padding: 16px; }
 .hud-big { font-size: clamp(40px, 9vw, 96px); font-weight: 800; letter-spacing: .12em; }
 .hud-small { font-size: clamp(14px, 2vw, 20px); margin-top: 8px; opacity: .9; white-space: pre-line; line-height: 1.5; }
+.hud-tips { font-size: clamp(12px, 1.5vw, 16px); margin: 18px auto 0; max-width: 640px; opacity: .85;
+             line-height: 1.55; text-align: left; white-space: pre-line; }
+.hud-tips b { color: #ffd166; font-weight: 700; }
 .hud-cross { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px;
               border-radius: 50%; background: #fff; box-shadow: 0 0 0 1.5px rgba(0,0,0,.45);
               transition: width .12s, height .12s, margin .12s, background .12s, opacity .2s; box-sizing: border-box; }
@@ -43,6 +46,7 @@ export class Hud {
   private centerEl: HTMLDivElement;
   private bigEl: HTMLDivElement;
   private smallEl: HTMLDivElement;
+  private tipsEl: HTMLDivElement;
   private hintEl: HTMLDivElement;
   private crossEl: HTMLDivElement;
   private markerRoot: HTMLDivElement;
@@ -61,10 +65,11 @@ export class Hud {
     this.centerEl = el('hud-center');
     this.bigEl = el('hud-big');
     this.smallEl = el('hud-small');
+    this.tipsEl = el('hud-tips');
     this.hintEl = el('hud-hint');
     this.crossEl = el('hud-cross hidden');
     this.markerRoot = el('hud-marker');
-    this.centerEl.append(this.bigEl, this.smallEl);
+    this.centerEl.append(this.bigEl, this.smallEl, this.tipsEl);
     root.append(this.markerRoot, this.levelEl, this.fpsEl, this.crossEl, this.centerEl, this.hintEl);
     document.body.appendChild(root);
     this.hide();
@@ -78,6 +83,7 @@ export class Hud {
   show(big: string, small = '', duration = 0) {
     this.bigEl.textContent = big;
     this.smallEl.textContent = small;
+    this.tips([]);
     this.centerEl.style.opacity = '1';
     this.messageTimer = duration;
   }
@@ -118,6 +124,17 @@ export class Hud {
         m.arrow.style.top = `${Math.round(t.y)}px`;
         m.arrow.style.transform = `rotate(${t.angle}rad)`;
       }
+    });
+  }
+
+  /** Labelled tip lines under the current message, e.g. [['Hint', '...'], ['Controls', '...']]. */
+  tips(lines: [string, string][]) {
+    this.tipsEl.replaceChildren();
+    lines.forEach(([label, text], i) => {
+      if (i) this.tipsEl.append(document.createElement('br'));
+      const b = document.createElement('b');
+      b.textContent = `${label}: `;
+      this.tipsEl.append(b, text);
     });
   }
 
