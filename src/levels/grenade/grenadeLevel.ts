@@ -595,7 +595,7 @@ function faceBox(collider: RAPIER.Collider, normal: Vec3): { min: Vec3; max: Vec
 }
 
 /** A "pineapple" frag grenade: segmented olive body, fuse cap, spoon lever and a blinking light. */
-function drawPineapple(out: DrawItem[], m: Mat4, s: number, color: number[], lightOn: boolean) {
+export function drawPineapple(out: DrawItem[], m: Mat4, s: number, color: number[], lightOn: boolean) {
   const metal = [0.34, 0.35, 0.33];
   const dark = color.map((c) => c * 0.55);
   out.push({ mesh: 'sphere', model: mul(m, scaling([0.12 * s, 0.145 * s, 0.12 * s])), color: dark });

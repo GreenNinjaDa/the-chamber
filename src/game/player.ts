@@ -184,7 +184,15 @@ export class Player {
 
   /** The reverse, as a portal spits the player out: they grow out of `pivot` over `seconds`. */
   growFrom(pivot: Vec3, seconds: number) {
+    this.inPortal = false;
     this.animatePortal(pivot, 0, 1, seconds);
+  }
+
+  /** Snaps straight back to full size, out of any portal. */
+  cancelPortal() {
+    this.inPortal = false;
+    this.portalScale = this.portalFrom = this.portalTo = 1;
+    this.portalTime = 0;
   }
 
   private animatePortal(pivot: Vec3, from: number, to: number, seconds: number) {

@@ -24,6 +24,9 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   inverts looking up/down (`src/game/settings.ts`, remembered in localStorage). Signs are floating world text
   (`Level.labels()`). **Pause menu** (`src/game/pauseMenu.ts`): Esc, or losing pointer lock, opens Resume /
   Restart / Back to the lobby.
+  Idle in the lobby for 20 s (alive, no input at all) and it pranks you (`lobby/afk.ts`): a fridge on the head
+  (gone after 5 s), a floor/air portal loop that bounces you 3–5 times (any input makes the portals vanish and
+  drops you), or rarely a live grenade. The 20 s restart after each prank.
 - **Level 1 — Darts** (`src/levels/darts/`): a giant rises over the south wall and blocks the sun. Five
   player-sized darts drop into the chamber and his hand hunts the player. The player survives by luring the
   hand onto darts until he has thrown **all five**; the hand gets faster after every grab. Each grab is a

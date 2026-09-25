@@ -55,6 +55,12 @@ export class Input {
     }
   }
 
+  /** Any input at all this frame: a key, a mouse button or mouse movement. */
+  active() {
+    return this.pressed.size > 0 || this.down.size > 0 || this.mouseDX !== 0 || this.mouseDY !== 0 ||
+      this.mouseDown || this.mousePressed || this.rightPressed;
+  }
+
   isDown(code: string) {
     return this.down.has(code);
   }

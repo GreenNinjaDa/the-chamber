@@ -3,6 +3,7 @@ import { CHAMBER_HALF } from '../../game/chamber';
 import { ExitPortal, PortalArrival } from '../../game/portal';
 import { Button, Lever } from '../../game/props';
 import { saveSettings, settings } from '../../game/settings';
+import { AfkPranks } from './afk';
 import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus, type WorldLabel } from '../level';
 
 /*
@@ -29,6 +30,9 @@ export class LobbyLevel implements Level {
   private startLabel: WorldLabel;
   private mouseLabel: WorldLabel;
   private invertLabel: WorldLabel;
+  /** Pranks for players who wander off and leave their character standing here. */
+  readonly afk: AfkPranks;
+  private deadFor = 0;
 
   constructor(private ctx: LevelContext, levelCount: number) {
     const { physics, hud } = ctx;
@@ -36,6 +40,7 @@ export class LobbyLevel implements Level {
     hud.hint('');
     this.arrival = new PortalArrival(ctx, [0, 0, 6]);
     this.exit.openAlready();
+    this.afk = new AfkPranks(ctx);
     settings.startLevel = Math.min(levelCount, Math.max(1, settings.startLevel));
 
     // Level select: a row of buttons along the north side.
@@ -101,14 +106,29 @@ export class LobbyLevel implements Level {
   }
 
   update(dt: number) {
+    const { player, hud } = this.ctx;
     this.arrival.update(dt);
-    this.exit.update(dt, this.ctx.player);
+    this.exit.update(dt, player);
     if (this.exit.entered) this.status = 'exited';
+    this.afk.update(dt, this.arrival.done && this.status === 'playing');
+    // The only way to die in the lobby is to leave your character unattended near a grenade.
+    if (player.mode === 'ragdoll' && this.status === 'playing') {
+      this.deadFor += dt;
+      if (this.deadFor > 1.5) {
+        this.status = 'lost';
+        hud.show('AWAY FROM KEYBOARD', 'Permanently, now.\nPress R to respawn.');
+        hud.tips([
+          ['Hint', 'Idle hands get handed grenades. Wiggle the mouse now and then.'],
+          ['Controls', 'R respawns you. Literally any key proves you are alive.'],
+        ]);
+      }
+    }
   }
 
   draw(out: DrawItem[]) {
     this.arrival.draw(out);
     this.exit.draw(out);
+    this.afk.draw(out);
   }
 
   labels(): WorldLabel[] {

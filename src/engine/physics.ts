@@ -15,8 +15,8 @@ export const GRAVITY = 20;
 /** Physics runs at a fixed 120 Hz, independent of frame rate, for stable joints and motors. */
 export const FIXED_STEP = 1 / 120;
 const MAX_SUBSTEPS = 8;
-/** Rapier has no rolling resistance, so balls and barrels get a touch of spin damping to slowly stop. */
-const ROLLING_DAMPING = 0.36;
+/** Rapier has no rolling resistance, so balls and barrels get spin damping to stop rolling. */
+const ROLLING_DAMPING = 1.2;
 
 // Collision groups: (membership << 16) | filter. Everything else uses the default (all/all).
 const BODY_BIT = 0x0002; // the player's physical body parts
