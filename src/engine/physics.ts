@@ -1,5 +1,5 @@
 import RAPIER from '@dimforge/rapier3d-compat';
-import { add, fromQuat, mul, scale, scaling, type Quat, type Vec3 } from './math';
+import { add, fromQuat, mul, scale, scaling, type Mat4, type Quat, type Vec3 } from './math';
 import type { DrawItem, MeshName } from './renderer';
 
 export { RAPIER };
@@ -35,6 +35,9 @@ export const GROUPS_QUERY_WORLD = (0xffff << 16) | (0xffff & ~BODY_BIT & ~CAPSUL
 
 
 /** A dynamic physics object that draws itself as one primitive. */
+/** Draws a body's custom model; `m` is the body's world transform (origin at its centre). */
+export type BodyModel = (out: DrawItem[], m: Mat4) => void;
+
 export interface Body {
   rb: RAPIER.RigidBody;
   collider: RAPIER.Collider;
@@ -51,6 +54,8 @@ export interface Body {
   angularDamping: number;
   /** Skip the default primitive drawing (the owner draws a custom model). */
   hidden: boolean;
+  /** Custom model drawn in the body's frame (origin at its centre) instead of the plain primitive. */
+  model?: BodyModel;
   /** Multiplies the player's throw speed for this object. */
   throwScale: number;
 }
@@ -76,6 +81,7 @@ export interface BodyOptions {
   pattern?: number;
   param?: number;
   hidden?: boolean;
+  model?: BodyModel;
   throwScale?: number;
 }
 
@@ -161,6 +167,7 @@ export class Physics {
       highlight: 0,
       angularDamping,
       hidden: opts.hidden ?? false,
+      model: opts.model,
       throwScale: opts.throwScale ?? 1,
     };
     this.bodies.push(body);
@@ -211,6 +218,12 @@ export class Physics {
     for (const b of this.bodies) {
       if (b.hidden) continue;
       const t = b.rb.translation();
+      if (b.model) {
+        const first = out.length;
+        b.model(out, fromQuat(b.rb.rotation(), [t.x, t.y, t.z]));
+        if (b.highlight) for (let i = first; i < out.length; i++) out[i].highlight = b.highlight;
+        continue;
+      }
       out.push({
         mesh: b.mesh,
         model: mul(fromQuat(b.rb.rotation(), [t.x, t.y, t.z]), scaling(b.size)),

@@ -6,7 +6,7 @@ import {
   type Mat4, type Vec3,
 } from './math';
 
-export type MeshName = 'box' | 'sphere' | 'cylinder' | 'cone' | 'roundbox' | 'holeplate' | 'tube';
+export type MeshName = 'box' | 'sphere' | 'cylinder' | 'cone' | 'roundbox' | 'bevelbox' | 'holeplate' | 'tube';
 
 /** Surface patterns understood by scene.wgsl. */
 export const Pattern = {
@@ -110,6 +110,7 @@ export class Renderer {
       cylinder: this.upload(cylinder()),
       cone: this.upload(cone()),
       roundbox: this.upload(roundBox()),
+      bevelbox: this.upload(roundBox(12)),
       holeplate: this.upload(holePlate(HOLE_PLATE_RATIO)),
       tube: this.upload(tube(TUBE_INNER_RATIO)),
     };

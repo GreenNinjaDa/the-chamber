@@ -6,6 +6,7 @@ import {
 import { GROUPS_QUERY_WITH_PLAYER, GROUPS_QUERY_WORLD, RAPIER, type Body } from '../../engine/physics';
 import { Pattern, type DrawItem } from '../../engine/renderer';
 import { PART_NAMES } from '../../game/body';
+import { JUNK, type JunkDef } from './junk';
 import { CHAMBER_HALF, type ChamberOptions } from '../../game/chamber';
 import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus, type TrackedTarget } from '../level';
 
@@ -22,7 +23,7 @@ import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type Level
 // --- Tuning -----------------------------------------------------------------------------------
 /** When the junk starts falling, how far apart each piece drops, and when the first grenade drops (s). */
 const JUNK_START = 1.5;
-const JUNK_INTERVAL = 0.22;
+const JUNK_INTERVAL = 0.13;
 const FIRST_GRENADE_AT = 5;
 /** Seconds after the first blast (if you survived it) before the second grenade drops. */
 const SECOND_GRENADE_DELAY = 1;
@@ -35,8 +36,12 @@ const HOLE = { x: 0, y: 6.75, radius: 0.36 };
 const CHAMBER_DIAGONAL = CHAMBER_HALF * 2 * Math.SQRT2;
 /** Damage at or above this (but below 1) knocks you flat instead of killing you. */
 const KNOCKDOWN_DAMAGE = 0.35;
-/** Fraction of the blast a loose object without its own value lets through. */
-const DEFAULT_PASS = 0.8;
+/**
+ * Cover: an object between you and the blast lets through 1 / (1 + mass / COVER_MASS) of it,
+ * so heavier things protect more (1 kg ≈ 98%, 20 kg ≈ 67%, 120 kg ≈ 25%, 200 kg ≈ 17%).
+ */
+const COVER_MASS = 40;
+const coverPass = (mass: number) => 1 / (1 + mass / COVER_MASS);
 /** Shrapnel: how far fragments fly (m), and the impulse each gives what it hits (kg·m/s). */
 const SHRAPNEL_RANGE = 40;
 const SHRAPNEL_PUSH = 14;
@@ -67,41 +72,16 @@ interface GrenadeSpec {
 
 const GRENADES: GrenadeSpec[] = [
   {
-    // Behind a fridge (lets 30% through) you live from about 6.6 m away.
+    // Across the room almost anything saves you; at 10 m you want 18+ kg in the way; at 5 m, a piano.
     radius: 0.16, mass: 0.3, throwScale: 1, fuse: 10, safeDistance: 12, falloff: 2, shrapnel: 300, scorchRange: 3.5, scorchSize: 2.6,
     push: 900, maxSpeed: 18, pushRange: 14, color: [0.13, 0.16, 0.06],
   },
   {
-    // 1.5x the size and much heavier. Behind any one object you live only from 80% of the way
-    // across the chamber (safeDistance), and the steep falloff makes closer cover hopeless.
+    // 1.5x the size and much heavier. Behind any object you live from 80% of the way across the
+    // chamber (safeDistance); closer in, the steep falloff needs a lot of weight in the way.
     radius: 0.24, mass: 0.6, throwScale: 0.93, fuse: 10, safeDistance: CHAMBER_DIAGONAL * 0.8, falloff: 3, shrapnel: 450, scorchRange: 5.5, scorchSize: 3.8,
     push: 2200, maxSpeed: 24, pushRange: 30, color: [0.09, 0.1, 0.05],
   },
-];
-
-interface JunkDef {
-  size: Vec3;
-  mass: number;
-  color: number[];
-  /** Fraction of the blast that gets through this object. */
-  pass: number;
-  shape?: 'box' | 'cylinder';
-}
-
-const JUNK: JunkDef[] = [
-  { size: [0.9, 1.9, 0.8], mass: 120, color: [0.93, 0.94, 0.95], pass: 0.3 }, // fridge
-  { size: [0.7, 0.9, 0.7], mass: 70, color: [0.85, 0.87, 0.9], pass: 0.4 }, // washing machine
-  { size: [1.7, 0.6, 0.8], mass: 90, color: [0.95, 0.95, 0.97], pass: 0.35 }, // bathtub
-  { size: [0.5, 1.3, 0.6], mass: 55, color: [0.45, 0.47, 0.5], pass: 0.45 }, // filing cabinet
-  { size: [1.0, 2.0, 0.35], mass: 45, color: [0.5, 0.33, 0.18], pass: 0.55 }, // bookcase
-  { size: [2.2, 0.8, 0.9], mass: 60, color: [0.45, 0.28, 0.18], pass: 0.6 }, // couch
-  { size: [2.0, 0.25, 1.4], mass: 20, color: [0.75, 0.8, 0.9], pass: 0.7 }, // mattress
-  { size: [0.8, 0.8, 0.8], mass: 20, color: [0.62, 0.45, 0.26], pass: 0.75 }, // crate
-  { size: [0.8, 0.8, 0.8], mass: 20, color: [0.62, 0.45, 0.26], pass: 0.75 }, // crate
-  { size: [0.6, 0.6, 0.6], mass: 12, color: [0.62, 0.45, 0.26], pass: 0.8 }, // small crate
-  { size: [0.4, 0.25, 0.4], mass: 10, color: [0.08, 0.08, 0.09], pass: 0.85, shape: 'cylinder' }, // tire
-  { size: [0.4, 0.25, 0.4], mass: 10, color: [0.08, 0.08, 0.09], pass: 0.85, shape: 'cylinder' }, // tire
-  { size: [0.15, 0.5, 0.15], mass: 5, color: [0.8, 0.15, 0.1], pass: 0.95, shape: 'cylinder' }, // gnome
 ];
 
 const QUIPS = {
@@ -141,14 +121,14 @@ function deathTips(blast: { byShrapnel: boolean; inSight: boolean; big: boolean 
     ]);
   } else if (blast.inSight) {
     hint = pick([
-      'It saw you, so you are now a fine mist. Put anything between you and it. Even the gnome.',
+      'It saw you, so you are now a fine mist. Put anything between you and it; the heavier the better.',
       'Distance alone does not cut it. Get something solid between you and the grenade.',
     ]);
   } else if (blast.big) {
     hint = 'The big one reaches the whole room. Get to the far side AND behind something heavy.';
   } else {
     hint = pick([
-      'Cover helps. Distance helps. Both help more. Heavier junk soaks up more of the blast.',
+      'Cover helps. Distance helps. Both help more. The heavier the thing you hide behind, the better.',
       'That was not enough cover. Stack more between you, or drag the fridge over.',
     ]);
   }
@@ -220,8 +200,7 @@ export class GrenadeLevel implements Level {
 
   private t = 0;
   private spawned = 0;
-  /** Fraction of the blast each junk collider lets through, by collider handle. */
-  private pass = new Map<number, number>();
+
   /** Index of the next grenade to drop, and when. */
   private nextGrenade = 0;
   private nextGrenadeAt = FIRST_GRENADE_AT;
@@ -273,11 +252,12 @@ export class GrenadeLevel implements Level {
   private spawnJunk(def: JunkDef) {
     const { physics } = this.ctx;
     const pos: Vec3 = [(Math.random() * 2 - 1) * 9, 14 + Math.random() * 8, (Math.random() * 2 - 1) * 9];
-    const opts = { mass: def.mass, color: def.color, rotation: randomRotation() };
+    const opts = { mass: def.mass, rotation: randomRotation(), model: def.model };
     const body = def.shape === 'cylinder'
       ? physics.addCylinder(pos, def.size[0], def.size[1], opts)
-      : physics.addBox(pos, def.size, opts);
-    this.pass.set(body.collider.handle, def.pass);
+      : def.shape === 'ball'
+        ? physics.addBall(pos, def.size[0], { ...opts, restitution: 0.5 })
+        : physics.addBox(pos, def.size, opts);
   }
 
   private dropGrenade(spec: GrenadeSpec) {
@@ -328,8 +308,8 @@ export class GrenadeLevel implements Level {
     const chest = targets[1];
     const d = length(sub(chest, pos));
     const exposures = targets.map((p) => this.exposure(pos, p));
-    const inSight = exposures[1] >= 0.999;
-    const exposure = exposures.reduce((sum, e) => sum + e, 0) / exposures.length;
+    const inSight = !exposures[1].covered;
+    const exposure = exposures.reduce((sum, e) => sum + e.pass, 0) / exposures.length;
     const damage = inSight ? Infinity : Math.pow(spec.safeDistance / Math.max(d, 0.5), spec.falloff) * exposure;
     const away = normalize(add(sub(chest, pos), [0, 0.5, 0]));
 
@@ -444,18 +424,19 @@ export class GrenadeLevel implements Level {
   }
 
   /**
-   * Fraction of the blast that reaches `point` after passing through everything in the way.
-   * Loose objects soak up part of it; a wall or other static geometry blocks it completely.
+   * How much of the blast reaches `point`: `pass` is the fraction left after everything in the
+   * way (each loose object soaks up more the heavier it is; a wall blocks it completely), and
+   * `covered` says whether anything at all is in the way.
    */
-  private exposure(from0: Vec3, point: Vec3): number {
+  private exposure(from0: Vec3, point: Vec3): { pass: number; covered: boolean } {
     const { physics } = this.ctx;
     const from = add(from0, [0, 0.15, 0]);
     const delta = sub(point, from);
     const dist = length(delta);
-    if (dist < 1e-3) return 1;
+    if (dist < 1e-3) return { pass: 1, covered: false };
     const dir = scale(delta, 1 / dist);
     const ray = new RAPIER.Ray({ x: from[0], y: from[1], z: from[2] }, { x: dir[0], y: dir[1], z: dir[2] });
-    let pass = 1;
+    let pass = 1, covered = false;
     const seen = new Set<number>();
     physics.world.intersectionsWithRay(ray, dist, true, (hit) => {
       const c = hit.collider;
@@ -463,12 +444,14 @@ export class GrenadeLevel implements Level {
       seen.add(c.handle);
       if (!c.parent()?.isDynamic()) {
         pass = 0;
+        covered = true;
         return false; // a wall: nothing gets through
       }
-      pass *= this.pass.get(c.handle) ?? DEFAULT_PASS;
+      pass *= coverPass(c.parent()!.mass());
+      covered = true;
       return true;
     }, undefined, GROUPS_QUERY_WORLD);
-    return pass;
+    return { pass, covered };
   }
 
   private finish(status: LevelStatus, big: string, small: string, tips: [string, string][] = []) {
