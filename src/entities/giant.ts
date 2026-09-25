@@ -2,8 +2,8 @@ import {
   add, basis, clamp, cross, dot, length, mul, normalize, rotationX, rotationY, rotationZ,
   scale, scaling, segment, sub, transformPoint, translation,
   type Mat4, type Vec3,
-} from '../../engine/math';
-import { Pattern, type DrawItem } from '../../engine/renderer';
+} from '../engine/math';
+import { Pattern, type DrawItem } from '../engine/renderer';
 
 const SKIN = [0.86, 0.64, 0.5];
 const SHIRT = [0.08, 0.26, 0.28];

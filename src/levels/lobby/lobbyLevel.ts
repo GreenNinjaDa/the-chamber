@@ -1,7 +1,8 @@
 import type { DrawItem } from '../../engine/renderer';
 import { CHAMBER_HALF } from '../../game/chamber';
-import { ExitPortal, PortalArrival } from '../../game/portal';
-import { Button, Lever } from '../../game/props';
+import { junk, spawnJunk } from '../../entities/junk';
+import { ExitPortal, PortalArrival } from '../../entities/portal';
+import { Button, Lever } from '../../entities/props';
 import { saveSettings, settings } from '../../game/settings';
 import { AfkPranks } from './afk';
 import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus, type WorldLabel } from '../level';
@@ -11,7 +12,6 @@ import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type Level
  * buttons and a lever change settings, and the START portal in the east wall goes to the game.
  */
 
-const WOOD = [0.62, 0.45, 0.26];
 const SELECTED = [0.15, 0.8, 0.2];
 const UNSELECTED = [0.45, 0.46, 0.5];
 const MOUSE_MIN = 0.2;
@@ -79,10 +79,11 @@ export class LobbyLevel implements Level {
 
     // Something to fling around while you make up your mind.
     for (let i = 0; i < 4; i++) {
-      const s = 0.6 + i * 0.15;
-      physics.addBox([4 + i * 1.3, s / 2 + 0.01, -3 + (i % 2) * 1.5], [s, s, s], { color: WOOD, mass: 8 + s * 20 });
+      const def = junk(i % 2 ? 'small crate' : 'crate');
+      spawnJunk(physics, def, [4 + i * 1.3, def.size[1] / 2 + 0.01, -3 + (i % 2) * 1.5]);
     }
-    physics.addBall([3, 0.45, 3], 0.45, { color: [0.85, 0.2, 0.15], mass: 3, restitution: 0.6 });
+    spawnJunk(physics, junk('beach ball'), [3, 0.4, 3]);
+    spawnJunk(physics, junk('rubber duck'), [1.5, 0.3, 3.5]);
   }
 
   private pickLevel(n: number) {

@@ -1,8 +1,8 @@
 import {
   basis, cross, mul, normalize, rotationX, rotationY, scale, scaling, translation,
   type Mat4, type Vec3,
-} from '../../engine/math';
-import type { DrawItem } from '../../engine/renderer';
+} from '../engine/math';
+import type { DrawItem } from '../engine/renderer';
 
 /** Distance from the tip to the grip point where the giant holds a dart. */
 export const DART_GRIP = 0.9;

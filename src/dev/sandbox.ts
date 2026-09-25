@@ -1,7 +1,8 @@
 import { mul, scaling, translation, type Vec3 } from '../engine/math';
 import type { Body } from '../engine/physics';
 import type { DrawItem } from '../engine/renderer';
-import { Button, Lever } from '../game/props';
+import { junk, spawnJunk } from '../entities/junk';
+import { Button, Lever } from '../entities/props';
 import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus } from '../levels/level';
 
 /*
@@ -27,22 +28,19 @@ export class Sandbox implements Level {
     hud.show('SANDBOX', 'Hold left click to carry · right-click to throw · E on levers and buttons', 3);
     hud.hint('');
 
-    // Loose crates of a few sizes, plus a stack to knock over.
+    // The same junk the levels use: crates of two sizes, plus a stack to knock over.
     for (let i = 0; i < 8; i++) {
-      const s = 0.6 + Math.random() * 0.6;
-      physics.addBox([-8 + i * 2.2, s / 2 + 0.01, -3], [s, s, s], { color: WOOD, mass: 8 + s * 20 });
+      const def = junk(i % 2 ? 'small crate' : 'crate');
+      spawnJunk(physics, def, [-8 + i * 2.2, def.size[1] / 2 + 0.01, -3]);
     }
-    for (let i = 0; i < 5; i++) {
-      physics.addBox([6, 0.45 + i * 0.91, 3], [0.9, 0.9, 0.9], { color: WOOD, mass: 15 });
-    }
-    // Too heavy to lift: can only be dragged along the floor.
-    physics.addBox([-6, 0.96, 5], [0.9, 1.9, 0.8], { color: [0.92, 0.93, 0.95], mass: 120 });
-    for (let i = 0; i < 4; i++) {
-      physics.addBall([-2 + i * 1.4, 0.4, 7], 0.35 + i * 0.1, { color: [0.85, 0.2 + i * 0.15, 0.15], mass: 3, restitution: 0.6 });
-    }
-    for (let i = 0; i < 3; i++) {
-      physics.addCylinder([3 + i * 1.5, 0.6, -8], 0.4, 1.2, { color: [0.2, 0.35, 0.7], mass: 25 });
-    }
+    for (let i = 0; i < 5; i++) spawnJunk(physics, junk('crate'), [6, 0.4 + i * 0.81, 3]);
+    // Too heavy to lift: can only be dragged along the floor (or tipped upright by one end).
+    spawnJunk(physics, junk('fridge'), [-6, 0.96, 5]);
+    // Things that roll.
+    spawnJunk(physics, junk('beach ball'), [-2, 0.4, 7]);
+    spawnJunk(physics, junk('rubber duck'), [-0.6, 0.3, 7]);
+    for (let i = 0; i < 2; i++) spawnJunk(physics, junk('tire'), [0.8 + i * 1.4, 0.45, 7]);
+    for (let i = 0; i < 3; i++) spawnJunk(physics, junk('oil drum'), [3 + i * 1.5, 0.46, -8]);
 
     // A static bar at head height: the movement capsule fits under it, the head doesn't.
     // Sprint into it to test head knocks from non-physics objects.

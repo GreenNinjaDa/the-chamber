@@ -7,9 +7,9 @@ import { CHAMBER_HALF } from '../../game/chamber';
 import {
   DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus, type TrackedTarget,
 } from '../level';
-import { drawPortal, ExitPortal, PORTAL_SQUEEZE_TIME, PortalArrival } from '../../game/portal';
-import { DART_GRIP, dartMatrix, drawDart } from './dart';
-import { Giant } from './giant';
+import { drawPortal, ExitPortal, PORTAL_SQUEEZE_TIME, PortalArrival } from '../../entities/portal';
+import { DART_GRIP, dartMatrix, drawDart } from '../../entities/dart';
+import { Giant } from '../../entities/giant';
 
 /*
  * Level 1 — Darts.

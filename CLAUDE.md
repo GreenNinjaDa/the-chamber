@@ -12,7 +12,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   (no theme names, no hint lines during play). Death screens do show a hint for how you died plus the controls
   that matter in that level (`hud.tips`). Any on-screen text is sarcastic or joking, may hint at the mechanics,
   and pop-culture references are welcome.
-- **Portals** (`src/game/portal.ts`): most levels start with `PortalArrival` — a rimless purple liquid portal
+- **Portals** (`src/entities/portal.ts`): most levels start with `PortalArrival` — a rimless purple liquid portal
   opens above the floor, spits the player out limp at a random 30–90° downward angle (90° = straight down; stunned 1.5 s), then shrinks away 0.5 s
   later — and most end with an `ExitPortal` (rimmed, in the east wall; invisible until
   `openNow()` slides a wall panel aside to reveal it, and its HUD marker is purple). Going through an exit sets the level's status to `'exited'`, and main.ts loads the next level
@@ -36,7 +36,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   the player instead, they are thrown at the dartboard and must steer mid-flight (WASD) into the bullseye — which
   is a portal to the next level — anything else is a loss. Once all five darts are thrown the exit opens: half the
   time the giant sinks away, half the time he has one last (slower) grab at you while you run for it.
-- **Level 2 — Grenade** (`src/levels/grenade/`): ~28 pieces of detailed junk (`junk.ts`: fridge, vending machine, piano, safe,
+- **Level 2 — Grenade** (`src/levels/grenade/`): ~28 pieces of detailed junk (`src/entities/junk.ts`: fridge, vending machine, piano, safe,
   anvil, bathtub, couch, bookcase, toilet, CRT TV, tires, crates, a rubber duck, a garden gnome...) crashes into the
   chamber, then a pineapple grenade with a blinking 10 s fuse. In direct line of sight (nothing at all between it and
   your chest) a blast is fatal anywhere in the chamber. Behind cover, damage =
@@ -70,8 +70,12 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   usables, ray casts, collision groups (the player's body parts and capsule are excluded from queries)
 - `src/game/` — shared pieces every level uses: chamber, player (Rapier character controller), over-the-shoulder
   camera, HUD (with crosshair), `interaction.ts` (crosshair targeting, E to use, hold left click to carry/drag,
-  right-click to throw), `props.ts` (Lever, Button), `body.ts` (11-part rounded player body: skeleton + poses for drawing,
+  right-click to throw), pause menu, settings, `body.ts` (11-part rounded player body: skeleton + poses for drawing,
   and `PhysBody`, the active ragdoll that follows the animation with joint motors and per-part pose matching)
+- `src/entities/` — things that can appear in more than one level (or the lobby / sandbox), each with its model:
+  `junk.ts` (28 pieces of household junk; `spawnJunk(physics, junk('fridge'), pos)`), `grenade.ts` (pineapple
+  model), `giant.ts`, `dart.ts`, `portal.ts` (entrance / exit portals), `props.ts` (Lever, Button). Put new
+  entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
 

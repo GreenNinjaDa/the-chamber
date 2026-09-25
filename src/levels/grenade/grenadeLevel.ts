@@ -6,8 +6,9 @@ import {
 import { GROUPS_QUERY_WITH_PLAYER, GROUPS_QUERY_WORLD, RAPIER, type Body } from '../../engine/physics';
 import { Pattern, type DrawItem } from '../../engine/renderer';
 import { PART_NAMES } from '../../game/body';
-import { ExitPortal, PortalArrival } from '../../game/portal';
-import { JUNK, type JunkDef } from './junk';
+import { drawPineapple } from '../../entities/grenade';
+import { ExitPortal, PortalArrival } from '../../entities/portal';
+import { JUNK, spawnJunk, type JunkDef } from '../../entities/junk';
 import { CHAMBER_HALF, type ChamberOptions } from '../../game/chamber';
 import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus, type TrackedTarget } from '../level';
 
@@ -279,14 +280,8 @@ export class GrenadeLevel implements Level {
   }
 
   private spawnJunk(def: JunkDef) {
-    const { physics } = this.ctx;
     const pos: Vec3 = [(Math.random() * 2 - 1) * 9, 14 + Math.random() * 8, (Math.random() * 2 - 1) * 9];
-    const opts = { mass: def.mass, rotation: randomRotation(), model: def.model };
-    const body = def.shape === 'cylinder'
-      ? physics.addCylinder(pos, def.size[0], def.size[1], opts)
-      : def.shape === 'ball'
-        ? physics.addBall(pos, def.size[0], { ...opts, restitution: 0.5 })
-        : physics.addBox(pos, def.size, opts);
+    spawnJunk(this.ctx.physics, def, pos, randomRotation());
   }
 
   private dropGrenade(spec: GrenadeSpec) {
@@ -592,48 +587,6 @@ function faceBox(collider: RAPIER.Collider, normal: Vec3): { min: Vec3; max: Vec
   // Room along the normal for the decal's lift; barely any sideways, so it can't overhang an edge.
   const pad = [0, 1, 2].map((ax) => 0.01 + Math.abs(normal[ax]) * 0.06);
   return { min: [min[0] - pad[0], min[1] - pad[1], min[2] - pad[2]], max: [max[0] + pad[0], max[1] + pad[1], max[2] + pad[2]] };
-}
-
-/** A "pineapple" frag grenade: segmented olive body, fuse cap, spoon lever and a blinking light. */
-export function drawPineapple(out: DrawItem[], m: Mat4, s: number, color: number[], lightOn: boolean) {
-  const metal = [0.34, 0.35, 0.33];
-  const dark = color.map((c) => c * 0.55);
-  out.push({ mesh: 'sphere', model: mul(m, scaling([0.12 * s, 0.145 * s, 0.12 * s])), color: dark });
-  // Rows of raised segments over an egg-shaped body.
-  const rx = 0.128 * s, ry = 0.155 * s;
-  for (let row = 0; row < 6; row++) {
-    const lat = lerp(-1.05, 1.05, row / 5);
-    for (let col = 0; col < 8; col++) {
-      const lon = ((col + (row % 2) * 0.5) / 8) * Math.PI * 2;
-      const n = normalize([Math.cos(lat) * Math.cos(lon) / rx, Math.sin(lat) / ry, Math.cos(lat) * Math.sin(lon) / rx]);
-      const p: Vec3 = [Math.cos(lat) * Math.cos(lon) * rx, Math.sin(lat) * ry, Math.cos(lat) * Math.sin(lon) * rx];
-      const east = normalize(cross([0, 1, 0], n));
-      const north = cross(n, east);
-      const size = 0.062 * s * (0.75 + 0.25 * Math.cos(lat));
-      out.push({
-        mesh: 'roundbox',
-        model: mul(m, basis(scale(east, size), scale(north, 0.07 * s), scale(n, 0.035 * s), p)),
-        color,
-        spec: 0.25,
-      });
-    }
-  }
-  // Fuse assembly, spoon lever and the fuse light.
-  out.push({ mesh: 'cylinder', model: mul(m, translation([0, 0.165 * s, 0]), scaling([0.045 * s, 0.06 * s, 0.045 * s])), color: metal, spec: 0.6 });
-  out.push({ mesh: 'cylinder', model: mul(m, translation([0, 0.2 * s, 0]), scaling([0.032 * s, 0.03 * s, 0.032 * s])), color: metal, spec: 0.6 });
-  out.push({
-    mesh: 'box',
-    model: mul(m, translation([0.075 * s, 0.1 * s, 0]), rotationZ(-0.22), scaling([0.022 * s, 0.19 * s, 0.05 * s])),
-    color: metal,
-    spec: 0.6,
-  });
-  out.push({
-    mesh: 'sphere',
-    model: mul(m, translation([0, 0.225 * s, 0]), scaling([0.028 * s, 0.028 * s, 0.028 * s])),
-    color: lightOn ? [8, 0.4, 0.2] : [0.25, 0.03, 0.03],
-    pattern: Pattern.emissive,
-    shadow: false,
-  });
 }
 
 function drawFragment(out: DrawItem[], f: Fragment) {

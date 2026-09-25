@@ -1,11 +1,11 @@
-import { mul, rotationX, rotationY, rotationZ, scaling, translation, type Mat4, type Vec3 } from '../../engine/math';
-import type { BodyModel } from '../../engine/physics';
-import type { DrawItem, MeshName } from '../../engine/renderer';
+import { mul, rotationX, rotationY, rotationZ, scaling, translation, type Mat4, type Quat, type Vec3 } from '../engine/math';
+import type { Body, BodyModel, Physics } from '../engine/physics';
+import type { DrawItem, MeshName } from '../engine/renderer';
 
 /*
- * The junk that crashes into the grenade chamber. Each piece has a simple collision shape
- * (box, cylinder or ball) and a detailed model built from primitives in its local frame
- * (origin at the centre, front facing -z).
+ * Household junk for any level (the grenade chamber drops the whole pile). Each piece has a
+ * simple collision shape (box, cylinder or ball) and a detailed model built from primitives in
+ * its local frame (origin at the centre, front facing -z). Spawn one with `spawnJunk`.
  */
 
 export interface JunkDef {
@@ -295,3 +295,20 @@ export const JUNK: JunkDef[] = [
   { name: 'beach ball', shape: 'ball', size: [0.35, 0.35, 0.35], mass: 0.5, model: beachBall },
   { name: 'pillow', shape: 'box', size: [0.6, 0.15, 0.4], mass: 1, model: pillow },
 ];
+
+/** The first junk definition with this name (e.g. 'fridge'). */
+export function junk(name: string): JunkDef {
+  const def = JUNK.find((d) => d.name === name);
+  if (!def) throw new Error(`No junk called ${name}`);
+  return def;
+}
+
+/** Adds a piece of junk to the physics world as a loose object with its detailed model. */
+export function spawnJunk(physics: Physics, def: JunkDef, pos: Vec3, rotation?: Quat): Body {
+  const opts = { mass: def.mass, rotation, model: def.model };
+  return def.shape === 'cylinder'
+    ? physics.addCylinder(pos, def.size[0], def.size[1], opts)
+    : def.shape === 'ball'
+      ? physics.addBall(pos, def.size[0], { ...opts, restitution: 0.5 })
+      : physics.addBox(pos, def.size, opts);
+}

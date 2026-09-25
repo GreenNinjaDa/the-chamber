@@ -1,9 +1,9 @@
 import { add, clamp, fromQuat, length, mul, normalize, scale, scaling, sub, translation, type Vec3 } from '../../engine/math';
 import type { Body } from '../../engine/physics';
 import { Pattern, type DrawItem } from '../../engine/renderer';
-import { drawPortal } from '../../game/portal';
-import { drawPineapple } from '../grenade/grenadeLevel';
-import { JUNK } from '../grenade/junk';
+import { drawPortal } from '../../entities/portal';
+import { drawPineapple, GRENADE_OLIVE } from '../../entities/grenade';
+import { junk, spawnJunk } from '../../entities/junk';
 import type { LevelContext } from '../level';
 
 /*
@@ -87,8 +87,7 @@ export class AfkPranks {
     this.idle = 0;
     const p = this.ctx.player.pos;
     if (this.prank === 'fridge') {
-      const def = JUNK.find((j) => j.name === 'fridge')!;
-      this.fridge = this.ctx.physics.addBox([p[0], FRIDGE_HEIGHT, p[2]], def.size, { mass: def.mass, model: def.model });
+      this.fridge = spawnJunk(this.ctx.physics, junk('fridge'), [p[0], FRIDGE_HEIGHT, p[2]]);
     } else if (this.prank === 'grenade') {
       const a = Math.random() * Math.PI * 2;
       const pos: Vec3 = [p[0] + Math.cos(a) * 1.5, 10, p[2] + Math.sin(a) * 1.5];
@@ -251,7 +250,7 @@ export class AfkPranks {
     if (this.grenade) {
       const t = this.grenade.rb.translation();
       const blink = Math.sin(this.t * (6 + this.t * 4)) > 0;
-      drawPineapple(out, fromQuat(this.grenade.rb.rotation(), [t.x, t.y, t.z]), 1, [0.13, 0.16, 0.06], blink);
+      drawPineapple(out, fromQuat(this.grenade.rb.rotation(), [t.x, t.y, t.z]), 1, GRENADE_OLIVE, blink);
     }
     if (this.flashT >= 0 && this.flashT < FLASH_TIME) {
       const r = 0.5 + this.flashT * 20;

@@ -1,8 +1,8 @@
 import { add, basis, clamp, cross, easeInOut, normalize, scale, sub, type Vec3 } from '../engine/math';
 import { Pattern, type DrawItem } from '../engine/renderer';
 import type { CameraShot, LevelContext } from '../levels/level';
-import { CHAMBER_HALF } from './chamber';
-import type { Player } from './player';
+import { CHAMBER_HALF } from '../game/chamber';
+import type { Player } from '../game/player';
 
 /*
  * Purple liquid portals: levels start by spitting the player out of one, and most end by walking
