@@ -1,4 +1,5 @@
 import { mul, scaling, translation } from '../engine/math';
+import type { Physics } from '../engine/physics';
 import { Pattern, type DrawItem } from '../engine/renderer';
 
 /** The chamber interior spans [-CHAMBER_HALF, CHAMBER_HALF] on x and z. */
@@ -31,4 +32,17 @@ export function drawChamber(out: DrawItem[]) {
   box([0, wy, CHAMBER_HALF + 0.5], [size + 2, h + 0.2, 1], WALL, 2);
   box([-CHAMBER_HALF - 0.5, wy, 0], [1, h + 0.2, size], WALL, 2);
   box([CHAMBER_HALF + 0.5, wy, 0], [1, h + 0.2, size], WALL, 2);
+}
+
+/** Floor, outside ground and the four walls as static colliders (matches drawChamber). */
+export function addChamberColliders(physics: Physics) {
+  const size = CHAMBER_HALF * 2;
+  const h = WALL_HEIGHT;
+  const wy = (h - 0.2) / 2;
+  physics.addStaticBox([0, -0.6, 0], [900, 1, 900]);
+  physics.addStaticBox([0, -0.25, 0], [size, 0.5, size]);
+  physics.addStaticBox([0, wy, -CHAMBER_HALF - 0.5], [size + 2, h + 0.2, 1]);
+  physics.addStaticBox([0, wy, CHAMBER_HALF + 0.5], [size + 2, h + 0.2, 1]);
+  physics.addStaticBox([-CHAMBER_HALF - 0.5, wy, 0], [1, h + 0.2, size]);
+  physics.addStaticBox([CHAMBER_HALF + 0.5, wy, 0], [1, h + 0.2, size]);
 }

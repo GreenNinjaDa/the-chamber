@@ -96,6 +96,35 @@ export function transformPoint(m: Mat4, v: Vec3): Vec3 {
   ];
 }
 
+export interface Quat {
+  x: number;
+  y: number;
+  z: number;
+  w: number;
+}
+
+/** Rotation from a unit quaternion followed by a translation. */
+export function fromQuat(q: Quat, t: Vec3): Mat4 {
+  const { x, y, z, w } = q;
+  const x2 = x + x, y2 = y + y, z2 = z + z;
+  const xx = x * x2, xy = x * y2, xz = x * z2;
+  const yy = y * y2, yz = y * z2, zz = z * z2;
+  const wx = w * x2, wy = w * y2, wz = w * z2;
+  return new Float32Array([
+    1 - (yy + zz), xy + wz, xz - wy, 0,
+    xy - wz, 1 - (xx + zz), yz + wx, 0,
+    xz + wy, yz - wx, 1 - (xx + yy), 0,
+    t[0], t[1], t[2], 1,
+  ]);
+}
+
+/** Rotates `v` by the unit quaternion `q`. */
+export function rotateByQuat(q: Quat, v: Vec3): Vec3 {
+  const u: Vec3 = [q.x, q.y, q.z];
+  const t = scale(cross(u, v), 2);
+  return add(add(v, scale(t, q.w)), cross(u, t));
+}
+
 /** Matrix whose columns are the given axes and translation. */
 export function basis(x: Vec3, y: Vec3, z: Vec3, t: Vec3): Mat4 {
   return new Float32Array([

@@ -33,7 +33,12 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   WebGPU clip space z ∈ [0,1]), input
 - `src/shaders/*.wgsl` — shaders, imported with `?raw`. Surface patterns (panels, dartboard, blob, skin, sky)
   are ids in `Pattern` (renderer.ts) that must match the constants in scene.wgsl
-- `src/game/` — shared pieces every level uses: chamber, player, over-the-shoulder camera, HUD
+- `src/engine/physics.ts` — Rapier wrapper: one `Physics` world per level attempt (created in main.ts with the
+  chamber colliders), dynamic bodies that draw themselves, usables, ray casts
+- `src/game/` — shared pieces every level uses: chamber, player (Rapier character controller), over-the-shoulder
+  camera, HUD (with crosshair), `interaction.ts` (crosshair targeting, E to use, hold E to carry/drag, click to
+  throw), `props.ts` (Lever, Button), `ragdoll.ts` (limp death ragdoll)
+- `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
 
 ## Adding a level
@@ -41,6 +46,13 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
 Implement `Level` (update / draw / environment / obstacles / cameraShot), set `status` to `won` or `lost`
 when it ends, and show the result with `hud.show(...)`. Levels can take over the camera by returning a
 `CameraShot`, and take over the player by changing `player.mode`.
+
+Shared mechanics available to levels (via `ctx`):
+- `ctx.physics.addBox / addBall / addCylinder` — loose objects; anything under ~40 kg can be carried, heavier
+  things can only be dragged. Pass `grabbable: false` for things the player shouldn't pick up.
+- `new Lever(physics, pos, yaw, onToggle)` and `new Button(physics, pos, color, onPress)` for E-usable props;
+  implement `Usable` and call `physics.registerUsable(collider, thing)` for custom ones.
+- `player.kill(launchVelocity)` — comic death: the player goes limp as a ragdoll (don't use it for Darts).
 
 ## Testing without a visible browser
 

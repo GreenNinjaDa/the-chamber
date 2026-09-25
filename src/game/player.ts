@@ -1,17 +1,19 @@
 import type { Input } from '../engine/input';
 import {
-  approachAngle, basis, clamp, cross, dot, mul, normalize, rotationX, rotationY, scale, scaling, sub, translation,
+  approachAngle, basis, cross, dot, mul, normalize, rotationX, rotationY, scale, scaling, sub, translation,
   type Mat4, type Vec3,
 } from '../engine/math';
+import { RAPIER, type Physics } from '../engine/physics';
 import type { DrawItem } from '../engine/renderer';
-import { CHAMBER_HALF } from './chamber';
+import { Ragdoll } from './ragdoll';
 
 /**
  * control: walking around under player control (pos = feet)
  * held:    in the giant's hand (pos = feet)
- * flying / stuck / splat: body horizontal, head toward -z (pos = body centre)
+ * flying / stuck / splat: body along `flightDir` (pos = body centre)
+ * ragdoll: dead and limp; pos follows the ragdoll (≈ feet) so cameras keep working
  */
-export type PlayerMode = 'control' | 'held' | 'flying' | 'stuck' | 'splat';
+export type PlayerMode = 'control' | 'held' | 'flying' | 'stuck' | 'splat' | 'ragdoll';
 
 export interface Circle {
   x: number;
@@ -20,6 +22,7 @@ export interface Circle {
 }
 
 export const PLAYER_RADIUS = 0.35;
+const CAPSULE_HALF = 0.55; // + radius = 0.9 = half the player's height
 const WALK_SPEED = 5;
 const SPRINT_SPEED = 8.5;
 const JUMP_SPEED = 7.5;
@@ -39,6 +42,11 @@ export class Player {
   flightDir: Vec3 = [0, 0, -1];
   mode: PlayerMode = 'control';
   onGround = true;
+  ragdoll: Ragdoll | null = null;
+  /** The player's capsule; exclude it from ray casts. */
+  collider: RAPIER.Collider | null = null;
+  private physics: Physics | null = null;
+  private controller: RAPIER.KinematicCharacterController | null = null;
   private walk = 0;
   private moveAmount = 0;
 
@@ -49,6 +57,26 @@ export class Player {
     this.flightDir = [0, 0, -1];
     this.mode = 'control';
     this.onGround = true;
+    this.ragdoll = null;
+  }
+
+  /** Gives the player a capsule and character controller in a (new) physics world. */
+  attach(physics: Physics) {
+    this.physics = physics;
+    const c = this.center();
+    // A parentless collider: dynamic objects collide with it, and the controller moves it.
+    this.collider = physics.world.createCollider(
+      RAPIER.ColliderDesc.capsule(CAPSULE_HALF, PLAYER_RADIUS).setTranslation(c[0], c[1], c[2]),
+    );
+    this.controller = physics.world.createCharacterController(0.02);
+    this.controller.enableAutostep(0.35, 0.2, true);
+    this.controller.enableSnapToGround(0.3);
+    this.controller.setApplyImpulsesToDynamicBodies(true);
+    this.controller.setCharacterMass(80);
+  }
+
+  private center(): Vec3 {
+    return [this.pos[0], this.pos[1] + CAPSULE_HALF + PLAYER_RADIUS, this.pos[2]];
   }
 
   update(dt: number, input: Input, camYaw: number, obstacles: Circle[]) {
@@ -74,19 +102,9 @@ export class Player {
     }
     this.vel[1] -= GRAVITY * dt;
 
-    const p = this.pos;
-    p[0] += this.vel[0] * dt;
-    p[1] += this.vel[1] * dt;
-    p[2] += this.vel[2] * dt;
-    if (p[1] <= 0) {
-      p[1] = 0;
-      this.vel[1] = 0;
-      this.onGround = true;
-    }
+    this.move(scale(this.vel, dt), dt);
 
-    const lim = CHAMBER_HALF - PLAYER_RADIUS;
-    p[0] = clamp(p[0], -lim, lim);
-    p[2] = clamp(p[2], -lim, lim);
+    const p = this.pos;
     for (const c of obstacles) {
       const dx = p[0] - c.x, dz = p[2] - c.z;
       const d = Math.hypot(dx, dz);
@@ -103,7 +121,65 @@ export class Player {
     this.walk += dt * hs * 1.6;
   }
 
+  /** Moves by `delta`, sliding along walls, stepping up small ledges and pushing loose objects. */
+  private move(delta: Vec3, dt: number) {
+    const col = this.collider, ctrl = this.controller;
+    if (!col || !ctrl) {
+      this.pos = [this.pos[0] + delta[0], Math.max(0, this.pos[1] + delta[1]), this.pos[2] + delta[2]];
+      this.onGround = this.pos[1] <= 0;
+      if (this.onGround) this.vel[1] = Math.max(0, this.vel[1]);
+      return;
+    }
+    // `pos` is the source of truth (levels may teleport the player), so sync the capsule first.
+    const c = this.center();
+    col.setTranslation({ x: c[0], y: c[1], z: c[2] });
+    ctrl.computeColliderMovement(col, { x: delta[0], y: delta[1], z: delta[2] });
+    const m = ctrl.computedMovement();
+    this.pos = [this.pos[0] + m.x, this.pos[1] + m.y, this.pos[2] + m.z];
+    this.onGround = ctrl.computedGrounded();
+    if (this.onGround && this.vel[1] < 0) this.vel[1] = 0;
+    if (delta[1] > 0 && m.y < delta[1] * 0.5) this.vel[1] = Math.min(this.vel[1], 0); // bumped head
+    if (dt > 0 && this.pos[1] < -20) this.pos[1] = 0; // fell out of the world
+    const n = this.center();
+    col.setTranslation({ x: n[0], y: n[1], z: n[2] });
+  }
+
+  /** Call once per tick before the physics step. */
+  syncCollider() {
+    if (!this.collider) return;
+    this.collider.setEnabled(this.mode === 'control');
+    if (this.mode === 'control') {
+      const c = this.center();
+      this.collider.setTranslation({ x: c[0], y: c[1], z: c[2] });
+    }
+  }
+
+  /** Call once per tick after the physics step. */
+  afterPhysics() {
+    if (this.ragdoll) {
+      const t = this.ragdoll.position('torso');
+      this.pos = [t[0], t[1] - 1.2, t[2]];
+    }
+  }
+
+  /** Goes limp with the given extra velocity (m/s). Comic deaths use this. */
+  kill(launch: Vec3 = [0, 0, 0]) {
+    if (!this.physics || this.mode === 'ragdoll') return;
+    const feet: Vec3 = this.mode === 'control' || this.mode === 'held' ? this.pos : sub(this.pos, [0, 0.9, 0]);
+    this.ragdoll = new Ragdoll(this.physics, feet, this.facing, [
+      this.vel[0] + launch[0],
+      this.vel[1] + launch[1],
+      this.vel[2] + launch[2],
+    ]);
+    this.mode = 'ragdoll';
+    this.collider?.setEnabled(false);
+  }
+
   draw(out: DrawItem[], time: number) {
+    if (this.ragdoll) {
+      this.drawRagdoll(out, this.ragdoll);
+      return;
+    }
     const horizontal = this.mode === 'flying' || this.mode === 'stuck' || this.mode === 'splat';
     const root = horizontal
       ? mul(translation(this.pos), alongDirection(this.flightDir), translation([0, -0.9, 0]))
@@ -127,18 +203,30 @@ export class Player {
       armL = armR = Math.PI;
     }
 
-    const part = (mesh: 'box' | 'sphere', m: Mat4, color: number[]) => out.push({ mesh, model: m, color });
     const limb = (pivot: Vec3, angle: number, size: Vec3, color: number[]) =>
-      part('box', mul(root, translation(pivot), rotationX(angle), translation([0, -size[1] / 2, 0]), scaling(size)), color);
+      out.push({ mesh: 'box', model: mul(root, translation(pivot), rotationX(angle), translation([0, -size[1] / 2, 0]), scaling(size)), color });
 
-    part('box', mul(root, translation([0, 1.2, 0]), scaling([0.56, 0.72, 0.3])), SUIT);
-    part('box', mul(root, translation([0, 1.22, 0.2]), scaling([0.42, 0.5, 0.14])), PACK);
-    part('sphere', mul(root, translation([0, 1.74, 0]), scaling([0.21, 0.23, 0.21])), SKIN);
-    part('sphere', mul(root, translation([0, 1.8, 0.03]), scaling([0.22, 0.2, 0.22])), HAIR);
+    this.drawTorsoAndHead(out, mul(root, translation([0, 1.2, 0])), mul(root, translation([0, 1.74, 0])));
     limb([-0.37, 1.5, 0], armL, [0.15, 0.66, 0.17], SUIT);
     limb([0.37, 1.5, 0], armR, [0.15, 0.66, 0.17], SUIT);
     limb([-0.14, 0.86, 0], legL, [0.21, 0.86, 0.25], PANTS);
     limb([0.14, 0.86, 0], legR, [0.21, 0.86, 0.25], PANTS);
+  }
+
+  /** `torso` and `head` are the frames at the torso centre and head centre. */
+  private drawTorsoAndHead(out: DrawItem[], torso: Mat4, head: Mat4) {
+    out.push({ mesh: 'box', model: mul(torso, scaling([0.56, 0.72, 0.3])), color: SUIT });
+    out.push({ mesh: 'box', model: mul(torso, translation([0, 0.02, 0.2]), scaling([0.42, 0.5, 0.14])), color: PACK });
+    out.push({ mesh: 'sphere', model: mul(head, scaling([0.21, 0.23, 0.21])), color: SKIN });
+    out.push({ mesh: 'sphere', model: mul(head, translation([0, 0.06, 0.03]), scaling([0.22, 0.2, 0.22])), color: HAIR });
+  }
+
+  private drawRagdoll(out: DrawItem[], r: Ragdoll) {
+    this.drawTorsoAndHead(out, r.transform('torso'), r.transform('head'));
+    out.push({ mesh: 'box', model: mul(r.transform('armL'), scaling([0.15, 0.66, 0.17])), color: SUIT });
+    out.push({ mesh: 'box', model: mul(r.transform('armR'), scaling([0.15, 0.66, 0.17])), color: SUIT });
+    out.push({ mesh: 'box', model: mul(r.transform('legL'), scaling([0.21, 0.86, 0.25])), color: PANTS });
+    out.push({ mesh: 'box', model: mul(r.transform('legR'), scaling([0.21, 0.86, 0.25])), color: PANTS });
   }
 }
 

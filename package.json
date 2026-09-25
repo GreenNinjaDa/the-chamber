@@ -12,5 +12,8 @@
     "@webgpu/types": "^0.1.60",
     "typescript": "^5.9.0",
     "vite": "^7.0.0"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.21.0"
   }
 }

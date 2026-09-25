@@ -26,6 +26,8 @@ export interface DrawItem {
   /** Pattern parameter: panel size for `panels`, opacity for `blob`. */
   param?: number;
   spec?: number;
+  /** 0..1 pulsing glow for the thing under the crosshair. */
+  highlight?: number;
   /** Set false to keep the item out of the shadow map. */
   shadow?: boolean;
 }
@@ -254,7 +256,7 @@ export class Renderer {
       od[o + 36] = d.pattern ?? Pattern.plain;
       od[o + 37] = d.param ?? 0;
       od[o + 38] = d.spec ?? 0.08;
-      od[o + 39] = 0;
+      od[o + 39] = d.highlight ?? 0;
     }
     device.queue.writeBuffer(this.objBuffer, 0, od, 0, n * OBJ_FLOATS);
 

@@ -8,6 +8,12 @@ const STYLE = `
               transition: opacity .4s; padding: 16px; }
 .hud-big { font-size: clamp(40px, 9vw, 96px); font-weight: 800; letter-spacing: .12em; }
 .hud-small { font-size: clamp(14px, 2vw, 20px); margin-top: 8px; opacity: .9; white-space: pre-line; line-height: 1.5; }
+.hud-cross { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px;
+              border-radius: 50%; background: #fff; box-shadow: 0 0 0 1.5px rgba(0,0,0,.45);
+              transition: width .12s, height .12s, margin .12s, background .12s, opacity .2s; box-sizing: border-box; }
+.hud-cross.target { width: 22px; height: 22px; margin: -11px 0 0 -11px; background: transparent; border: 2px solid #fff; }
+.hud-cross.holding { width: 14px; height: 14px; margin: -7px 0 0 -7px; background: rgba(255,255,255,.35); border: 2px solid #fff; }
+.hud-cross.hidden { opacity: 0; }
 .hud-hint { position: absolute; bottom: 28px; left: 0; right: 0; text-align: center; font-size: 18px;
             padding: 0 16px; transition: opacity .3s; }
 `;
@@ -20,6 +26,7 @@ export class Hud {
   private bigEl: HTMLDivElement;
   private smallEl: HTMLDivElement;
   private hintEl: HTMLDivElement;
+  private crossEl: HTMLDivElement;
   private messageTimer = 0;
   private fpsAccum = 0;
   private fpsFrames = 0;
@@ -35,8 +42,9 @@ export class Hud {
     this.bigEl = el('hud-big');
     this.smallEl = el('hud-small');
     this.hintEl = el('hud-hint');
+    this.crossEl = el('hud-cross hidden');
     this.centerEl.append(this.bigEl, this.smallEl);
-    root.append(this.levelEl, this.fpsEl, this.centerEl, this.hintEl);
+    root.append(this.levelEl, this.fpsEl, this.crossEl, this.centerEl, this.hintEl);
     document.body.appendChild(root);
     this.hide();
   }
@@ -56,6 +64,11 @@ export class Hud {
   hide() {
     this.centerEl.style.opacity = '0';
     this.messageTimer = 0;
+  }
+
+  crosshair(state: 'hidden' | 'idle' | 'target' | 'holding') {
+    const cls = `hud-cross ${state === 'idle' ? '' : state}`.trim();
+    if (this.crossEl.className !== cls) this.crossEl.className = cls;
   }
 
   hint(text: string) {

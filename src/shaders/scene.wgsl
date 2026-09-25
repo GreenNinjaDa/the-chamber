@@ -13,7 +13,7 @@ struct Object {
   model: mat4x4f,
   normalMat: mat4x4f,
   color: vec4f,
-  params: vec4f,      // x: pattern, y: pattern parameter, z: specular strength
+  params: vec4f,      // x: pattern, y: pattern parameter, z: specular strength, w: highlight
 };
 
 @group(0) @binding(0) var<uniform> frame: Frame;
@@ -163,6 +163,11 @@ fn fs(in: VsOut) -> @location(0) vec4f {
   let h = normalize(l + v);
   let spec = pow(max(dot(n, h), 0.0), 48.0) * obj.params.z * step(0.0, dot(n, l));
   var col = albedo * (frame.sunColor.rgb * ndl * sh + hemi) + frame.sunColor.rgb * spec * sh;
+  if (obj.params.w > 0.0) {
+    // Pulsing glow on whatever the crosshair is targeting.
+    let pulse = 0.65 + 0.35 * sin(frame.camPos.w * 6.0);
+    col += (albedo * 0.5 + vec3f(0.08, 0.07, 0.03)) * obj.params.w * pulse;
+  }
 
   let dist = length(camPos - in.worldPos);
   let fog = 1.0 - exp(-dist * frame.fogColor.w);

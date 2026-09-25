@@ -5,6 +5,9 @@ export class Input {
   mouseDX = 0;
   mouseDY = 0;
   locked = false;
+  /** Left mouse button went down this frame. */
+  mousePressed = false;
+  mouseDown = false;
   private down = new Set<string>();
   private pressed = new Set<string>();
 
@@ -20,6 +23,14 @@ export class Input {
       if (!this.locked) return;
       this.mouseDX += e.movementX;
       this.mouseDY += e.movementY;
+    });
+    window.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      this.mousePressed = true;
+      this.mouseDown = true;
+    });
+    window.addEventListener('mouseup', (e) => {
+      if (e.button === 0) this.mouseDown = false;
     });
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === canvas;
@@ -45,6 +56,7 @@ export class Input {
 
   endFrame() {
     this.pressed.clear();
+    this.mousePressed = false;
     this.mouseDX = 0;
     this.mouseDY = 0;
   }

@@ -1,4 +1,5 @@
 import type { Input } from '../engine/input';
+import type { Physics } from '../engine/physics';
 import type { Vec3 } from '../engine/math';
 import type { DrawItem, Environment } from '../engine/renderer';
 import type { ThirdPersonCamera } from '../game/camera';
@@ -12,6 +13,8 @@ export interface LevelContext {
   camera: ThirdPersonCamera;
   hud: Hud;
   input: Input;
+  /** Fresh physics world for this attempt, with the chamber colliders already added. */
+  physics: Physics;
 }
 
 /** A camera position a level wants instead of the normal over-the-shoulder view. */
