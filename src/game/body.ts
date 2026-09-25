@@ -105,14 +105,19 @@ const HAIR = [0.12, 0.08, 0.05];
 const PACK = [0.35, 0.37, 0.4];
 const BOOT = [0.1, 0.09, 0.08];
 
-export function drawBody(out: DrawItem[], f: Frames) {
+/**
+ * Draws the body from its part frames. `girth` > 1 fattens the torso (wider, and mostly a
+ * belly pushing out the front; the backpack stays put).
+ */
+export function drawBody(out: DrawItem[], f: Frames, girth = 1) {
   const rb = (m: Mat4, pos: Vec3, size: Vec3, color: number[]) =>
     out.push({ mesh: 'roundbox', model: mul(m, translation(pos), scaling(size)), color });
   const ball = (m: Mat4, pos: Vec3, size: Vec3, color: number[]) =>
     out.push({ mesh: 'sphere', model: mul(m, translation(pos), scaling(size)), color });
 
-  rb(f.pelvis, [0, 0, 0], [0.36, 0.24, 0.25], PANTS);
-  rb(f.chest, [0, 0, 0], [0.5, 0.5, 0.29], SUIT);
+  const wide = 1 + (girth - 1) * 0.45, deep = 1 + (girth - 1) * 1.3;
+  rb(f.pelvis, [0, 0, -0.125 * (deep - 1) * 0.6], [0.36 * wide, 0.24, 0.25 * (1 + (deep - 1) * 0.6)], PANTS);
+  rb(f.chest, [0, 0, -0.145 * (deep - 1)], [0.5 * wide, 0.5, 0.29 * deep], SUIT);
   rb(f.chest, [0, 0.02, 0.19], [0.38, 0.4, 0.14], PACK);
   ball(f.head, [0, 0, 0], [0.2, 0.23, 0.21], SKIN);
   ball(f.head, [0, 0.06, 0.03], [0.21, 0.2, 0.22], HAIR);

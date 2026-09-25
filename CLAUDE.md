@@ -50,7 +50,9 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   and a third, comically huge grenade (5× the first) drops (400 kg, too heavy to pick up); it kills you wherever you are, but the exit
   opens 5 s after it lands, with 5 s left on its fuse.
 - **Level 3 — Piece of Cake** (`src/levels/cake/`; meant to become a secret level reached by an easter egg): a
-  black forest cake on a pedestal with one slice cut and pulled out (E eats it, with a quip; E again gets refused).
+  black forest cake of eight slices on a pedestal. One is already cut and pulled out and must be eaten first; then
+  E eats any slice. Each one fattens the torso (`player.girth`, this life only) and the quips get more worried;
+  the 7th brings a stern warning and the 8th kills you (Mr Creosote style, torn apart).
   Companion shapes (`entities/companions.ts`: sphere, cylinder, cone, capsule, wheel — never a cube; ~1 m like the
   real cube, 25 kg) lie around;
   putting one on the floor button (`entities/pressurePlate.ts`) opens the exit.

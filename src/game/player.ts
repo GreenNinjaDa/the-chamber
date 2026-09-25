@@ -32,8 +32,8 @@ const SPRINT_SPEED = 8.5;
 const JUMP_SPEED = 7.5;
 const GRAVITY = 22;
 /** How quickly the player reaches their target speed on the ground / in the air (higher = snappier). */
-const GROUND_ACCEL = 14;
-const AIR_ACCEL = 4;
+const GROUND_ACCEL = 8;
+const AIR_ACCEL = 3;
 /** How quickly the player turns to face their movement direction. */
 const TURN_RATE = 12;
 
@@ -153,6 +153,8 @@ export class Player {
    */
   portalScale = 1;
   inPortal = false;
+  /** Torso fatness for this life only (1 = normal); reset() puts it back. */
+  girth = 1;
   private portalPivot: Vec3 = [0, 0, 0];
   private portalFrom = 1;
   private portalTo = 1;
@@ -173,6 +175,7 @@ export class Player {
     this.portalScale = this.portalFrom = this.portalTo = 1;
     this.portalTime = 0;
     this.inPortal = false;
+    this.girth = 1;
   }
 
   /** Sucks the player into a portal centred at `pivot`: they shrink into it over `seconds`. */
@@ -645,9 +648,9 @@ export class Player {
     const start = out.length;
     const body = this.body;
     if (body && body.isEnabled && (this.mode === 'control' || this.mode === 'ragdoll')) {
-      drawBody(out, body.frames());
+      drawBody(out, body.frames(), this.girth);
     } else {
-      drawBody(out, poseFrames(this.scriptedRoot(), this.pose));
+      drawBody(out, poseFrames(this.scriptedRoot(), this.pose), this.girth);
     }
     // Going through a portal: squeeze everything toward the portal's centre.
     if (this.portalScale < 0.999) {
