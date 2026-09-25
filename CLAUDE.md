@@ -63,8 +63,10 @@ when it ends, and show the result with `hud.show(...)`. Levels can take over the
 `CameraShot`, and take over the player by changing `player.mode`.
 
 Shared mechanics available to levels (via `ctx`):
-- `ctx.physics.addBox / addBall / addCylinder` — loose objects; anything under ~40 kg can be carried, heavier
-  things can only be dragged. Pass `grabbable: false` for things the player shouldn't pick up.
+- `ctx.physics.addBox / addBall / addCylinder` — loose objects. Carried things are held 0.9–1.8 m in front of the
+  chest with at most ~95 kg of lifting force (`MAX_CARRY_FORCE` in interaction.ts): light things are carried, a
+  120 kg fridge can be tipped upright by one end but only dragged, never lifted clear. Pass `grabbable: false`
+  for things the player shouldn't pick up.
 - `new Lever(physics, pos, yaw, onToggle)` and `new Button(physics, pos, color, onPress)` for E-usable props;
   implement `Usable` and call `physics.registerUsable(collider, thing)` for custom ones.
 - `trackedTargets()` — optional; returns things to flag on screen (pulsing red ring when visible, pulsing edge

@@ -10,6 +10,15 @@ export type CrosshairState = 'hidden' | 'idle' | 'target' | 'holding';
 const REACH = 3.2;
 /** Objects up to this mass are carried; heavier ones can only be dragged along. */
 const LIFT_MASS = 40;
+/** Carried objects are held this far in front of the chest (m), however far away they were grabbed. */
+const HOLD_MIN = 0.9;
+const HOLD_MAX = 1.8;
+/**
+ * The most force the player can put into a carried object (N): enough to hold ~95 kg up, so a
+ * lying fridge (120-150 kg) can be tipped upright by one end (that takes half its weight) but
+ * not lifted clear of the floor, only dragged.
+ */
+const MAX_CARRY_FORCE = 95 * GRAVITY;
 const HOLD_STIFFNESS = 10;
 const MAX_HOLD_SPEED = 14;
 const THROW_SPEED = 14;
@@ -97,17 +106,21 @@ export class Interaction {
     const q = body.rb.rotation();
     const inv = { x: -q.x, y: -q.y, z: -q.z, w: q.w };
     this.grabLocal = rotateByQuat(inv, sub(point, t));
-    this.holdDist = clamp(distance, camToChest + 1.4, camToChest + REACH);
+    this.holdDist = clamp(distance, camToChest + HOLD_MIN, camToChest + HOLD_MAX);
     this.held = body;
-    body.rb.setAngularDamping(4);
+    // Steady light things in the hand; heavy ones need to be free to tip.
+    body.rb.setAngularDamping(body.rb.mass() > LIFT_MASS ? 0.5 : 4);
     body.rb.wakeUp();
   }
 
-  /** Pulls the grab point toward a spot in front of the crosshair. Heavy objects lag and stay grounded. */
+  /**
+   * Pulls the grab point toward a spot in front of the crosshair, with at most MAX_CARRY_FORCE:
+   * light things follow closely, heavy ones can only be tipped or dragged.
+   */
   private drag(dt: number, origin: Vec3, dir: Vec3, camToChest: number) {
     const body = this.held!;
     const rb = body.rb;
-    const target = add(origin, scale(dir, Math.max(this.holdDist, camToChest + 1.4)));
+    const target = add(origin, scale(dir, clamp(this.holdDist, camToChest + HOLD_MIN, camToChest + HOLD_MAX)));
     const grabWorld = add(vec(rb.translation()), rotateByQuat(rb.rotation(), this.grabLocal));
     const toTarget = sub(target, grabWorld);
     if (length(toTarget) > 4.5) {
@@ -115,13 +128,15 @@ export class Interaction {
       return;
     }
     const mass = rb.mass();
-    const strength = clamp(LIFT_MASS / mass, 0.05, 1);
     let desired = scale(toTarget, HOLD_STIFFNESS);
     const speed = length(desired);
     if (speed > MAX_HOLD_SPEED) desired = scale(desired, MAX_HOLD_SPEED / speed);
     const dv = sub(desired, vec(rb.linvel()));
-    const impulse = scale(dv, mass * strength * 0.5);
-    impulse[1] += GRAVITY * dt * mass * strength; // hold light things up; heavy things mostly slide
+    let impulse = scale(dv, mass * 0.5);
+    impulse[1] += GRAVITY * dt * mass; // hold it up against gravity...
+    const cap = MAX_CARRY_FORCE * dt; // ...but only as hard as the player can pull
+    const magnitude = length(impulse);
+    if (magnitude > cap) impulse = scale(impulse, cap / magnitude);
     rb.applyImpulseAtPoint({ x: impulse[0], y: impulse[1], z: impulse[2] }, { x: grabWorld[0], y: grabWorld[1], z: grabWorld[2] }, true);
   }
 

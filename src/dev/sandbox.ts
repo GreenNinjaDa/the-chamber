@@ -36,7 +36,7 @@ export class Sandbox implements Level {
       physics.addBox([6, 0.45 + i * 0.91, 3], [0.9, 0.9, 0.9], { color: WOOD, mass: 15 });
     }
     // Too heavy to lift: can only be dragged along the floor.
-    physics.addBox([-6, 0.96, 5], [0.9, 1.9, 0.8], { color: [0.92, 0.93, 0.95], mass: 150 });
+    physics.addBox([-6, 0.96, 5], [0.9, 1.9, 0.8], { color: [0.92, 0.93, 0.95], mass: 120 });
     for (let i = 0; i < 4; i++) {
       physics.addBall([-2 + i * 1.4, 0.4, 7], 0.35 + i * 0.1, { color: [0.85, 0.2 + i * 0.15, 0.15], mass: 3, restitution: 0.6 });
     }
