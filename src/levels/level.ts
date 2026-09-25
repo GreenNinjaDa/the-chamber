@@ -23,6 +23,8 @@ export interface TrackedTarget {
   pos: Vec3;
   /** World-space radius, so the ring fits around the object. */
   radius: number;
+  /** Marker colour: red (danger, the default) or yellow (somewhere to go). */
+  color?: 'red' | 'yellow';
 }
 
 /** A camera position a level wants instead of the normal over-the-shoulder view. */

@@ -71,6 +71,10 @@ interface GrenadeSpec {
   scorchRange: number;
   scorchSize: number;
   color: number[];
+  /** Kills the player wherever they are, cover or not (the huge one). */
+  alwaysLethal?: boolean;
+  /** Can't be picked up (walking into it still nudges it, very slowly). */
+  tooHeavy?: boolean;
 }
 
 const GRENADES: GrenadeSpec[] = [
@@ -86,9 +90,10 @@ const GRENADES: GrenadeSpec[] = [
     push: 2200, maxSpeed: 24, pushRange: 30, color: [0.09, 0.1, 0.05],
   },
   {
-    // Comically huge: 5x the first. Nothing in the room saves you; the exit opens 5 s after it
-    // lands, so run.
-    radius: 0.8, mass: 12, throwScale: 0.5, fuse: 10, safeDistance: 400, falloff: 1, shrapnel: 700, scorchRange: 8, scorchSize: 6,
+    // Comically huge: 5x the first, far too heavy to pick up, and nothing in the room saves you;
+    // the exit opens 5 s after it lands, so run.
+    alwaysLethal: true, tooHeavy: true,
+    radius: 0.8, mass: 400, throwScale: 0.5, fuse: 10, safeDistance: 400, falloff: 1, shrapnel: 700, scorchRange: 8, scorchSize: 6,
     push: 9000, maxSpeed: 30, pushRange: 40, color: [0.13, 0.16, 0.06],
   },
 ];
@@ -293,6 +298,7 @@ export class GrenadeLevel implements Level {
     }
     const body = physics.addBall(pos, spec.radius, {
       mass: spec.mass, color: spec.color, restitution: 0.3, hidden: true, throwScale: spec.throwScale,
+      grabbable: !spec.tooHeavy,
     });
     this.grenade = { spec, body, fuseLeft: spec.fuse };
   }
@@ -334,7 +340,7 @@ export class GrenadeLevel implements Level {
     const exposures = targets.map((p) => this.exposure(pos, p));
     const inSight = !exposures[1].covered;
     const exposure = exposures.reduce((sum, e) => sum + e.pass, 0) / exposures.length;
-    const damage = inSight ? Infinity : Math.pow(spec.safeDistance / Math.max(d, 0.5), spec.falloff) * exposure;
+    const damage = inSight || spec.alwaysLethal ? Infinity : Math.pow(spec.safeDistance / Math.max(d, 0.5), spec.falloff) * exposure;
     const away = normalize(add(sub(chest, pos), [0, 0.5, 0]));
 
     // Shrapnel flies before anyone gets launched, so it hits where you were standing.

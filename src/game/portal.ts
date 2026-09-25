@@ -156,8 +156,10 @@ export class ExitPortal {
   }
 
   draw(out: DrawItem[]) {
+    // Until it opens there's nothing to see: the plain wall hides it.
+    if (!this.isOpen) return;
     drawPortal(out, this.centre, [-1, 0, 0], EXIT_RADIUS, true);
-    // The panel matches the wall until it slides aside.
+    // A wall panel slides aside to reveal it.
     const slide = easeInOut(clamp(this.openT / PANEL_SLIDE_TIME, 0, 1));
     const panelCentre: Vec3 = [CHAMBER_HALF - PANEL[0] / 2 - 0.005, PANEL[1] / 2, this.centre[2] + slide * (PANEL[2] + 0.1)];
     out.push({
@@ -172,6 +174,6 @@ export class ExitPortal {
 
   /** For the HUD's pulsing marker once it's open. */
   target() {
-    return this.isOpen ? { pos: this.centre, radius: EXIT_RADIUS } : null;
+    return this.isOpen ? { pos: this.centre, radius: EXIT_RADIUS, color: 'yellow' as const } : null;
   }
 }

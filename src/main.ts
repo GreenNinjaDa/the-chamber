@@ -29,14 +29,14 @@ function screenMarkers(targets: TrackedTarget[], view: Mat4, proj: Mat4, fov: nu
   const w = window.innerWidth, h = window.innerHeight;
   const margin = 44;
   const viewProj = multiply(proj, view);
-  return targets.map(({ pos, radius }) => {
+  return targets.map(({ pos, radius, color }) => {
     const cx = viewProj[0] * pos[0] + viewProj[4] * pos[1] + viewProj[8] * pos[2] + viewProj[12];
     const cy = viewProj[1] * pos[0] + viewProj[5] * pos[1] + viewProj[9] * pos[2] + viewProj[13];
     const cw = viewProj[3] * pos[0] + viewProj[7] * pos[1] + viewProj[11] * pos[2] + viewProj[15];
     const nx = cx / cw, ny = cy / cw;
     if (cw > 0.05 && Math.abs(nx) <= 1 && Math.abs(ny) <= 1) {
       const pxPerUnit = h / (2 * Math.tan(fov / 2) * cw);
-      return { onScreen: true, x: (nx * 0.5 + 0.5) * w, y: (0.5 - ny * 0.5) * h, size: Math.max(26, radius * 2 * pxPerUnit + 16), angle: 0 };
+      return { onScreen: true, x: (nx * 0.5 + 0.5) * w, y: (0.5 - ny * 0.5) * h, size: Math.max(26, radius * 2 * pxPerUnit + 16), angle: 0, color };
     }
     // Off screen: point along the target's direction in camera space (right / up), which also
     // does the sensible thing for targets behind the camera (e.g. behind and below = down).
@@ -45,7 +45,7 @@ function screenMarkers(targets: TrackedTarget[], view: Mat4, proj: Mat4, fov: nu
     let dx = vx, dy = -vy;
     if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) dy = 1;
     const t = Math.min((w / 2 - margin) / Math.max(Math.abs(dx), 1e-6), (h / 2 - margin) / Math.max(Math.abs(dy), 1e-6));
-    return { onScreen: false, x: w / 2 + dx * t, y: h / 2 + dy * t, size: 0, angle: Math.atan2(dy, dx) };
+    return { onScreen: false, x: w / 2 + dx * t, y: h / 2 + dy * t, size: 0, angle: Math.atan2(dy, dx), color };
   });
 }
 

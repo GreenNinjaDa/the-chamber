@@ -14,8 +14,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   and pop-culture references are welcome.
 - **Portals** (`src/game/portal.ts`): most levels start with `PortalArrival` — a rimless purple liquid portal
   opens above the floor, spits the player out limp at a random 30–90° downward angle (90° = straight down; stunned 1.5 s), then shrinks away 0.5 s
-  later — and most end with an `ExitPortal` (rimmed, behind a wall panel in the east wall that slides aside on
-  `openNow()`). Going through an exit sets the level's status to `'exited'`, and main.ts loads the next level
+  later — and most end with an `ExitPortal` (rimmed, in the east wall; invisible until
+  `openNow()` slides a wall panel aside to reveal it, and its HUD marker is yellow). Going through an exit sets the level's status to `'exited'`, and main.ts loads the next level
   immediately (after the last level it loops back to level 1).
 - **Level 1 — Darts** (`src/levels/darts/`): a giant rises over the south wall and blocks the sun. Five
   player-sized darts drop into the chamber and his hand hunts the player. The player survives by luring the
@@ -37,7 +37,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   neither grenade can be thrown over the 10 m walls from the floor. Survive the first and 1 s later a second
   grenade 1.5× the size arrives:
   behind any single object you only live from 80% of the chamber's diagonal away (closer needs much more weight). Survive that
-  and a third, comically huge grenade (5× the first) drops; nothing in the room saves you from it, but the exit
+  and a third, comically huge grenade (5× the first) drops (400 kg, too heavy to pick up); it kills you wherever you are, but the exit
   opens 5 s after it lands, with 5 s left on its fuse.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall.
 
