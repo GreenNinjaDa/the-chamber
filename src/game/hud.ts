@@ -18,14 +18,14 @@ const STYLE = `
 .hud-cross.holding { width: 14px; height: 14px; margin: -7px 0 0 -7px; background: rgba(255,255,255,.35); border: 2px solid #fff; }
 .hud-cross.hidden { opacity: 0; }
 .hud-marker { position: absolute; left: 0; top: 0; pointer-events: none; }
-.hud-ring { position: absolute; border: 2px solid #ff2a1a; border-radius: 50%; box-sizing: border-box;
+.hud-ring { position: absolute; border: 4px solid #ff2a1a; border-radius: 50%; box-sizing: border-box;
             box-shadow: 0 0 8px rgba(255,40,20,.8), inset 0 0 6px rgba(255,40,20,.5);
             animation: hud-pulse .55s ease-in-out infinite; }
-.hud-arrow { position: absolute; width: 34px; height: 28px; margin: -14px 0 0 -17px; }
+.hud-arrow { position: absolute; width: 54px; height: 44px; margin: -22px 0 0 -27px; }
 .hud-arrow > div { width: 100%; height: 100%; background: #ff2a1a; clip-path: polygon(100% 50%, 0 0, 22% 50%, 0 100%);
                    filter: drop-shadow(0 0 6px rgba(255,40,20,.9)); animation: hud-pulse .55s ease-in-out infinite; }
-.hud-ring.yellow { border-color: #ffd21a; box-shadow: 0 0 8px rgba(255,210,20,.8), inset 0 0 6px rgba(255,210,20,.5); }
-.hud-arrow.yellow > div { background: #ffd21a; filter: drop-shadow(0 0 6px rgba(255,210,20,.9)); }
+.hud-ring.purple { border-color: #c04dff; box-shadow: 0 0 10px rgba(190,70,255,.9), inset 0 0 8px rgba(190,70,255,.6); }
+.hud-arrow.purple > div { background: #c04dff; filter: drop-shadow(0 0 7px rgba(190,70,255,.95)); }
 .hud-label { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); white-space: nowrap;
              font-weight: 800; letter-spacing: .06em; text-shadow: 0 0 6px rgba(0,0,0,.55), 0 2px 3px rgba(0,0,0,.5); }
 @keyframes hud-pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.3); opacity: .3; } }
@@ -50,7 +50,7 @@ export interface ScreenMarker {
   size: number;
   /** Arrow direction (radians, screen space, 0 = right), when off screen. */
   angle: number;
-  color?: 'red' | 'yellow';
+  color?: 'red' | 'purple';
 }
 
 /** DOM overlay for level titles, messages and hints. */
@@ -148,9 +148,9 @@ export class Hud {
       m.ring.style.display = t?.onScreen ? 'block' : 'none';
       m.arrow.style.display = t && !t.onScreen ? 'block' : 'none';
       if (!t) return;
-      const yellow = t.color === 'yellow';
-      m.ring.classList.toggle('yellow', yellow);
-      m.arrow.classList.toggle('yellow', yellow);
+      const purple = t.color === 'purple';
+      m.ring.classList.toggle('purple', purple);
+      m.arrow.classList.toggle('purple', purple);
       if (t.onScreen) {
         const d = Math.round(t.size);
         m.ring.style.width = m.ring.style.height = `${d}px`;

@@ -195,6 +195,6 @@ export class ExitPortal {
 
   /** For the HUD's pulsing marker once it's open. */
   target() {
-    return this.isOpen ? { pos: this.centre, radius: EXIT_RADIUS, color: 'yellow' as const } : null;
+    return this.isOpen ? { pos: this.centre, radius: EXIT_RADIUS, color: 'purple' as const } : null;
   }
 }

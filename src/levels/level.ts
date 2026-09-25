@@ -23,8 +23,8 @@ export interface TrackedTarget {
   pos: Vec3;
   /** World-space radius, so the ring fits around the object. */
   radius: number;
-  /** Marker colour: red (danger, the default) or yellow (somewhere to go). */
-  color?: 'red' | 'yellow';
+  /** Marker colour: red (danger, the default) or purple (somewhere to go). */
+  color?: 'red' | 'purple';
 }
 
 /** Text floating in the world (signs, button labels), drawn by the HUD. */

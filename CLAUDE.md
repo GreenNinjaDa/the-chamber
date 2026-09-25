@@ -15,7 +15,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
 - **Portals** (`src/game/portal.ts`): most levels start with `PortalArrival` — a rimless purple liquid portal
   opens above the floor, spits the player out limp at a random 30–90° downward angle (90° = straight down; stunned 1.5 s), then shrinks away 0.5 s
   later — and most end with an `ExitPortal` (rimmed, in the east wall; invisible until
-  `openNow()` slides a wall panel aside to reveal it, and its HUD marker is yellow). Going through an exit sets the level's status to `'exited'`, and main.ts loads the next level
+  `openNow()` slides a wall panel aside to reveal it, and its HUD marker is purple). Going through an exit sets the level's status to `'exited'`, and main.ts loads the next level
   immediately (after the last level it goes back to the lobby). Going through a portal squeezes the player: they
   shrink into it over 0.5 s (`player.shrinkInto`, no control and invulnerable meanwhile) and grow back out of the
   entrance portal over 0.5 s (`player.growFrom`), drawn scaled about the portal's centre.
