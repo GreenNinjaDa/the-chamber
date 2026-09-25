@@ -13,8 +13,9 @@ import { crouchLegs, drawBody, PART_NAMES, PhysBody, poseFrames, REST_POSE, stan
  * held:    in the giant's hand (pos = feet)
  * flying / stuck / splat: body along `flightDir` (pos = body centre)
  * ragdoll: dead and limp; pos follows the body (≈ feet) so cameras keep working
+ * hidden:  not in the level yet (waiting inside an entrance portal)
  */
-export type PlayerMode = 'control' | 'held' | 'flying' | 'stuck' | 'splat' | 'ragdoll';
+export type PlayerMode = 'control' | 'held' | 'flying' | 'stuck' | 'splat' | 'ragdoll' | 'hidden';
 
 export interface Circle {
   x: number;
@@ -457,6 +458,32 @@ export class Player {
    * Knocks the player loose: muscles go slack for `stunSeconds`, the body is shoved by
    * `velocity` (m/s), then the player pulls themselves together.
    */
+  /** Takes the player out of the level (e.g. while an entrance portal opens). */
+  hide() {
+    this.mode = 'hidden';
+    this.vel = [0, 0, 0];
+  }
+
+  /**
+   * Pops the player out at `centre` (where the body's middle appears), flying along
+   * `velocity` limp and stunned for `stunSeconds`, facing `facing`.
+   */
+  emerge(centre: Vec3, facing: number, velocity: Vec3, stunSeconds: number) {
+    this.mode = 'control';
+    this.facing = facing;
+    this.pos = [centre[0], centre[1] - 0.95, centre[2]];
+    this.vel = [0, 0, 0];
+    this.onGround = false;
+    const body = this.body;
+    if (body) {
+      body.teleport(poseFrames(standingRoot(this.pos, facing), REST_POSE));
+      body.setEnabled(true);
+      body.parts.chest.setAngvel({ x: (Math.random() - 0.5) * 6, y: (Math.random() - 0.5) * 4, z: (Math.random() - 0.5) * 6 }, true);
+    }
+    this.driveFeet = [...this.pos];
+    this.knock(velocity, stunSeconds);
+  }
+
   knock(velocity: Vec3, stunSeconds: number) {
     if (this.mode !== 'control' || !this.body) return;
     this.body.muscle = STUNNED_MUSCLE;
@@ -562,6 +589,7 @@ export class Player {
   }
 
   draw(out: DrawItem[], _time: number) {
+    if (this.mode === 'hidden') return;
     const body = this.body;
     if (body && body.isEnabled && (this.mode === 'control' || this.mode === 'ragdoll')) {
       drawBody(out, body.frames());

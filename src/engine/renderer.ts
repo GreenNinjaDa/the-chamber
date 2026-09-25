@@ -17,6 +17,7 @@ export const Pattern = {
   emissive: 4,
   skin: 5,
   sky: 6,
+  portal: 7,
 } as const;
 
 export interface DrawItem {

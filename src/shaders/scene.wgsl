@@ -30,6 +30,7 @@ const PAT_BLOB = 3;
 const PAT_EMISSIVE = 4;
 const PAT_SKIN = 5;
 const PAT_SKY = 6;
+const PAT_PORTAL = 7;
 
 struct VsOut {
   @builtin(position) pos: vec4f,
@@ -122,6 +123,37 @@ fn dartboardColor(lp: vec3f, ln: vec3f) -> vec3f {
   return select(vec3f(0.9, 0.84, 0.66), vec3f(0.04, 0.04, 0.04), isEven);
 }
 
+fn vnoise(p: vec2f) -> f32 {
+  let i = floor(p);
+  let f = fract(p);
+  let u = f * f * (3.0 - 2.0 * f);
+  let a = hash2(i);
+  let b = hash2(i + vec2f(1.0, 0.0));
+  let c = hash2(i + vec2f(0.0, 1.0));
+  let d = hash2(i + vec2f(1.0, 1.0));
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+// Swirling purple liquid on the caps of the unit cylinder (a thin disc).
+fn portalColor(lp: vec3f, ln: vec3f, t: f32) -> vec3f {
+  if (abs(ln.y) < 0.5) {
+    return vec3f(0.2, 0.03, 0.35); // the disc's thin edge
+  }
+  let p = lp.xz;
+  let r = length(p);
+  let a = atan2(p.y, p.x);
+  // Swirl faster toward the centre, then domain-warp noise so it churns like a liquid.
+  let swirl = a + t * 0.9 + (1.0 - r) * 3.5;
+  let q = vec2f(cos(swirl), sin(swirl)) * r * 3.0;
+  let w = vec2f(vnoise(q + vec2f(t * 0.6, 0.0)), vnoise(q + vec2f(5.2, -t * 0.5)));
+  let n = vnoise(q * 1.7 + w * 2.5 + vec2f(t * 0.3, -t * 0.2));
+  let ripple = 0.5 + 0.5 * sin(r * 22.0 - t * 5.0 + n * 6.0);
+  var col = mix(vec3f(0.09, 0.0, 0.22), vec3f(0.62, 0.12, 1.25), smoothstep(0.3, 0.95, n * 0.8 + ripple * 0.35));
+  col += vec3f(0.9, 0.35, 1.5) * pow(1.0 - r, 3.0) * 0.7; // glowing core
+  col += vec3f(0.8, 0.2, 1.3) * smoothstep(0.8, 1.0, r) * 1.1; // bright lip
+  return col;
+}
+
 fn skyColor(dir: vec3f) -> vec3f {
   let l = normalize(frame.sunDir.xyz);
   let t = clamp(dir.y, 0.0, 1.0);
@@ -138,6 +170,9 @@ fn fs(in: VsOut) -> @location(0) vec4f {
 
   if (pattern == PAT_SKY) {
     return vec4f(tonemap(skyColor(normalize(in.worldPos - camPos))), 1.0);
+  }
+  if (pattern == PAT_PORTAL) {
+    return vec4f(tonemap(portalColor(in.localPos, in.localNormal, frame.camPos.w)), 1.0);
   }
   if (pattern == PAT_EMISSIVE) {
     // Unlit glow (lights, explosion flashes); values above 1 bloom into white through the tonemap.

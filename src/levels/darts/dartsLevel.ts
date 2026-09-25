@@ -5,8 +5,9 @@ import {
 import { Pattern, type DrawItem } from '../../engine/renderer';
 import { CHAMBER_HALF } from '../../game/chamber';
 import {
-  DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus,
+  DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus, type TrackedTarget,
 } from '../level';
+import { drawPortal, ExitPortal, PortalArrival } from '../../game/portal';
 import { DART_GRIP, dartMatrix, drawDart } from './dart';
 import { Giant } from './giant';
 
@@ -31,6 +32,10 @@ const BOARD_FACE_Z = BOARD_CENTER[2] + 0.5;
 const SCORING_R = BOARD_R * 0.8;
 /** Player centre must land this close to the centre to count as a bullseye. */
 const BULLSEYE_R = 1.1;
+/** After the last dart, the chance the giant has one more go at you (while the exit opens). */
+const FINAL_REACH_CHANCE = 0.5;
+/** That last grab hovers this long (s): just about enough time to run for the exit. */
+const FINAL_HOVER = 2.2;
 const GRAB_R = 2.8;
 const HOVER_Y = 18;
 const HAND_LIMIT = CHAMBER_HALF - 1;
@@ -59,7 +64,7 @@ const SWEEP_PLAYER_R = 1.6;
 const SWEEP_PAUSE = 0.15;
 const SWEEP_MAX_TIME = 3;
 
-type Phase = 'intro' | 'rise' | 'drop' | 'hunt' | 'sink' | 'over';
+type Phase = 'intro' | 'rise' | 'drop' | 'hunt' | 'sink' | 'gone' | 'over';
 type HandState = 'rest' | 'hover' | 'reach' | 'sweep' | 'close' | 'carry' | 'windup' | 'throw' | 'recover';
 
 interface Dart {
@@ -97,6 +102,10 @@ export class DartsLevel implements Level {
   private flightVel: Vec3 = [0, 0, 0];
   private passedBoard = false;
   private boardDrop = BOARD_HIDDEN_DROP;
+  private arrival: PortalArrival;
+  private exit = new ExitPortal(-2);
+  /** Set once all the darts are gone and the exit has opened. */
+  private endgame = false;
 
   constructor(private ctx: LevelContext) {
     ctx.hud.setLevel(`The Chamber · Level ${this.number}`);
@@ -105,16 +114,20 @@ export class DartsLevel implements Level {
     // Pose the giant once so he starts hidden below ground rather than at the origin.
     this.giant.update(0, [0, 0, 0]);
     this.grasp = this.restPoint();
+    this.arrival = new PortalArrival(ctx, [0, 0, 6]);
   }
 
   update(dt: number) {
     const { player, camera } = this.ctx;
     this.phaseT += dt;
     this.giant.time += dt;
+    this.arrival.update(dt);
+    this.exit.update(dt, player);
+    if (this.exit.entered) this.status = 'exited';
 
     switch (this.phase) {
       case 'intro':
-        if (this.phaseT > 1.5) this.setPhase('rise');
+        if (this.arrival.done) this.setPhase('rise');
         break;
       case 'rise': {
         const k = easeInOut(Math.min(1, this.phaseT / 4.5));
@@ -141,7 +154,7 @@ export class DartsLevel implements Level {
         this.giant.root[1] = lerp(0, -80, k);
         this.giant.headShake = 1 - k;
         camera.addShake(0.2);
-        if (this.phaseT > 4.2) this.finish('won', 'SURVIVED', pick(QUIPS.outOfDarts));
+        if (this.phaseT > 4.2) this.setPhase('gone'); // off he goes; the exit is open
         break;
       }
     }
@@ -287,9 +300,17 @@ export class DartsLevel implements Level {
         g.rightCurl = Math.max(0, g.rightCurl - dt * 2);
         if (u >= 1) {
           if (this.thrown >= DART_COUNT) {
-            this.setHand('rest');
-            this.setPhase('sink');
-            this.ctx.hud.hint('');
+            // Out of darts: the exit opens, and half the time he has one last go at you.
+            const lastGo = !this.endgame && player.mode === 'control' && Math.random() < FINAL_REACH_CHANCE;
+            this.endgame = true;
+            this.exit.openNow();
+            if (lastGo) {
+              this.hoverTime = FINAL_HOVER;
+              this.startHover();
+            } else {
+              this.setHand('rest');
+              this.setPhase('sink');
+            }
           } else if (player.mode === 'control') {
             this.startHover();
           } else {
@@ -385,7 +406,8 @@ export class DartsLevel implements Level {
     } else if (this.held) {
       const dart = this.held;
       dart.state = 'flying';
-      dart.vel = ballistic(dart.tip, aimAt(Math.random() * 4), 1.7, G);
+      // Aim around the bullseye, not into it (that's the portal).
+      dart.vel = ballistic(dart.tip, aimAt(1.6 + Math.random() * 2.6), 1.7, G);
       this.thrown++;
       this.speedUp();
     }
@@ -470,7 +492,9 @@ export class DartsLevel implements Level {
 
   private boardResult(r: number) {
     if (r <= BULLSEYE_R) {
-      this.finish('won', 'BULLSEYE!', pick(QUIPS.bullseye));
+      // The bullseye is a portal: straight through to the next chamber.
+      this.status = 'exited';
+      this.phase = 'over';
       return;
     }
     const mm = (r / SCORING_R) * 170;
@@ -512,6 +536,9 @@ export class DartsLevel implements Level {
       pattern: Pattern.dartboard,
       spec: 0.02,
     });
+    drawPortal(out, [bx, by - drop, bz + 0.52], [0, 0, 1], BULLSEYE_R, false);
+    this.arrival.draw(out);
+    this.exit.draw(out);
 
     for (const d of this.darts) drawDart(out, dartMatrix(d.tip, d.dir), d.color);
 
@@ -541,7 +568,14 @@ export class DartsLevel implements Level {
       .map((d) => ({ x: d.tip[0], z: d.tip[2], r: 0.25 }));
   }
 
+  trackedTargets(): TrackedTarget[] {
+    const t = this.exit.target();
+    return t ? [t] : [];
+  }
+
   cameraShot(): CameraShot | null {
+    const arriving = this.arrival.cameraShot();
+    if (arriving) return arriving;
     const p = this.ctx.player.pos;
     switch (this.ctx.player.mode) {
       case 'held': {
@@ -562,16 +596,6 @@ export class DartsLevel implements Level {
 
 // End-screen lines. The game is about surprise and humour, so keep any text dry and joking.
 const QUIPS = {
-  outOfDarts: [
-    'He ran out of darts. Somewhere, a pub league weeps.',
-    'Five darts thrown, zero of them you. Mum would be so proud.',
-    'The giant has left the building.',
-  ],
-  bullseye: [
-    'One hundred and eightyyy! (It is fifty. Nobody tell him.)',
-    'You are the dart now. Congratulations?',
-    'Nailed it. Mostly with your face.',
-  ],
   missedBoard: [
     'Houston, we have a problem.',
     'To infinity and... the floor.',

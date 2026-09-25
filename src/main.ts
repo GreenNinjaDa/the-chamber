@@ -120,6 +120,14 @@ async function main() {
           startLevel();
         }
       }
+      // Through an exit portal: straight into the next chamber (after the last, back to the first).
+      if (level.status === 'exited' && !sandbox) {
+        levelIndex = (levelIndex + 1) % LEVELS.length;
+        startLevel();
+        if (levelIndex === 0) {
+          hud.show('BACK TO LEVEL 1', "That's every chamber so far. The rest are still being built. Probably.", 4);
+        }
+      }
       camera.look(dt, input);
       if (player.mode === 'control') player.update(dt, input, camera.yaw, level.obstacles(), camera.pitch);
       player.syncCollider();

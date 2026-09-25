@@ -12,14 +12,20 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   (no theme names, no hint lines during play). Death screens do show a hint for how you died plus the controls
   that matter in that level (`hud.tips`). Any on-screen text is sarcastic or joking, may hint at the mechanics,
   and pop-culture references are welcome.
+- **Portals** (`src/game/portal.ts`): most levels start with `PortalArrival` — a rimless purple liquid portal
+  opens above the floor, spits the player out limp at a random 30–90° angle (stunned 1.5 s), then shrinks away 0.5 s
+  later — and most end with an `ExitPortal` (rimmed, behind a wall panel in the east wall that slides aside on
+  `openNow()`). Going through an exit sets the level's status to `'exited'`, and main.ts loads the next level
+  immediately (after the last level it loops back to level 1).
 - **Level 1 — Darts** (`src/levels/darts/`): a giant rises over the south wall and blocks the sun. Five
   player-sized darts drop into the chamber and his hand hunts the player. The player survives by luring the
   hand onto darts until he has thrown **all five**; the hand gets faster after every grab. Each grab is a
   hover that tracks the player, then a gradual descent that locks its landing spot halfway down. If it lands
   on nothing, it immediately sweeps sideways along the floor at the player: a dart in its path is grabbed
   instead, otherwise the player is caught. If the giant grabs
-  the player instead, they are thrown at the dartboard and must steer mid-flight (WASD) into the bullseye to
-  survive — anything else is a loss.
+  the player instead, they are thrown at the dartboard and must steer mid-flight (WASD) into the bullseye — which
+  is a portal to the next level — anything else is a loss. Once all five darts are thrown the exit opens: half the
+  time the giant sinks away, half the time he has one last (slower) grab at you while you run for it.
 - **Level 2 — Grenade** (`src/levels/grenade/`): ~28 pieces of detailed junk (`junk.ts`: fridge, vending machine, piano, safe,
   anvil, bathtub, couch, bookcase, toilet, CRT TV, tires, crates, a rubber duck, a garden gnome...) crashes into the
   chamber, then a pineapple grenade with a blinking 10 s fuse. In direct line of sight (nothing at all between it and
@@ -30,7 +36,9 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   6.75 m up, above carrying reach) in the north wall lets you throw grenades out; throw speeds are tuned so
   neither grenade can be thrown over the 10 m walls from the floor. Survive the first and 1 s later a second
   grenade 1.5× the size arrives:
-  behind any single object you only live from 80% of the chamber's diagonal away (closer needs much more weight). Survive both to win.
+  behind any single object you only live from 80% of the chamber's diagonal away (closer needs much more weight). Survive that
+  and a third, comically huge grenade (5× the first) drops; nothing in the room saves you from it, but the exit
+  opens 5 s after it lands, with 5 s left on its fuse.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall.
 
 ## Commands
@@ -59,8 +67,10 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
 
 ## Adding a level
 
-Implement `Level` (update / draw / environment / obstacles / cameraShot), set `status` to `won` or `lost`
-when it ends, and show the result with `hud.show(...)`. Levels can take over the camera by returning a
+Implement `Level` (update / draw / environment / obstacles / cameraShot), set `status` to `lost` (with `hud.show`)
+when the player dies, and `exited` when they go through the exit portal (`won` still works for an end screen).
+Start with `new PortalArrival(ctx, spawn)` (update/draw it, and return its `cameraShot()` while it has one) and
+put an `ExitPortal` somewhere; its `target()` makes a good `trackedTargets()` entry once open. Levels can take over the camera by returning a
 `CameraShot`, and take over the player by changing `player.mode`.
 
 Shared mechanics available to levels (via `ctx`):

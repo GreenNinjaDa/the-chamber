@@ -7,7 +7,8 @@ import type { ChamberOptions } from '../game/chamber';
 import type { Hud } from '../game/hud';
 import type { Circle, Player } from '../game/player';
 
-export type LevelStatus = 'playing' | 'won' | 'lost';
+/** 'exited' means the player went through the level's exit portal: go straight to the next level. */
+export type LevelStatus = 'playing' | 'won' | 'lost' | 'exited';
 
 export interface LevelContext {
   player: Player;

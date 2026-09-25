@@ -6,6 +6,7 @@ import {
 import { GROUPS_QUERY_WITH_PLAYER, GROUPS_QUERY_WORLD, RAPIER, type Body } from '../../engine/physics';
 import { Pattern, type DrawItem } from '../../engine/renderer';
 import { PART_NAMES } from '../../game/body';
+import { ExitPortal, PortalArrival } from '../../game/portal';
 import { JUNK, type JunkDef } from './junk';
 import { CHAMBER_HALF, type ChamberOptions } from '../../game/chamber';
 import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus, type TrackedTarget } from '../level';
@@ -22,9 +23,11 @@ import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type Level
 
 // --- Tuning -----------------------------------------------------------------------------------
 /** When the junk starts falling, how far apart each piece drops, and when the first grenade drops (s). */
-const JUNK_START = 1.5;
+const JUNK_START = 3;
 const JUNK_INTERVAL = 0.13;
-const FIRST_GRENADE_AT = 5;
+const FIRST_GRENADE_AT = 6.5;
+/** The exit panel opens this long (s) after the last (comically huge) grenade drops. */
+const EXIT_OPENS_AFTER_LAST_DROP = 5;
 /** Seconds after the first blast (if you survived it) before the second grenade drops. */
 const SECOND_GRENADE_DELAY = 1;
 /** Seconds after the last blast before the result screen appears. */
@@ -81,6 +84,12 @@ const GRENADES: GrenadeSpec[] = [
     // chamber (safeDistance); closer in, the steep falloff needs a lot of weight in the way.
     radius: 0.24, mass: 0.6, throwScale: 0.93, fuse: 10, safeDistance: CHAMBER_DIAGONAL * 0.8, falloff: 3, shrapnel: 450, scorchRange: 5.5, scorchSize: 3.8,
     push: 2200, maxSpeed: 24, pushRange: 30, color: [0.09, 0.1, 0.05],
+  },
+  {
+    // Comically huge: 5x the first. Nothing in the room saves you; the exit opens 5 s after it
+    // lands, so run.
+    radius: 0.8, mass: 12, throwScale: 0.5, fuse: 10, safeDistance: 400, falloff: 1, shrapnel: 700, scorchRange: 8, scorchSize: 6,
+    push: 9000, maxSpeed: 30, pushRange: 40, color: [0.13, 0.16, 0.06],
   },
 ];
 
@@ -215,15 +224,24 @@ export class GrenadeLevel implements Level {
   private tracers: Tracer[] = [];
   private scorches: Scorch[] = [];
 
+  private arrival: PortalArrival;
+  private exit = new ExitPortal(3);
+  private exitOpensAt = Infinity;
+
   constructor(private ctx: LevelContext) {
     ctx.hud.setLevel(`The Chamber · Level ${this.number}`);
     ctx.hud.show(`LEVEL ${this.number}`, '', 2.5);
     ctx.hud.hint('');
+    this.arrival = new PortalArrival(ctx, [0, 0, 6]);
   }
 
   update(dt: number) {
     this.t += dt;
     const { player } = this.ctx;
+    this.arrival.update(dt);
+    if (this.t >= this.exitOpensAt) this.exit.openNow();
+    this.exit.update(dt, player);
+    if (this.exit.entered && this.status === 'playing') this.status = 'exited';
 
     while (this.spawned < JUNK.length && this.t >= JUNK_START + this.spawned * JUNK_INTERVAL) {
       this.spawnJunk(JUNK[this.spawned]);
@@ -232,6 +250,7 @@ export class GrenadeLevel implements Level {
     if (!this.grenade && this.nextGrenade < GRENADES.length && this.t >= this.nextGrenadeAt && this.status === 'playing') {
       this.dropGrenade(GRENADES[this.nextGrenade]);
       this.nextGrenade++;
+      if (this.nextGrenade === GRENADES.length) this.exitOpensAt = this.t + EXIT_OPENS_AFTER_LAST_DROP;
       this.nextGrenadeAt = Infinity;
     }
     if (this.grenade) {
@@ -469,6 +488,8 @@ export class GrenadeLevel implements Level {
   }
 
   draw(out: DrawItem[]) {
+    this.arrival.draw(out);
+    this.exit.draw(out);
     const g = this.grenade;
     if (g) {
       const t = g.body.rb.translation();
@@ -523,14 +544,19 @@ export class GrenadeLevel implements Level {
   }
 
   cameraShot(): CameraShot | null {
-    return null;
+    return this.arrival.cameraShot();
   }
 
   trackedTargets(): TrackedTarget[] {
+    const targets: TrackedTarget[] = [];
     const g = this.grenade;
-    if (!g) return [];
-    const t = g.body.rb.translation();
-    return [{ pos: [t.x, t.y, t.z], radius: g.spec.radius * 1.3 }];
+    if (g) {
+      const t = g.body.rb.translation();
+      targets.push({ pos: [t.x, t.y, t.z], radius: g.spec.radius * 1.3 });
+    }
+    const exit = this.exit.target();
+    if (exit) targets.push(exit);
+    return targets;
   }
 }
 
