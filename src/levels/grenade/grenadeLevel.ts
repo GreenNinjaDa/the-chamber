@@ -168,6 +168,11 @@ interface Fragment {
   pos: Vec3;
   normal: Vec3;
   spin: number;
+  /**
+   * Impact mark around the fragment, clipped to the face it's in. Only on walls and floors big
+   * enough to hold one; fragments in loose objects (and the body) have no mark.
+   */
+  mark: { min: Vec3; max: Vec3 } | null;
 }
 
 /** A burn mark on a floor or wall. */
@@ -366,9 +371,12 @@ export class GrenadeLevel implements Level {
           pos: rotateByQuat(inv, sub(hit.point, [t.x, t.y, t.z])),
           normal: rotateByQuat(inv, hit.normal),
           spin: Math.random() * Math.PI,
+          mark: null,
         });
       } else {
-        this.fragments.push({ rb: null, pos: hit.point, normal: hit.normal, spin: Math.random() * Math.PI });
+        this.fragments.push({
+          rb: null, pos: hit.point, normal: hit.normal, spin: Math.random() * Math.PI, mark: faceBox(hit.collider, hit.normal),
+        });
       }
     }
     return hitPlayer;
@@ -609,7 +617,7 @@ function drawFragment(out: DrawItem[], f: Fragment) {
   const b = cross(normal, a);
   const c = Math.cos(f.spin), s = Math.sin(f.spin);
   const x = add(scale(a, c), scale(b, s)), z = add(scale(a, -s), scale(b, c));
-  // A jagged metal chunk half-buried in the surface, inside a dark impact mark.
+  // A jagged metal chunk half-buried in the surface...
   out.push({
     mesh: 'roundbox',
     model: basis(scale(x, 0.1), scale(normal, 0.07), scale(z, 0.055), pos),
@@ -617,6 +625,8 @@ function drawFragment(out: DrawItem[], f: Fragment) {
     spec: 0.7,
     shadow: false,
   });
+  // ...inside a dark impact mark that stops at the edge of its surface.
+  if (!f.mark) return;
   out.push({
     mesh: 'cylinder',
     model: basis(scale(x, 0.16), scale(normal, 0.004), scale(z, 0.16), add(pos, scale(normal, 0.004))),
@@ -624,5 +634,6 @@ function drawFragment(out: DrawItem[], f: Fragment) {
     pattern: Pattern.blob,
     param: 0.75,
     shadow: false,
+    clip: f.mark,
   });
 }
