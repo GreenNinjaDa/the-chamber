@@ -59,7 +59,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
 
 ## Layout
 
-- `src/main.ts` — game loop, title screen, pause, the `LEVELS` list (`?level=N` skips the lobby and starts at
+- `src/main.ts` — game loop, title screen (starts by itself after 10 s), pause, the `LEVELS` list (`?level=N` skips the lobby and starts at
   level N), level start/restart and portal progression, dev hook
 - `src/engine/` — renderer (primitive meshes, sun shadow map, MSAA, patterns), math (column-major,
   WebGPU clip space z ∈ [0,1]), input

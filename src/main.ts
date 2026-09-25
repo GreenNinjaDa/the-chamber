@@ -16,6 +16,8 @@ import type { Level, LevelContext, TrackedTarget, WorldLabel } from './levels/le
 import { LobbyLevel } from './levels/lobby/lobbyLevel';
 
 const SPAWN: Vec3 = [0, 0, 6];
+/** Seconds on the title screen before the game starts by itself. */
+const TITLE_AUTOSTART = 10;
 /** The game's levels, in order. */
 const LEVELS: ((ctx: LevelContext) => Level)[] = [
   (ctx) => new DartsLevel(ctx),
@@ -144,12 +146,16 @@ async function main() {
   }
   input.onUnlock = pause;
 
+  function begin() {
+    if (playing) return;
+    playing = true;
+    startLevel();
+  }
+  // Clicking starts the game (and grabs the mouse); so does sitting on the title screen too long.
+  // Without a click there's no mouse lock yet, so the first click in the chamber takes it.
   canvas.addEventListener('click', () => {
     input.lock();
-    if (!playing) {
-      playing = true;
-      startLevel();
-    }
+    begin();
   });
 
   const draws: DrawItem[] = [];
@@ -212,6 +218,7 @@ async function main() {
       const a = time * 0.1;
       camera.moveTo([Math.sin(a) * 26, 24, Math.cos(a) * 26], [0, 2, 0], dt, 2);
       hud.crosshair('hidden');
+      if (time >= TITLE_AUTOSTART) begin();
     }
     hud.update(dt);
     input.endFrame();
