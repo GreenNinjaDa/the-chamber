@@ -1,12 +1,12 @@
 import sceneCode from '../shaders/scene.wgsl?raw';
 import shadowCode from '../shaders/shadow.wgsl?raw';
-import { box, cone, cylinder, roundBox, sphere, type MeshData } from './meshes';
+import { box, cone, cylinder, holePlate, roundBox, sphere, tube, type MeshData } from './meshes';
 import {
   add, lookAt, multiply, normalMatrix, normalize, ortho, scale,
   type Mat4, type Vec3,
 } from './math';
 
-export type MeshName = 'box' | 'sphere' | 'cylinder' | 'cone' | 'roundbox';
+export type MeshName = 'box' | 'sphere' | 'cylinder' | 'cone' | 'roundbox' | 'holeplate' | 'tube';
 
 /** Surface patterns understood by scene.wgsl. */
 export const Pattern = {
@@ -54,7 +54,10 @@ interface GpuMesh {
   count: number;
 }
 
-const MAX_DRAWS = 2048;
+const MAX_DRAWS = 4096;
+/** Hole radius of the 'holeplate' mesh relative to its side, and inner radius of the 'tube' mesh. */
+export const HOLE_PLATE_RATIO = 0.35;
+export const TUBE_INNER_RATIO = 0.5;
 const OBJ_STRIDE = 256; // bytes, satisfies minUniformBufferOffsetAlignment
 const OBJ_FLOATS = OBJ_STRIDE / 4;
 const SHADOW_SIZE = 4096;
@@ -103,6 +106,8 @@ export class Renderer {
       cylinder: this.upload(cylinder()),
       cone: this.upload(cone()),
       roundbox: this.upload(roundBox()),
+      holeplate: this.upload(holePlate(HOLE_PLATE_RATIO)),
+      tube: this.upload(tube(TUBE_INNER_RATIO)),
     };
 
     this.frameBuffer = device.createBuffer({

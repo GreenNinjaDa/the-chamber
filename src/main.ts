@@ -41,17 +41,15 @@ async function main() {
   const camera = new ThirdPersonCamera();
   const interaction = new Interaction();
 
-  function freshPhysics() {
-    const physics = new Physics();
-    addChamberColliders(physics);
-    return physics;
-  }
+  // Chamber colliders are added after the level is created, since levels can tweak the chamber.
+  const freshPhysics = () => new Physics();
 
   const ctx: LevelContext = { player, camera, hud, input, physics: freshPhysics() };
   player.attach(ctx.physics);
 
   let playing = false;
   let level: Level = makeLevel(ctx);
+  addChamberColliders(ctx.physics, level.chamber);
   hud.show('THE CHAMBER', 'Click to begin\nWASD move · Mouse look · Shift sprint · Space jump · E use / hold to carry · R restart');
   hud.setLevel('');
 
@@ -63,6 +61,7 @@ async function main() {
     player.attach(ctx.physics);
     camera.reset(0);
     level = makeLevel(ctx);
+    addChamberColliders(ctx.physics, level.chamber);
     nextOffered = false;
   }
 
@@ -127,7 +126,7 @@ async function main() {
       pattern: Pattern.sky,
       shadow: false,
     });
-    drawChamber(draws);
+    drawChamber(draws, level.chamber);
     ctx.physics.draw(draws, time);
     player.draw(draws, time);
     level.draw(draws, time);

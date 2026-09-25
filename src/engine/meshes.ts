@@ -157,3 +157,78 @@ export function roundBox(n = 4, res = 10): MeshData {
   }
   return b.build();
 }
+
+/**
+ * Square plate [-0.5, 0.5]² in the XY plane, z in [-0.5, 0.5], with a round hole of radius
+ * `ratio` through it (the hole's inside surface is included; the plate's outer edges are not,
+ * since it's meant to sit flush inside a wall opening).
+ */
+export function holePlate(ratio = 0.35, segments = 32): MeshData {
+  const b = new Builder();
+  const ring = (z: number, nz: number) => {
+    const inner: number[] = [], outer: number[] = [];
+    for (let i = 0; i <= segments; i++) {
+      const a = (i / segments) * Math.PI * 2;
+      const c = Math.cos(a), s = Math.sin(a);
+      const k = 0.5 / Math.max(Math.abs(c), Math.abs(s));
+      inner.push(b.vert(c * ratio, s * ratio, z, 0, 0, nz));
+      outer.push(b.vert(c * k, s * k, z, 0, 0, nz));
+    }
+    return { inner, outer };
+  };
+  const front = ring(0.5, 1);
+  const back = ring(-0.5, -1);
+  for (let i = 0; i < segments; i++) {
+    b.tri(front.inner[i], front.outer[i], front.outer[i + 1]);
+    b.tri(front.inner[i], front.outer[i + 1], front.inner[i + 1]);
+    b.tri(back.inner[i], back.outer[i + 1], back.outer[i]);
+    b.tri(back.inner[i], back.inner[i + 1], back.outer[i + 1]);
+  }
+  // Inside of the hole, facing the axis.
+  const f: number[] = [], k: number[] = [];
+  for (let i = 0; i <= segments; i++) {
+    const a = (i / segments) * Math.PI * 2;
+    const c = Math.cos(a), s = Math.sin(a);
+    f.push(b.vert(c * ratio, s * ratio, 0.5, -c, -s, 0));
+    k.push(b.vert(c * ratio, s * ratio, -0.5, -c, -s, 0));
+  }
+  for (let i = 0; i < segments; i++) {
+    b.tri(f[i], f[i + 1], k[i + 1]);
+    b.tri(f[i], k[i + 1], k[i]);
+  }
+  return b.build();
+}
+
+/** Hollow cylinder along y (radius 1, inner radius `inner`, y in [-0.5, 0.5]) with annular caps. */
+export function tube(inner = 0.5, segments = 32): MeshData {
+  const b = new Builder();
+  const oBot: number[] = [], oTop: number[] = [], iBot: number[] = [], iTop: number[] = [];
+  for (let j = 0; j <= segments; j++) {
+    const a = (j / segments) * Math.PI * 2;
+    const c = Math.cos(a), s = Math.sin(a);
+    oBot.push(b.vert(c, -0.5, s, c, 0, s));
+    oTop.push(b.vert(c, 0.5, s, c, 0, s));
+    iBot.push(b.vert(c * inner, -0.5, s * inner, -c, 0, -s));
+    iTop.push(b.vert(c * inner, 0.5, s * inner, -c, 0, -s));
+  }
+  const capTop = { o: [] as number[], i: [] as number[] }, capBot = { o: [] as number[], i: [] as number[] };
+  for (let j = 0; j <= segments; j++) {
+    const a = (j / segments) * Math.PI * 2;
+    const c = Math.cos(a), s = Math.sin(a);
+    capTop.o.push(b.vert(c, 0.5, s, 0, 1, 0));
+    capTop.i.push(b.vert(c * inner, 0.5, s * inner, 0, 1, 0));
+    capBot.o.push(b.vert(c, -0.5, s, 0, -1, 0));
+    capBot.i.push(b.vert(c * inner, -0.5, s * inner, 0, -1, 0));
+  }
+  for (let j = 0; j < segments; j++) {
+    b.tri(oBot[j], oTop[j], oBot[j + 1]);
+    b.tri(oTop[j], oTop[j + 1], oBot[j + 1]);
+    b.tri(iBot[j], iBot[j + 1], iTop[j]);
+    b.tri(iTop[j], iBot[j + 1], iTop[j + 1]);
+    b.tri(capTop.i[j], capTop.o[j + 1], capTop.o[j]);
+    b.tri(capTop.i[j], capTop.i[j + 1], capTop.o[j + 1]);
+    b.tri(capBot.i[j], capBot.o[j], capBot.o[j + 1]);
+    b.tri(capBot.i[j], capBot.o[j + 1], capBot.i[j + 1]);
+  }
+  return b.build();
+}

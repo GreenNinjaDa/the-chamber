@@ -3,6 +3,7 @@ import type { Physics } from '../engine/physics';
 import type { Vec3 } from '../engine/math';
 import type { DrawItem, Environment } from '../engine/renderer';
 import type { ThirdPersonCamera } from '../game/camera';
+import type { ChamberOptions } from '../game/chamber';
 import type { Hud } from '../game/hud';
 import type { Circle, Player } from '../game/player';
 
@@ -31,6 +32,8 @@ export interface CameraShot {
 export interface Level {
   readonly number: number;
   readonly title: string;
+  /** Tweaks to the standard chamber (e.g. a hole in a wall). */
+  readonly chamber?: ChamberOptions;
   status: LevelStatus;
   update(dt: number): void;
   draw(out: DrawItem[], time: number): void;

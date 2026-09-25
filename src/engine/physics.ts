@@ -27,6 +27,8 @@ export const GROUPS_PLAYER_BODY = (BODY_BIT << 16) | (0xffff & ~BODY_BIT & ~CAPS
 export const GROUPS_PLAYER_BODY_LIMP = (BODY_BIT << 16) | (0xffff & ~CAPSULE_BIT);
 /** Movement capsule: takes part in no contacts at all; only the character controller queries use it. */
 export const GROUPS_PLAYER_CAPSULE = CAPSULE_BIT << 16;
+/** For queries that should also hit the player's body parts (but not the movement capsule). */
+export const GROUPS_QUERY_WITH_PLAYER = (0xffff << 16) | (0xffff & ~CAPSULE_BIT);
 /** For queries that should see the world and props but not the player. */
 export const GROUPS_QUERY_WORLD = (0xffff << 16) | (0xffff & ~BODY_BIT & ~CAPSULE_BIT);
 
@@ -47,6 +49,10 @@ export interface Body {
   highlight: number;
   /** Resting angular damping (gives rounded things a little rolling resistance). */
   angularDamping: number;
+  /** Skip the default primitive drawing (the owner draws a custom model). */
+  hidden: boolean;
+  /** Multiplies the player's throw speed for this object. */
+  throwScale: number;
 }
 
 /** Anything the player can press E on (levers, buttons...). */
@@ -69,6 +75,8 @@ export interface BodyOptions {
   restitution?: number;
   pattern?: number;
   param?: number;
+  hidden?: boolean;
+  throwScale?: number;
 }
 
 export interface RayHit {
@@ -152,6 +160,8 @@ export class Physics {
       grabbable: opts.grabbable ?? true,
       highlight: 0,
       angularDamping,
+      hidden: opts.hidden ?? false,
+      throwScale: opts.throwScale ?? 1,
     };
     this.bodies.push(body);
     this.byCollider.set(collider.handle, body);
@@ -199,6 +209,7 @@ export class Physics {
 
   draw(out: DrawItem[], time: number) {
     for (const b of this.bodies) {
+      if (b.hidden) continue;
       const t = b.rb.translation();
       out.push({
         mesh: b.mesh,

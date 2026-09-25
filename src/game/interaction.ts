@@ -124,7 +124,7 @@ export class Interaction {
   private throw(dir: Vec3) {
     const rb = this.held!.rb;
     const strength = clamp(LIFT_MASS / rb.mass(), 0.05, 1);
-    const v = scale(dir, THROW_SPEED * strength);
+    const v = scale(dir, THROW_SPEED * strength * this.held!.throwScale);
     rb.setLinvel({ x: v[0], y: v[1] + 2 * strength, z: v[2] }, true);
     this.release();
   }
