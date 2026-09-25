@@ -13,7 +13,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   that matter in that level (`hud.tips`). Any on-screen text is sarcastic or joking, may hint at the mechanics,
   and pop-culture references are welcome.
 - **Portals** (`src/game/portal.ts`): most levels start with `PortalArrival` — a rimless purple liquid portal
-  opens above the floor, spits the player out limp at a random 30–90° angle (stunned 1.5 s), then shrinks away 0.5 s
+  opens above the floor, spits the player out limp at a random 30–90° downward angle (90° = straight down; stunned 1.5 s), then shrinks away 0.5 s
   later — and most end with an `ExitPortal` (rimmed, behind a wall panel in the east wall that slides aside on
   `openNow()`). Going through an exit sets the level's status to `'exited'`, and main.ts loads the next level
   immediately (after the last level it loops back to level 1).

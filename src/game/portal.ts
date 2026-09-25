@@ -46,8 +46,9 @@ const CLOSE_AFTER = 0.5;
 const CLOSE_TIME = 0.35;
 const GROW_TIME = 0.35;
 const RADIUS = 1.1;
-/** How high the portal hangs, how hard it spits, how long you're stunned, and the launch angle range. */
-const HEIGHT = 2.3;
+/** How high the portal hangs, how hard it spits, how long you're stunned, and the launch angle range
+ * (below horizontal: 90° is straight down). */
+const HEIGHT = 3.4;
 const SPIT_SPEED = 7;
 const STUN = 1.5;
 const MIN_ELEVATION = (30 * Math.PI) / 180;
@@ -55,7 +56,7 @@ const MAX_ELEVATION = (90 * Math.PI) / 180;
 
 /**
  * The start of a level: a rimless purple portal opens above the floor near `spawn` and flings the
- * player out at a random angle 30–90° above the floor, stunned, then shrinks into nothing.
+ * player out downward at a random angle 30–90° below horizontal, stunned, then shrinks into nothing.
  */
 export class PortalArrival {
   private t = 0;
@@ -71,7 +72,7 @@ export class PortalArrival {
     const yaw = toCentre + (Math.random() - 0.5) * Math.PI;
     const elevation = MIN_ELEVATION + Math.random() * (MAX_ELEVATION - MIN_ELEVATION);
     this.facing = yaw;
-    this.dir = [-Math.sin(yaw) * Math.cos(elevation), Math.sin(elevation), -Math.cos(yaw) * Math.cos(elevation)];
+    this.dir = [-Math.sin(yaw) * Math.cos(elevation), -Math.sin(elevation), -Math.cos(yaw) * Math.cos(elevation)];
     this.centre = [spawn[0], HEIGHT, spawn[2]];
   }
 
@@ -84,7 +85,8 @@ export class PortalArrival {
     this.t += dt;
     if (!this.spat && this.t >= SPIT_AT) {
       this.spat = true;
-      this.ctx.player.emerge(add(this.centre, scale(this.dir, 0.2)), this.facing, scale(this.dir, SPIT_SPEED), STUN);
+      // The body comes out below the portal, so start it a body-length along the spit direction.
+      this.ctx.player.emerge(add(this.centre, scale(this.dir, 1.0)), this.facing, scale(this.dir, SPIT_SPEED), STUN);
       this.ctx.camera.addShake(0.3);
     }
   }
