@@ -1,5 +1,5 @@
 import {
-  add, basis, clamp, fromQuat, length, mul, normalize, quatConj, quatMul, rotationX, rotationZ, scale, scaling, sub, toQuat,
+  add, basis, clamp, fromQuat, length, mul, normalize, quatConj, quatMul, rotationX, rotationY, rotationZ, scale, scaling, sub, toQuat,
   translation, type Mat4, type Quat, type Vec3,
 } from '../engine/math';
 import { GROUPS_PLAYER_BODY, GROUPS_PLAYER_BODY_LIMP, RAPIER, type Physics } from '../engine/physics';
@@ -25,7 +25,12 @@ export type Frames = Record<PartName, Mat4>;
 
 /** Joint angles in radians. Positive shoulder/hip swings the limb forward; knees bend back (negative). */
 export interface Pose {
+  /** Bend at the waist: negative leans the chest forward. */
   lean: number;
+  /** Twist at the waist (radians about the vertical, same sense as the player's facing). */
+  twist?: number;
+  /** How far the hips drop (m); pair with crouchLegs() so the feet stay on the floor. */
+  crouch?: number;
   headPitch: number;
   shoulderL: number;
   shoulderR: number;
@@ -57,10 +62,18 @@ const HIP: Vec3 = [0.11, -0.08, 0]; // on the pelvis (x mirrored)
 const THIGH = 0.42;
 const SHIN = 0.4;
 
+/** Hip and knee angles that keep the feet under the hips when they drop by `crouch` metres. */
+export function crouchLegs(crouch: number): { hip: number; knee: number } {
+  const reach = Math.max(0.3, THIGH + SHIN - crouch);
+  const hip = Math.acos(clamp((THIGH * THIGH + reach * reach - SHIN * SHIN) / (2 * THIGH * reach), -1, 1));
+  const kneeInner = Math.acos(clamp((THIGH * THIGH + SHIN * SHIN - reach * reach) / (2 * THIGH * SHIN), -1, 1));
+  return { hip, knee: -(Math.PI - kneeInner) };
+}
+
 /** World frames at each part's centre for a pose, given the root (feet, facing) transform. */
 export function poseFrames(root: Mat4, p: Pose): Frames {
-  const pelvis = mul(root, translation([0, PELVIS_Y, 0]));
-  const chest = mul(pelvis, translation(WAIST), rotationX(p.lean), translation([0, CHEST_UP, 0]));
+  const pelvis = mul(root, translation([0, PELVIS_Y - (p.crouch ?? 0), 0]));
+  const chest = mul(pelvis, translation(WAIST), rotationY(p.twist ?? 0), rotationX(p.lean), translation([0, CHEST_UP, 0]));
   const head = mul(chest, translation(NECK), rotationX(p.headPitch), translation([0, HEAD_UP, 0]));
   const arm = (side: 1 | -1, shoulder: number, elbow: number) => {
     const upper = mul(
@@ -368,7 +381,7 @@ export class PhysBody {
     const m = this.muscle;
     const k = { ball: STIFFNESS.ball * this.strength, hinge: STIFFNESS.hinge * this.strength };
     const d = { ball: DAMPING.ball * this.strength, hinge: DAMPING.hinge * this.strength };
-    const ball = (name: BallJointName, x: number, z = 0) => {
+    const ball = (name: BallJointName, x: number, z = 0, y = 0) => {
       if (this.broken.has(name)) return;
       const j = this.balls[name];
       const raw = rawSet(j);
@@ -379,7 +392,7 @@ export class PhysBody {
         return;
       }
       raw.jointConfigureMotorPosition(j.handle, RAPIER.JointAxis.AngX, x, k.ball * m, d.ball * m);
-      raw.jointConfigureMotorPosition(j.handle, RAPIER.JointAxis.AngY, 0, k.ball * m, d.ball * m);
+      raw.jointConfigureMotorPosition(j.handle, RAPIER.JointAxis.AngY, y, k.ball * m, d.ball * m);
       raw.jointConfigureMotorPosition(j.handle, RAPIER.JointAxis.AngZ, z, k.ball * m, d.ball * m);
     };
     const hinge = (name: HingeName, angle: number) => {
@@ -388,7 +401,7 @@ export class PhysBody {
       if (m <= 0) j.configureMotorVelocity(0, LIMP_FRICTION);
       else j.configureMotorPosition(angle, k.hinge * m, d.hinge * m);
     };
-    ball('waist', pose.lean);
+    ball('waist', pose.lean, 0, pose.twist ?? 0);
     ball('neck', pose.headPitch);
     ball('shoulderL', pose.shoulderL, -pose.armOut);
     ball('shoulderR', pose.shoulderR, pose.armOut);

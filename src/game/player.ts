@@ -5,7 +5,7 @@ import {
 } from '../engine/math';
 import { GROUPS_PLAYER_CAPSULE, GROUPS_QUERY_WORLD, RAPIER, type Body, type Physics } from '../engine/physics';
 import type { DrawItem } from '../engine/renderer';
-import { drawBody, PART_NAMES, PhysBody, poseFrames, REST_POSE, standingRoot, type PartName, type Pose } from './body';
+import { crouchLegs, drawBody, PART_NAMES, PhysBody, poseFrames, REST_POSE, standingRoot, type PartName, type Pose } from './body';
 
 /**
  * control: walking around under player control (pos = feet); the physical body follows the
@@ -42,6 +42,22 @@ const TURN_RATE = 12;
  * and how stiff the joints are. 1 = default; lower is floppier, higher is more robotic.
  */
 const MUSCLE_STRENGTH = 0.3;
+
+// --- Aiming the upper body at the camera --------------------------------------------------------
+/** The torso twists this share of the way toward the camera's direction, up to AIM_MAX_TWIST (rad). */
+const AIM_TWIST_SHARE = 0.7;
+const AIM_MAX_TWIST = 0.9;
+/**
+ * Looking down bends you forward at the waist (share of the camera's pitch), up to AIM_MAX_BEND
+ * (rad) — enough to duck behind low cover. Looking up leans back only a little.
+ */
+const AIM_BEND_SHARE = 0.85;
+const AIM_MAX_BEND = 0.9;
+const AIM_MAX_BACK_LEAN = 0.2;
+/** How quickly the torso follows the camera (higher = snappier). */
+const AIM_RATE = 8;
+/** Standing still and looking down, you also crouch: the hips drop up to this much (m) at full bend. */
+const AIM_MAX_CROUCH = 0.3;
 
 /**
  * A hit to the head knocks you loose if the impact speed (m/s, into the surface) and momentum
@@ -115,6 +131,10 @@ export class Player {
   private physics: Physics | null = null;
   private controller: RAPIER.KinematicCharacterController | null = null;
   private walk = 0;
+  /** Current (smoothed) torso twist and waist bend toward the camera, and the camera's pitch. */
+  private aimTwist = 0;
+  private aimBend = 0;
+  private aimPitch = 0;
   private moveAmount = 0;
   private time = 0;
   private pose: Pose = REST_POSE;
@@ -165,7 +185,7 @@ export class Player {
     return [this.pos[0], this.pos[1] + CAPSULE_HALF + PLAYER_RADIUS, this.pos[2]];
   }
 
-  update(dt: number, input: Input, camYaw: number, obstacles: Circle[]) {
+  update(dt: number, input: Input, camYaw: number, obstacles: Circle[], camPitch = 0) {
     this.time += dt;
     const stunned = this.stun > 0;
     this.stun = Math.max(0, this.stun - dt);
@@ -230,6 +250,15 @@ export class Player {
     const hs = Math.hypot(this.vel[0], this.vel[2]);
     this.moveAmount = Math.min(1, hs / WALK_SPEED);
     if (len > 0) this.facing = approachAngle(this.facing, Math.atan2(-mx, -mz), dt * TURN_RATE);
+
+    // Aim the upper body toward where the camera looks.
+    const rel = Math.atan2(Math.sin(camYaw - this.facing), Math.cos(camYaw - this.facing));
+    const wantTwist = clamp(rel * AIM_TWIST_SHARE, -AIM_MAX_TWIST, AIM_MAX_TWIST);
+    const wantBend = clamp(camPitch * AIM_BEND_SHARE, -AIM_MAX_BEND, AIM_MAX_BACK_LEAN);
+    const ka = 1 - Math.exp(-dt * AIM_RATE);
+    this.aimTwist += (wantTwist - this.aimTwist) * ka;
+    this.aimBend += (wantBend - this.aimBend) * ka;
+    this.aimPitch = camPitch;
     this.walk += dt * hs * 1.6;
 
     this.driveFeet = before;
@@ -486,23 +515,29 @@ export class Player {
       case 'control': {
         if (!this.onGround) {
           return {
-            lean: -0.1, headPitch: 0.1, shoulderL: -0.5, shoulderR: -0.5, armOut: 0.5, elbowL: 0.7, elbowR: 0.7,
+            lean: -0.1 + this.aimBend * 0.5, twist: this.aimTwist, headPitch: 0.1, shoulderL: -0.5, shoulderR: -0.5, armOut: 0.5, elbowL: 0.7, elbowR: 0.7,
             hipL: 0.7, hipR: -0.1, kneeL: -1.1, kneeR: -0.35,
           };
         }
         const a = this.moveAmount, s = Math.sin(this.walk), c = Math.cos(this.walk);
+        // Ducking: looking down while standing still also bends the knees.
+        const crouch = AIM_MAX_CROUCH * clamp(-this.aimBend / AIM_MAX_BEND, 0, 1) * (1 - a);
+        const legs = crouchLegs(crouch);
         return {
-          lean: -0.12 * a,
-          headPitch: 0.1 * a,
+          crouch,
+          lean: -0.12 * a + this.aimBend,
+          twist: this.aimTwist,
+          // Keep the head following the view rather than the bent-over chest.
+          headPitch: clamp(this.aimPitch * 0.6 - this.aimBend, -0.5, 0.6) + 0.1 * a,
           shoulderL: s * 0.55 * a,
           shoulderR: -s * 0.55 * a,
           armOut: 0.08,
           elbowL: 0.2 + 0.45 * a,
           elbowR: 0.2 + 0.45 * a,
-          hipL: -s * 0.6 * a,
-          hipR: s * 0.6 * a,
-          kneeL: -0.05 - (0.1 + 1.0 * Math.max(0, -c)) * a,
-          kneeR: -0.05 - (0.1 + 1.0 * Math.max(0, c)) * a,
+          hipL: -s * 0.6 * a + legs.hip,
+          hipR: s * 0.6 * a + legs.hip,
+          kneeL: -0.05 - (0.1 + 1.0 * Math.max(0, -c)) * a + legs.knee,
+          kneeR: -0.05 - (0.1 + 1.0 * Math.max(0, c)) * a + legs.knee,
         };
       }
       case 'held':

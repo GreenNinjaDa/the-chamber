@@ -82,6 +82,9 @@ Shared mechanics available to levels (via `ctx`):
   things as 50 kg, nothing heavier than 50 kg. Only head, chest and pelvis count against non-physics things.
 - The player's movement capsule is wider than the body and never pushes things itself: walking pushes loose
   objects by hand (heavier = slower), and flying objects pass through the capsule to hit the real body.
+- The upper body aims at the camera: the torso twists toward where you look and looking down bends you over
+  (and crouches you when standing still), which physically lowers the head and chest, so ducking behind low
+  cover works against anything that checks body parts (e.g. grenade blasts). Tunables: `AIM_*` in player.ts.
 - In scripted modes (`held`, `flying`, `stuck`, `splat`) the physical body is switched off and the pose is drawn
   directly; in `control` and `ragdoll` the body is drawn from physics.
 

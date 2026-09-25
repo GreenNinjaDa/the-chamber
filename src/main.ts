@@ -121,7 +121,7 @@ async function main() {
         }
       }
       camera.look(dt, input);
-      if (player.mode === 'control') player.update(dt, input, camera.yaw, level.obstacles());
+      if (player.mode === 'control') player.update(dt, input, camera.yaw, level.obstacles(), camera.pitch);
       player.syncCollider();
       level.update(dt);
       interaction.update(dt, input, camera, player, ctx.physics);
