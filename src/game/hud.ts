@@ -26,10 +26,21 @@ const STYLE = `
                    filter: drop-shadow(0 0 6px rgba(255,40,20,.9)); animation: hud-pulse .55s ease-in-out infinite; }
 .hud-ring.yellow { border-color: #ffd21a; box-shadow: 0 0 8px rgba(255,210,20,.8), inset 0 0 6px rgba(255,210,20,.5); }
 .hud-arrow.yellow > div { background: #ffd21a; filter: drop-shadow(0 0 6px rgba(255,210,20,.9)); }
+.hud-label { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); white-space: nowrap;
+             font-weight: 800; letter-spacing: .06em; text-shadow: 0 0 6px rgba(0,0,0,.55), 0 2px 3px rgba(0,0,0,.5); }
 @keyframes hud-pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.3); opacity: .3; } }
 .hud-hint { position: absolute; bottom: 28px; left: 0; right: 0; text-align: center; font-size: 18px;
             padding: 0 16px; transition: opacity .3s; }
 `;
+
+export interface ScreenLabel {
+  x: number;
+  y: number;
+  /** Font size (px). */
+  px: number;
+  text: string;
+  color?: string;
+}
 
 export interface ScreenMarker {
   onScreen: boolean;
@@ -54,6 +65,7 @@ export class Hud {
   private crossEl: HTMLDivElement;
   private markerRoot: HTMLDivElement;
   private markerPool: { ring: HTMLDivElement; arrow: HTMLDivElement }[] = [];
+  private labelPool: HTMLDivElement[] = [];
   private messageTimer = 0;
   private fpsAccum = 0;
   private fpsFrames = 0;
@@ -105,6 +117,25 @@ export class Hud {
    * Shows a pulsing ring around each on-screen target (x, y, diameter in px) and an arrow at the
    * screen edge for each off-screen one (angle in radians, 0 = pointing right).
    */
+  /** Floating world text, already projected to the screen. */
+  labels(list: ScreenLabel[]) {
+    while (this.labelPool.length < list.length) {
+      const label = el('hud-label');
+      this.markerRoot.append(label);
+      this.labelPool.push(label);
+    }
+    this.labelPool.forEach((label, i) => {
+      const t = list[i];
+      label.style.display = t ? 'block' : 'none';
+      if (!t) return;
+      if (label.textContent !== t.text) label.textContent = t.text;
+      label.style.left = `${Math.round(t.x)}px`;
+      label.style.top = `${Math.round(t.y)}px`;
+      label.style.fontSize = `${t.px.toFixed(1)}px`;
+      label.style.color = t.color ?? '#fff';
+    });
+  }
+
   markers(list: ScreenMarker[]) {
     while (this.markerPool.length < list.length) {
       const ring = el('hud-ring'), arrow = el('hud-arrow');

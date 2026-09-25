@@ -5,12 +5,15 @@ import { initPhysics, Physics } from './engine/physics';
 import { Pattern, Renderer, type DrawItem } from './engine/renderer';
 import { ThirdPersonCamera } from './game/camera';
 import { addChamberColliders, drawChamber } from './game/chamber';
-import { Hud, type ScreenMarker } from './game/hud';
+import { Hud, type ScreenLabel, type ScreenMarker } from './game/hud';
 import { Interaction } from './game/interaction';
+import { PauseMenu } from './game/pauseMenu';
 import { Player } from './game/player';
+import { settings } from './game/settings';
 import { DartsLevel } from './levels/darts/dartsLevel';
 import { GrenadeLevel } from './levels/grenade/grenadeLevel';
-import type { Level, LevelContext, TrackedTarget } from './levels/level';
+import type { Level, LevelContext, TrackedTarget, WorldLabel } from './levels/level';
+import { LobbyLevel } from './levels/lobby/lobbyLevel';
 
 const SPAWN: Vec3 = [0, 0, 6];
 /** The game's levels, in order. */
@@ -19,10 +22,13 @@ const LEVELS: ((ctx: LevelContext) => Level)[] = [
   (ctx) => new GrenadeLevel(ctx),
 ];
 const params = new URLSearchParams(location.search);
-/** `?sandbox` opens the mechanics test room; `?level=N` starts at level N. */
+/** `?sandbox` opens the mechanics test room; `?level=N` skips the lobby and starts at level N. */
 const sandbox = params.has('sandbox');
 let levelIndex = Math.min(LEVELS.length - 1, Math.max(0, (Number(params.get('level')) || 1) - 1));
-const makeLevel = (ctx: LevelContext) => (sandbox ? new Sandbox(ctx) : LEVELS[levelIndex](ctx));
+/** The lobby is the main menu: a chamber you walk around in, with a START portal. */
+let inLobby = !params.has('level');
+const makeLevel = (ctx: LevelContext) =>
+  sandbox ? new Sandbox(ctx) : inLobby ? new LobbyLevel(ctx, LEVELS.length) : LEVELS[levelIndex](ctx);
 
 /** Where each tracked target is on screen: a ring if visible, otherwise an edge arrow toward it. */
 function screenMarkers(targets: TrackedTarget[], view: Mat4, proj: Mat4, fov: number): ScreenMarker[] {
@@ -47,6 +53,25 @@ function screenMarkers(targets: TrackedTarget[], view: Mat4, proj: Mat4, fov: nu
     const t = Math.min((w / 2 - margin) / Math.max(Math.abs(dx), 1e-6), (h / 2 - margin) / Math.max(Math.abs(dy), 1e-6));
     return { onScreen: false, x: w / 2 + dx * t, y: h / 2 + dy * t, size: 0, angle: Math.atan2(dy, dx), color };
   });
+}
+
+/** Projects floating world text to the screen, sized by distance; skips anything off screen. */
+function screenLabels(labels: WorldLabel[], view: Mat4, proj: Mat4, fov: number): ScreenLabel[] {
+  const w = window.innerWidth, h = window.innerHeight;
+  const viewProj = multiply(proj, view);
+  const out: ScreenLabel[] = [];
+  for (const { pos, text, size, color } of labels) {
+    const cx = viewProj[0] * pos[0] + viewProj[4] * pos[1] + viewProj[8] * pos[2] + viewProj[12];
+    const cy = viewProj[1] * pos[0] + viewProj[5] * pos[1] + viewProj[9] * pos[2] + viewProj[13];
+    const cw = viewProj[3] * pos[0] + viewProj[7] * pos[1] + viewProj[11] * pos[2] + viewProj[15];
+    if (cw < 0.3) continue;
+    const nx = cx / cw, ny = cy / cw;
+    if (Math.abs(nx) > 1.3 || Math.abs(ny) > 1.3) continue;
+    const px = (size * h) / (2 * Math.tan(fov / 2) * cw);
+    if (px < 5) continue;
+    out.push({ x: (nx * 0.5 + 0.5) * w, y: (0.5 - ny * 0.5) * h, px, text, color });
+  }
+  return out;
 }
 
 function showError(message: string) {
@@ -75,7 +100,7 @@ async function main() {
   let playing = false;
   let level: Level = makeLevel(ctx);
   addChamberColliders(ctx.physics, level.chamber);
-  hud.show('THE CHAMBER', 'Click to begin\nWASD move · Mouse look · Shift sprint · Space jump · E use · Hold click carry · Right-click throw · R restart');
+  hud.show('THE CHAMBER', 'Click to begin\nWASD move · Mouse look · Shift sprint · Space jump · E use · Hold click carry · Right-click throw · R restart · Esc pause');
   hud.setLevel('');
 
   function startLevel() {
@@ -85,10 +110,39 @@ async function main() {
     player.reset(SPAWN);
     player.attach(ctx.physics);
     camera.reset(0);
+    hud.hide();
     level = makeLevel(ctx);
     addChamberColliders(ctx.physics, level.chamber);
     nextOffered = false;
   }
+
+  // Pausing: Esc (or losing the mouse some other way) opens the menu. Browsers swallow the
+  // Esc that releases the mouse, or deliver it as well, so ignore an Esc right after a pause.
+  let pausedAt = 0;
+  const pauseMenu = new PauseMenu({
+    resume,
+    restart: () => {
+      startLevel();
+      resume();
+    },
+    lobby: () => {
+      inLobby = true;
+      startLevel();
+      resume();
+    },
+  });
+  function pause() {
+    if (!playing || pauseMenu.isOpen) return;
+    pausedAt = performance.now();
+    pauseMenu.open(inLobby);
+    hud.crosshair('hidden');
+    interaction.release();
+  }
+  function resume() {
+    pauseMenu.close();
+    input.lock();
+  }
+  input.onUnlock = pause;
 
   canvas.addEventListener('click', () => {
     input.lock();
@@ -106,7 +160,13 @@ async function main() {
 
   function tick(dt: number) {
     time += dt;
-    if (playing) {
+    if (playing && input.wasPressed('Escape')) {
+      if (!pauseMenu.isOpen) pause();
+      else if (performance.now() - pausedAt > 300) resume();
+    }
+    if (playing && pauseMenu.isOpen) {
+      // Frozen: keep drawing, advance nothing.
+    } else if (playing) {
       if (input.wasPressed('KeyR')) startLevel();
       // After a win, N moves on to the next chamber.
       const hasNext = !sandbox && levelIndex < LEVELS.length - 1;
@@ -120,18 +180,26 @@ async function main() {
           startLevel();
         }
       }
-      // Through an exit portal: straight into the next chamber (after the last, back to the first).
+      // Through an exit portal: from the lobby to the chosen level, then straight on to the next
+      // chamber (after the last, back to the lobby).
       if (level.status === 'exited' && !sandbox) {
-        levelIndex = (levelIndex + 1) % LEVELS.length;
-        startLevel();
-        if (levelIndex === 0) {
-          hud.show('BACK TO LEVEL 1', "That's every chamber so far. The rest are still being built. Probably.", 4);
+        let finished = false;
+        if (inLobby) {
+          inLobby = false;
+          levelIndex = Math.min(LEVELS.length - 1, Math.max(0, settings.startLevel - 1));
+        } else if (levelIndex < LEVELS.length - 1) {
+          levelIndex++;
+        } else {
+          inLobby = finished = true;
         }
+        startLevel();
+        if (finished) hud.show("THAT'S ALL, FOLKS", 'Every chamber so far. The rest are still being built. Probably.', 4);
       }
       camera.look(dt, input);
-      if (player.mode === 'control') player.update(dt, input, camera.yaw, level.obstacles(), camera.pitch);
+      if (player.mode === 'control' && !player.inPortal) player.update(dt, input, camera.yaw, level.obstacles(), camera.pitch);
       player.syncCollider();
       level.update(dt);
+      player.tickPortal(dt);
       interaction.update(dt, input, camera, player, ctx.physics);
       ctx.physics.step(dt);
       player.afterPhysics();
@@ -166,6 +234,7 @@ async function main() {
 
     renderer.render(draws, view, level.environment(), time);
     hud.markers(playing ? screenMarkers(level.trackedTargets?.() ?? [], view.view, view.proj, camera.fov) : []);
+    hud.labels(playing ? screenLabels(level.labels?.() ?? [], view.view, view.proj, camera.fov) : []);
   }
 
   function frame(now: number) {
@@ -186,6 +255,9 @@ async function main() {
           draw(1 / 60);
         },
         get level() { return level; },
+        get paused() { return pauseMenu.isOpen; },
+        pause,
+        resume,
         get physics() { return ctx.physics; },
         player,
         camera,

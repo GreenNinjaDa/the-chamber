@@ -3,6 +3,7 @@ import { add, clamp, lerp3, lookAt, perspective, scale, sub, type Vec3 } from '.
 import type { CameraView } from '../engine/renderer';
 import { CHAMBER_HALF } from './chamber';
 import type { Player } from './player';
+import { settings } from './settings';
 
 const MOUSE_SENSITIVITY = 0.0022;
 const SHOULDER_OFFSET = 0.6;
@@ -24,8 +25,9 @@ export class ThirdPersonCamera {
   }
 
   look(dt: number, input: Input) {
-    this.yaw -= input.mouseDX * MOUSE_SENSITIVITY;
-    this.pitch -= input.mouseDY * MOUSE_SENSITIVITY;
+    const sensitivity = MOUSE_SENSITIVITY * settings.mouseSpeed;
+    this.yaw -= input.mouseDX * sensitivity;
+    this.pitch -= input.mouseDY * sensitivity * (settings.invertY ? -1 : 1);
     const turn = (input.isDown('ArrowLeft') ? 1 : 0) - (input.isDown('ArrowRight') ? 1 : 0);
     const tilt = (input.isDown('ArrowUp') ? 1 : 0) - (input.isDown('ArrowDown') ? 1 : 0);
     this.yaw += turn * 2.2 * dt;

@@ -16,7 +16,14 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   opens above the floor, spits the player out limp at a random 30–90° downward angle (90° = straight down; stunned 1.5 s), then shrinks away 0.5 s
   later — and most end with an `ExitPortal` (rimmed, in the east wall; invisible until
   `openNow()` slides a wall panel aside to reveal it, and its HUD marker is yellow). Going through an exit sets the level's status to `'exited'`, and main.ts loads the next level
-  immediately (after the last level it loops back to level 1).
+  immediately (after the last level it goes back to the lobby). Going through a portal squeezes the player: they
+  shrink into it over 0.5 s (`player.shrinkInto`, no control and invulnerable meanwhile) and grow back out of the
+  entrance portal over 0.5 s (`player.growFrom`), drawn scaled about the portal's centre.
+- **Lobby** (`src/levels/lobby/`): the main menu is a chamber you walk around in (after the title screen, and via
+  the pause menu). Buttons pick the level the START portal leads to, two more change mouse speed, and a lever
+  inverts looking up/down (`src/game/settings.ts`, remembered in localStorage). Signs are floating world text
+  (`Level.labels()`). **Pause menu** (`src/game/pauseMenu.ts`): Esc, or losing pointer lock, opens Resume /
+  Restart / Back to the lobby.
 - **Level 1 — Darts** (`src/levels/darts/`): a giant rises over the south wall and blocks the sun. Five
   player-sized darts drop into the chamber and his hand hunts the player. The player survives by luring the
   hand onto darts until he has thrown **all five**; the hand gets faster after every grab. Each grab is a
@@ -49,8 +56,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
 
 ## Layout
 
-- `src/main.ts` — game loop, title screen, the `LEVELS` list (`?level=N` starts at level N; N key after a win goes
-  to the next level), level start/restart, dev hook
+- `src/main.ts` — game loop, title screen, pause, the `LEVELS` list (`?level=N` skips the lobby and starts at
+  level N), level start/restart and portal progression, dev hook
 - `src/engine/` — renderer (primitive meshes, sun shadow map, MSAA, patterns), math (column-major,
   WebGPU clip space z ∈ [0,1]), input
 - `src/shaders/*.wgsl` — shaders, imported with `?raw`. Surface patterns (panels, dartboard, blob, skin, sky)

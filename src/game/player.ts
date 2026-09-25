@@ -1,6 +1,6 @@
 import type { Input } from '../engine/input';
 import {
-  approachAngle, basis, clamp, cross, dot, length, mul, normalize, scale, sub, translation,
+  approachAngle, basis, clamp, cross, dot, easeInOut, length, mul, multiply, normalize, scale, scaling, sub, translation,
   type Mat4, type Vec3,
 } from '../engine/math';
 import { GROUPS_PLAYER_CAPSULE, GROUPS_QUERY_WORLD, RAPIER, type Body, type Physics } from '../engine/physics';
@@ -146,6 +146,18 @@ export class Player {
   private incoming = new Map<Body, Vec3>();
   /** Each body part's velocity just before the current physics step (by collider handle). */
   private partVelocity = new Map<number, Vec3>();
+  /**
+   * Portal travel: the player is drawn scaled by `portalScale` about `portalPivot` (a portal's
+   * centre), so at 0 they are a speck inside the portal. `inPortal` is set while being sucked in:
+   * no control, and nothing can hurt them any more.
+   */
+  portalScale = 1;
+  inPortal = false;
+  private portalPivot: Vec3 = [0, 0, 0];
+  private portalFrom = 1;
+  private portalTo = 1;
+  private portalT = 0;
+  private portalTime = 0;
 
   reset(pos: Vec3, facing = 0) {
     this.pos = [...pos];
@@ -158,6 +170,38 @@ export class Player {
     this.gettingUp = false;
     this.knockGrace = 0;
     this.pose = REST_POSE;
+    this.portalScale = this.portalFrom = this.portalTo = 1;
+    this.portalTime = 0;
+    this.inPortal = false;
+  }
+
+  /** Sucks the player into a portal centred at `pivot`: they shrink into it over `seconds`. */
+  shrinkInto(pivot: Vec3, seconds: number) {
+    this.inPortal = true;
+    this.vel = [0, 0, 0];
+    this.animatePortal(pivot, 1, 0, seconds);
+  }
+
+  /** The reverse, as a portal spits the player out: they grow out of `pivot` over `seconds`. */
+  growFrom(pivot: Vec3, seconds: number) {
+    this.animatePortal(pivot, 0, 1, seconds);
+  }
+
+  private animatePortal(pivot: Vec3, from: number, to: number, seconds: number) {
+    this.portalPivot = [...pivot];
+    this.portalFrom = this.portalScale = from;
+    this.portalTo = to;
+    this.portalT = 0;
+    this.portalTime = seconds;
+  }
+
+  /** Advances portal shrinking / growing; call every tick whatever the mode. */
+  tickPortal(dt: number) {
+    if (this.portalTime <= 0) return;
+    this.portalT = Math.min(this.portalTime, this.portalT + dt);
+    const k = easeInOut(this.portalT / this.portalTime);
+    this.portalScale = this.portalFrom + (this.portalTo - this.portalFrom) * k;
+    if (this.portalT >= this.portalTime) this.portalTime = 0;
   }
 
   /** Gives the player a capsule, character controller and physical body in a (new) physics world. */
@@ -454,10 +498,6 @@ export class Player {
     this.knock(scale(normalize(hit.rel), Math.min(9, hit.momentum / 12)), STUN_MIN + (STUN_MAX - STUN_MIN) * hit.severity);
   }
 
-  /**
-   * Knocks the player loose: muscles go slack for `stunSeconds`, the body is shoved by
-   * `velocity` (m/s), then the player pulls themselves together.
-   */
   /** Takes the player out of the level (e.g. while an entrance portal opens). */
   hide() {
     this.mode = 'hidden';
@@ -484,8 +524,12 @@ export class Player {
     this.knock(velocity, stunSeconds);
   }
 
+  /**
+   * Knocks the player loose: muscles go slack for `stunSeconds`, the body is shoved by
+   * `velocity` (m/s), then the player pulls themselves together.
+   */
   knock(velocity: Vec3, stunSeconds: number) {
-    if (this.mode !== 'control' || !this.body) return;
+    if (this.mode !== 'control' || !this.body || this.inPortal) return;
     this.body.muscle = STUNNED_MUSCLE;
     this.stun = stunSeconds;
     this.gettingUp = true;
@@ -508,7 +552,7 @@ export class Player {
    */
   kill(launch: Vec3 = [0, 0, 0], opts: { violence?: number; origin?: Vec3 } = {}) {
     const body = this.body;
-    if (!body || this.mode === 'ragdoll') return;
+    if (!body || this.mode === 'ragdoll' || this.inPortal) return;
     if (!body.isEnabled || this.mode !== 'control') {
       body.teleport(poseFrames(this.scriptedRoot(), this.pose));
       body.setEnabled(true);
@@ -589,12 +633,19 @@ export class Player {
   }
 
   draw(out: DrawItem[], _time: number) {
-    if (this.mode === 'hidden') return;
+    if (this.mode === 'hidden' || this.portalScale < 0.01) return;
+    const start = out.length;
     const body = this.body;
     if (body && body.isEnabled && (this.mode === 'control' || this.mode === 'ragdoll')) {
       drawBody(out, body.frames());
     } else {
       drawBody(out, poseFrames(this.scriptedRoot(), this.pose));
+    }
+    // Going through a portal: squeeze everything toward the portal's centre.
+    if (this.portalScale < 0.999) {
+      const p = this.portalPivot, s = this.portalScale;
+      const squeeze = mul(translation(p), scaling([s, s, s]), translation([-p[0], -p[1], -p[2]]));
+      for (let i = start; i < out.length; i++) out[i].model = multiply(squeeze, out[i].model);
     }
   }
 }

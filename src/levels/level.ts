@@ -27,6 +27,15 @@ export interface TrackedTarget {
   color?: 'red' | 'yellow';
 }
 
+/** Text floating in the world (signs, button labels), drawn by the HUD. */
+export interface WorldLabel {
+  pos: Vec3;
+  text: string;
+  /** Letter height in metres. */
+  size: number;
+  color?: string;
+}
+
 /** A camera position a level wants instead of the normal over-the-shoulder view. */
 export interface CameraShot {
   pos: Vec3;
@@ -52,6 +61,8 @@ export interface Level {
   cameraShot(): CameraShot | null;
   /** Things to flag on screen (a pulsing ring when visible, an edge arrow when not), e.g. live grenades. */
   trackedTargets?(): TrackedTarget[];
+  /** Text to float in the world. */
+  labels?(): WorldLabel[];
 }
 
 export const DEFAULT_ENV: Environment = {

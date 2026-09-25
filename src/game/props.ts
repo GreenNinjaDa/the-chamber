@@ -62,7 +62,7 @@ export class Button implements Usable {
   constructor(
     physics: Physics,
     private pos: Vec3,
-    private color: number[],
+    public color: number[],
     private onPress?: () => void,
   ) {
     const collider = physics.addStaticBox(add(pos, [0, 0.55, 0]), [0.7, 1.1, 0.7]);

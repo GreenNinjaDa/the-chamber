@@ -7,7 +7,7 @@ import { CHAMBER_HALF } from '../../game/chamber';
 import {
   DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus, type TrackedTarget,
 } from '../level';
-import { drawPortal, ExitPortal, PortalArrival } from '../../game/portal';
+import { drawPortal, ExitPortal, PORTAL_SQUEEZE_TIME, PortalArrival } from '../../game/portal';
 import { DART_GRIP, dartMatrix, drawDart } from './dart';
 import { Giant } from './giant';
 
@@ -106,6 +106,8 @@ export class DartsLevel implements Level {
   private exit = new ExitPortal(-2);
   /** Set once all the darts are gone and the exit has opened. */
   private endgame = false;
+  /** Counts down while the player is being sucked into the bullseye portal (-1: not). */
+  private bullseyeExit = -1;
 
   constructor(private ctx: LevelContext) {
     ctx.hud.setLevel(`The Chamber · Level ${this.number}`);
@@ -124,6 +126,10 @@ export class DartsLevel implements Level {
     this.arrival.update(dt);
     this.exit.update(dt, player);
     if (this.exit.entered) this.status = 'exited';
+    if (this.bullseyeExit >= 0) {
+      this.bullseyeExit -= dt;
+      if (this.bullseyeExit < 0) this.status = 'exited';
+    }
 
     switch (this.phase) {
       case 'intro':
@@ -492,9 +498,11 @@ export class DartsLevel implements Level {
 
   private boardResult(r: number) {
     if (r <= BULLSEYE_R) {
-      // The bullseye is a portal: straight through to the next chamber.
-      this.status = 'exited';
+      // The bullseye is a portal: sucked straight through to the next chamber.
       this.phase = 'over';
+      const [bx, by, bz] = BOARD_CENTER;
+      this.ctx.player.shrinkInto([bx, by - this.boardDrop, bz + 0.52], PORTAL_SQUEEZE_TIME);
+      this.bullseyeExit = PORTAL_SQUEEZE_TIME;
       return;
     }
     const mm = (r / SCORING_R) * 170;

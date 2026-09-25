@@ -10,6 +10,8 @@ import type { Player } from './player';
  */
 
 const RIM = [0.14, 0.12, 0.18];
+/** Seconds the player takes to shrink into a portal, or to grow back out of one. */
+export const PORTAL_SQUEEZE_TIME = 0.5;
 
 /** A portal disc facing along `normal`, optionally with a dark metal rim around it. */
 export function drawPortal(out: DrawItem[], centre: Vec3, normal: Vec3, radius: number, rim: boolean) {
@@ -87,6 +89,8 @@ export class PortalArrival {
       this.spat = true;
       // The body comes out below the portal, so start it a body-length along the spit direction.
       this.ctx.player.emerge(add(this.centre, scale(this.dir, 1.0)), this.facing, scale(this.dir, SPIT_SPEED), STUN);
+      // They start as a speck inside the portal and grow to full size on the way out.
+      this.ctx.player.growFrom(this.centre, PORTAL_SQUEEZE_TIME);
       this.ctx.camera.addShake(0.3);
     }
   }
@@ -129,9 +133,12 @@ const WALL = [0.86, 0.87, 0.88];
  * aside. Walking into it sets `entered`.
  */
 export class ExitPortal {
+  /** Set once the player has been sucked all the way in. */
   entered = false;
   private isOpen = false;
   private openT = 0;
+  /** Seconds since the player touched it (-1: not yet). */
+  private sucking = -1;
   readonly centre: Vec3;
 
   constructor(z = 0) {
@@ -146,13 +153,27 @@ export class ExitPortal {
     this.isOpen = true;
   }
 
+  /** Open from the start, with the panel already out of the way. */
+  openAlready() {
+    this.isOpen = true;
+    this.openT = PANEL_SLIDE_TIME;
+  }
+
   update(dt: number, player: Player) {
     if (!this.isOpen) return;
     this.openT += dt;
+    if (this.sucking >= 0) {
+      this.sucking += dt;
+      if (this.sucking >= PORTAL_SQUEEZE_TIME) this.entered = true;
+      return;
+    }
     if (this.openT < PANEL_SLIDE_TIME * 0.6 || player.mode !== 'control') return;
     const nearWall = CHAMBER_HALF - player.pos[0] < 0.75;
     const inside = Math.hypot(player.pos[2] - this.centre[2], player.pos[1] + 1 - this.centre[1]) < EXIT_RADIUS + 0.1;
-    if (nearWall && inside) this.entered = true;
+    if (nearWall && inside) {
+      this.sucking = 0;
+      player.shrinkInto(this.centre, PORTAL_SQUEEZE_TIME);
+    }
   }
 
   draw(out: DrawItem[]) {

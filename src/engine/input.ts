@@ -10,6 +10,8 @@ export class Input {
   mouseDown = false;
   /** Right mouse button went down this frame. */
   rightPressed = false;
+  /** Called when pointer lock is lost (Esc, alt-tab...). */
+  onUnlock: (() => void) | null = null;
   private down = new Set<string>();
   private pressed = new Set<string>();
 
@@ -38,7 +40,9 @@ export class Input {
       if (e.button === 0) this.mouseDown = false;
     });
     document.addEventListener('pointerlockchange', () => {
+      const wasLocked = this.locked;
       this.locked = document.pointerLockElement === canvas;
+      if (wasLocked && !this.locked) this.onUnlock?.();
     });
   }
 
