@@ -25,8 +25,10 @@ const JUNK_INTERVAL = 0.22;
 const FIRST_GRENADE_AT = 5;
 /** Seconds after surviving the first blast before the second grenade drops. */
 const SECOND_GRENADE_DELAY = 3.5;
-/** The hole in the north wall (centre height and radius, m). The first grenade's radius is 0.16. */
-const HOLE = { x: 0, y: 4.2, radius: 0.2 };
+/** The hole in the north wall (centre height and radius, m). The grenades' radii are 0.16 and 0.24. */
+const HOLE = { x: 0, y: 4.2, radius: 0.3 };
+/** The chamber floor's diagonal (m), for distances like "80% of the way across". */
+const CHAMBER_DIAGONAL = CHAMBER_HALF * 2 * Math.SQRT2;
 /** Damage at or above this (but below 1) knocks you flat instead of killing you. */
 const KNOCKDOWN_DAMAGE = 0.35;
 /** Fraction of the blast a chamber wall lets through (the grenade went out through the hole). */
@@ -43,8 +45,12 @@ interface GrenadeSpec {
   /** Multiplies the player's throw speed (heavier grenades don't fly as far). */
   throwScale: number;
   fuse: number;
-  /** Unshielded blast damage at distance d (m): power / (d + 4) ^ falloff. 1 = dead. */
-  power: number;
+  /**
+   * Blast damage. In direct line of sight (nothing between the grenade and your chest) it is
+   * always fatal. Behind cover: (safeDistance / d) ^ falloff × the fraction of the blast that
+   * gets through to your head, chest and pelvis (averaged). 1 = dead.
+   */
+  safeDistance: number;
   falloff: number;
   shrapnel: number;
   /** Loose objects get impulse push / (d + 1), speed capped at maxSpeed, within pushRange. */
@@ -56,12 +62,14 @@ interface GrenadeSpec {
 
 const GRENADES: GrenadeSpec[] = [
   {
-    radius: 0.16, mass: 0.6, throwScale: 1, fuse: 10, power: 100, falloff: 1.4, shrapnel: 180,
+    // Behind a fridge (lets 30% through) you live from about 6.6 m away.
+    radius: 0.16, mass: 0.6, throwScale: 1, fuse: 10, safeDistance: 12, falloff: 2, shrapnel: 300,
     push: 900, maxSpeed: 18, pushRange: 14, color: [0.13, 0.16, 0.06],
   },
   {
-    // Slightly bigger (barely fits the hole), heavier, and deadly anywhere in the open.
-    radius: 0.185, mass: 2.5, throwScale: 0.85, fuse: 10, power: 450, falloff: 1.4, shrapnel: 260,
+    // 1.5x the size and much heavier. Behind any one object you live only from 80% of the way
+    // across the chamber (safeDistance), and the steep falloff makes closer cover hopeless.
+    radius: 0.24, mass: 2.5, throwScale: 0.85, fuse: 10, safeDistance: CHAMBER_DIAGONAL * 0.8, falloff: 3, shrapnel: 450,
     push: 2200, maxSpeed: 24, pushRange: 30, color: [0.09, 0.1, 0.05],
   },
 ];
@@ -261,7 +269,8 @@ export class GrenadeLevel implements Level {
       b.rb.applyImpulse({ x: dir[0] * speed * mass, y: dir[1] * speed * mass, z: dir[2] * speed * mass }, true);
     }
 
-    // Blast damage: distance falloff times how much of it reaches the head, chest and pelvis.
+    // Blast damage: fatal in line of sight; otherwise distance falloff times how much of it
+    // gets through to the head, chest and pelvis.
     const alive = player.mode !== 'ragdoll';
     const body = player.body;
     const targets: Vec3[] = body && body.isEnabled
@@ -269,8 +278,10 @@ export class GrenadeLevel implements Level {
       : [add(player.pos, [0, 1.7, 0]), add(player.pos, [0, 1.3, 0]), add(player.pos, [0, 1.0, 0])];
     const chest = targets[1];
     const d = length(sub(chest, pos));
-    const exposure = targets.reduce((sum, p) => sum + this.exposure(pos, p), 0) / targets.length;
-    const damage = (spec.power / Math.pow(d + 4, spec.falloff)) * exposure;
+    const exposures = targets.map((p) => this.exposure(pos, p));
+    const inSight = exposures[1] >= 0.999;
+    const exposure = exposures.reduce((sum, e) => sum + e, 0) / exposures.length;
+    const damage = inSight ? Infinity : Math.pow(spec.safeDistance / Math.max(d, 0.5), spec.falloff) * exposure;
     const away = normalize(add(sub(chest, pos), [0, 0.5, 0]));
 
     // Shrapnel flies before anyone gets launched, so it hits where you were standing.
