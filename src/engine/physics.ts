@@ -15,12 +15,16 @@ export const GRAVITY = 20;
 /** Physics runs at a fixed 120 Hz, independent of frame rate, for stable joints and motors. */
 export const FIXED_STEP = 1 / 120;
 const MAX_SUBSTEPS = 8;
+/** Rapier has no rolling resistance, so balls and barrels get a touch of spin damping to slowly stop. */
+const ROLLING_DAMPING = 0.12;
 
 // Collision groups: (membership << 16) | filter. Everything else uses the default (all/all).
 const BODY_BIT = 0x0002; // the player's physical body parts
 const CAPSULE_BIT = 0x0004; // the player's movement capsule
-/** Player body parts: collide with the world and props, not with each other or the capsule. */
+/** Player body parts while animated: collide with the world and props, but not each other. */
 export const GROUPS_PLAYER_BODY = (BODY_BIT << 16) | (0xffff & ~BODY_BIT & ~CAPSULE_BIT);
+/** Player body parts while limp: also collide with each other (jointed pairs have contacts off). */
+export const GROUPS_PLAYER_BODY_LIMP = (BODY_BIT << 16) | (0xffff & ~CAPSULE_BIT);
 /** Movement capsule: takes part in no contacts at all; only the character controller queries use it. */
 export const GROUPS_PLAYER_CAPSULE = CAPSULE_BIT << 16;
 /** For queries that should see the world and props but not the player. */
@@ -41,6 +45,8 @@ export interface Body {
   grabbable: boolean;
   /** Set each frame by the interaction system when targeted. */
   highlight: number;
+  /** Resting angular damping (gives rounded things a little rolling resistance). */
+  angularDamping: number;
 }
 
 /** Anything the player can press E on (levers, buttons...). */
@@ -128,6 +134,8 @@ export class Physics {
       .setTranslation(center[0], center[1], center[2])
       .setCcdEnabled(true);
     if (opts.rotation) rbDesc.setRotation(opts.rotation);
+    const angularDamping = mesh === 'sphere' || mesh === 'cylinder' ? ROLLING_DAMPING : 0;
+    rbDesc.setAngularDamping(angularDamping);
     const rb = this.world.createRigidBody(rbDesc);
     desc.setMass(opts.mass ?? 20)
       .setFriction(opts.friction ?? 0.7)
@@ -143,6 +151,7 @@ export class Physics {
       param: opts.param,
       grabbable: opts.grabbable ?? true,
       highlight: 0,
+      angularDamping,
     };
     this.bodies.push(body);
     this.byCollider.set(collider.handle, body);

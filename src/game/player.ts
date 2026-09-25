@@ -1,6 +1,6 @@
 import type { Input } from '../engine/input';
 import {
-  approachAngle, basis, cross, dot, length, mul, normalize, scale, sub, translation,
+  approachAngle, basis, clamp, cross, dot, length, mul, normalize, scale, sub, translation,
   type Mat4, type Vec3,
 } from '../engine/math';
 import { GROUPS_PLAYER_CAPSULE, GROUPS_QUERY_WORLD, RAPIER, type Body, type Physics } from '../engine/physics';
@@ -31,10 +31,14 @@ const GRAVITY = 22;
 
 /** A hit knocks you loose if the other object's relative speed and momentum are at least this. */
 const KNOCK_MIN_SPEED = 5;
-const KNOCK_MIN_MOMENTUM = 25;
+const KNOCK_MIN_MOMENTUM = 40;
 /** After a knock, muscles stay at this strength for the stun time, then recover over `RECOVER_TIME`. */
-const STUNNED_MUSCLE = 0;
-const RECOVER_TIME = 1.0;
+const STUNNED_MUSCLE = 0.05;
+const RECOVER_TIME = 0.3;
+/** Stun time scales with the hit's momentum: STUN_MIN at the knock threshold, up to STUN_MAX. */
+const STUN_MIN = 0.1;
+const STUN_MAX = 2.0;
+const STUN_MAX_MOMENTUM = 400;
 
 export class Player {
   pos: Vec3 = [0, 0, 6];
@@ -202,6 +206,8 @@ export class Player {
     const body = this.body;
     if (!body) return;
     this.recordIncoming();
+    // Limbs collide with each other only while the body is limp (dead or knocked loose).
+    body.setSelfCollision(this.mode === 'ragdoll' || body.muscle < 0.3);
     if (this.mode === 'ragdoll') {
       body.drive(h, poseFrames(standingRoot(this.pos, this.facing), this.pose), [0, 0, 0], this.pose);
       return;
@@ -216,7 +222,10 @@ export class Player {
       this.driveFeet[2] + this.driveVel[2] * h,
     ];
     const targets = poseFrames(standingRoot(this.driveFeet, this.facing), this.pose);
-    if (!body.isEnabled) {
+    const pelvis = body.position('pelvis');
+    const farAway = Math.hypot(pelvis[0] - targets.pelvis[12], pelvis[1] - targets.pelvis[13], pelvis[2] - targets.pelvis[14]) > 2;
+    // A teleported player snaps their body over rather than dragging it through the room.
+    if (!body.isEnabled || (farAway && body.muscle > 0.5)) {
       body.teleport(targets, this.driveVel);
       body.setEnabled(true);
     }
@@ -254,7 +263,8 @@ export class Player {
         });
       });
       if (!touching) continue;
-      this.knock(scale(normalize(rel), Math.min(9, momentum / 12)), 0.3 + Math.min(1.2, momentum / 150));
+      const severity = clamp((momentum - KNOCK_MIN_MOMENTUM) / (STUN_MAX_MOMENTUM - KNOCK_MIN_MOMENTUM), 0, 1);
+      this.knock(scale(normalize(rel), Math.min(9, momentum / 12)), STUN_MIN + (STUN_MAX - STUN_MIN) * severity);
       return;
     }
   }

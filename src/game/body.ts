@@ -2,7 +2,7 @@ import {
   add, basis, fromQuat, mul, quatConj, quatMul, rotationX, rotationZ, scale, scaling, sub, toQuat,
   translation, type Mat4, type Quat, type Vec3,
 } from '../engine/math';
-import { GROUPS_PLAYER_BODY, RAPIER, type Physics } from '../engine/physics';
+import { GROUPS_PLAYER_BODY, GROUPS_PLAYER_BODY_LIMP, RAPIER, type Physics } from '../engine/physics';
 import type { DrawItem } from '../engine/renderer';
 
 /*
@@ -199,6 +199,7 @@ export class PhysBody {
   private balls = {} as Record<BallJointName, RAPIER.ImpulseJoint>;
   private hinges = {} as Record<HingeName, RAPIER.RevoluteImpulseJoint>;
   private enabled = true;
+  private selfCollision = false;
 
   constructor(private physics: Physics, frames: Frames) {
     const world = physics.world;
@@ -255,6 +256,17 @@ export class PhysBody {
     if (enabled === this.enabled) return;
     this.enabled = enabled;
     for (const name of PART_NAMES) this.parts[name].setEnabled(enabled);
+  }
+
+  /**
+   * Limp bodies need self-collision so limbs can't pass through the torso. Animated bodies
+   * leave it off: the animation keeps limbs apart, and self-contacts would let a tangled limb
+   * get stuck fighting its target pose.
+   */
+  setSelfCollision(on: boolean) {
+    if (on === this.selfCollision) return;
+    this.selfCollision = on;
+    for (const c of this.colliders) c.setCollisionGroups(on ? GROUPS_PLAYER_BODY_LIMP : GROUPS_PLAYER_BODY);
   }
 
   get isEnabled() {

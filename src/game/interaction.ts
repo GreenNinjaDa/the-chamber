@@ -130,7 +130,7 @@ export class Interaction {
   }
 
   release() {
-    if (this.held) this.held.rb.setAngularDamping(0);
+    if (this.held) this.held.rb.setAngularDamping(this.held.angularDamping);
     this.held = null;
   }
 }
