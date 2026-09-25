@@ -24,10 +24,24 @@ export interface Circle {
 
 export const PLAYER_RADIUS = 0.35;
 const CAPSULE_HALF = 0.55; // + radius = 0.9 = half the player's height
+
+// --- Movement -------------------------------------------------------------------------------
 const WALK_SPEED = 5;
 const SPRINT_SPEED = 8.5;
 const JUMP_SPEED = 7.5;
 const GRAVITY = 22;
+/** How quickly the player reaches their target speed on the ground / in the air (higher = snappier). */
+const GROUND_ACCEL = 14;
+const AIR_ACCEL = 4;
+/** How quickly the player turns to face their movement direction. */
+const TURN_RATE = 12;
+
+// --- Muscles ------------------------------------------------------------------------------
+/**
+ * How strong the player's muscles normally are: how firmly the body holds its animated pose
+ * and how stiff the joints are. 1 = default; lower is floppier, higher is more robotic.
+ */
+const MUSCLE_STRENGTH = 0.3;
 
 /**
  * A hit to the head knocks you loose if the impact speed (m/s, into the surface) and momentum
@@ -41,10 +55,28 @@ const BODY_KNOCK_MOMENTUM_SCALE = 5;
 const NON_PHYSICS_MASS = 50;
 const MAX_KNOCK_MASS = 50;
 /** Objects up to this mass get pushed at walking speed; heavier ones move proportionally slower. */
-const PUSH_MASS = 80;
+const PUSH_MASS = 20;
+// --- Knocked loose -------------------------------------------------------------------------
 /** After a knock, muscles stay at this strength for the stun time, then recover over `RECOVER_TIME`. */
 const STUNNED_MUSCLE = 0.07;
-const RECOVER_TIME = 0.3;
+const RECOVER_TIME = 1;
+/**
+ * Getting up: body parts move at most this fast (m/s) and spin at most this fast (rad/s) while
+ * pulling back into pose, so standing up is a visible scramble rather than a snap.
+ */
+const GETUP_SPEED = 1.6;
+const GETUP_SPIN = 4;
+/** You can move while getting up, at this fraction of your normal speed (no jumping). */
+const GETUP_MOVE_SCALE = 0.2;
+/** Getting up is done once the pelvis is back within this distance (m) of where it belongs. */
+const GETUP_DONE_DISTANCE = 0.15;
+/** If the body is stuck (e.g. pinned under crates), give up on the slow get-up after this long (s). */
+const GETUP_MAX_TIME = 3;
+/**
+ * After standing back up, bumping into walls/bars/scripted things can't knock you again for
+ * this long (s). Thrown and falling objects still can.
+ */
+const KNOCK_GRACE_TIME = 0.5;
 /** Stun time scales with the hit's momentum: STUN_MIN at the knock threshold, up to STUN_MAX. */
 const STUN_MIN = 0.1;
 const STUN_MAX = 2.0;
@@ -65,6 +97,10 @@ export class Player {
   carrying: RAPIER.Collider | null = null;
   /** Seconds left before muscles start recovering from a knock. */
   stun = 0;
+  /** True from a knock until the body is back on its feet. */
+  gettingUp = false;
+  private getUpTime = 0;
+  private knockGrace = 0;
   private physics: Physics | null = null;
   private controller: RAPIER.KinematicCharacterController | null = null;
   private walk = 0;
@@ -87,6 +123,8 @@ export class Player {
     this.mode = 'control';
     this.onGround = true;
     this.stun = 0;
+    this.gettingUp = false;
+    this.knockGrace = 0;
     this.pose = REST_POSE;
   }
 
@@ -118,10 +156,20 @@ export class Player {
 
   update(dt: number, input: Input, camYaw: number, obstacles: Circle[]) {
     this.time += dt;
-    const stunned = this.stun > 0 || (this.body !== null && this.body.muscle < 0.5);
+    const stunned = this.stun > 0;
     this.stun = Math.max(0, this.stun - dt);
+    this.knockGrace = Math.max(0, this.knockGrace - dt);
     if (this.body && this.stun <= 0 && this.body.muscle < 1) {
       this.body.muscle = Math.min(1, this.body.muscle + dt / RECOVER_TIME);
+    }
+    if (this.gettingUp && !stunned && this.body) {
+      this.getUpTime += dt;
+      const p = this.body.position('pelvis');
+      const off = Math.hypot(p[0] - this.pos[0], p[1] - (this.pos[1] + 0.98), p[2] - this.pos[2]);
+      if ((off < GETUP_DONE_DISTANCE && this.body.muscle >= 1) || this.getUpTime > GETUP_MAX_TIME) {
+        this.gettingUp = false;
+        this.knockGrace = KNOCK_GRACE_TIME;
+      }
     }
 
     const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw);
@@ -137,12 +185,12 @@ export class Player {
     if (len > 0) { mx /= len; mz /= len; }
 
     const sprint = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
-    const speed = sprint ? SPRINT_SPEED : WALK_SPEED;
-    const k = 1 - Math.exp(-dt * (stunned ? 3 : this.onGround ? 14 : 4));
+    const speed = (sprint ? SPRINT_SPEED : WALK_SPEED) * (this.gettingUp ? GETUP_MOVE_SCALE : 1);
+    const k = 1 - Math.exp(-dt * (stunned ? 3 : this.onGround ? GROUND_ACCEL : AIR_ACCEL));
     this.vel[0] += (mx * speed - this.vel[0]) * k;
     this.vel[2] += (mz * speed - this.vel[2]) * k;
 
-    if (this.onGround && !stunned && input.wasPressed('Space')) {
+    if (this.onGround && !stunned && !this.gettingUp && input.wasPressed('Space')) {
       this.vel[1] = JUMP_SPEED;
       this.onGround = false;
     }
@@ -170,7 +218,7 @@ export class Player {
 
     const hs = Math.hypot(this.vel[0], this.vel[2]);
     this.moveAmount = Math.min(1, hs / WALK_SPEED);
-    if (len > 0) this.facing = approachAngle(this.facing, Math.atan2(-mx, -mz), dt * 12);
+    if (len > 0) this.facing = approachAngle(this.facing, Math.atan2(-mx, -mz), dt * TURN_RATE);
     this.walk += dt * hs * 1.6;
 
     this.driveFeet = before;
@@ -246,6 +294,9 @@ export class Player {
     // Record velocities before the animation drives the parts, so a limb being pulled
     // through an obstacle doesn't register as a fast impact.
     this.recordIncoming();
+    body.strength = MUSCLE_STRENGTH;
+    body.catchUpSpeed = this.gettingUp ? GETUP_SPEED : Infinity;
+    body.catchUpSpin = this.gettingUp ? GETUP_SPIN : Infinity;
     // Limbs collide with each other only while the body is limp (dead or knocked loose).
     body.setSelfCollision(this.mode === 'ragdoll' || body.muscle < 0.3);
     if (this.mode === 'ragdoll') {
@@ -336,8 +387,10 @@ export class Player {
       });
     }
 
-    // Non-physics things the body ran into.
+    // Non-physics things the body ran into (not while scrambling back up, or just after).
+    const canBump = !this.gettingUp && this.knockGrace <= 0;
     PART_NAMES.forEach((name, i) => {
+      if (!canBump) return;
       if (name !== 'head' && name !== 'chest' && name !== 'pelvis') return;
       const part = body.colliders[i];
       const partVel = this.partVelocity.get(part.handle);
@@ -368,6 +421,8 @@ export class Player {
     if (this.mode !== 'control' || !this.body) return;
     this.body.muscle = STUNNED_MUSCLE;
     this.stun = stunSeconds;
+    this.gettingUp = true;
+    this.getUpTime = 0;
     this.body.addVelocity(velocity);
     this.vel = [this.vel[0] + velocity[0] * 0.6, Math.max(this.vel[1], velocity[1] * 0.3), this.vel[2] + velocity[2] * 0.6];
   }

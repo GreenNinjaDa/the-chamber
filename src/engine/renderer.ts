@@ -14,6 +14,7 @@ export const Pattern = {
   panels: 1,
   dartboard: 2,
   blob: 3,
+  emissive: 4,
   skin: 5,
   sky: 6,
 } as const;

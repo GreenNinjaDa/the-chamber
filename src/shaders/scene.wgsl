@@ -25,6 +25,7 @@ struct Object {
 const PAT_PANELS = 1;
 const PAT_DARTBOARD = 2;
 const PAT_BLOB = 3;
+const PAT_EMISSIVE = 4;
 const PAT_SKIN = 5;
 const PAT_SKY = 6;
 
@@ -135,6 +136,10 @@ fn fs(in: VsOut) -> @location(0) vec4f {
 
   if (pattern == PAT_SKY) {
     return vec4f(tonemap(skyColor(normalize(in.worldPos - camPos))), 1.0);
+  }
+  if (pattern == PAT_EMISSIVE) {
+    // Unlit glow (lights, explosion flashes); values above 1 bloom into white through the tonemap.
+    return vec4f(tonemap(obj.color.rgb), 1.0);
   }
   if (pattern == PAT_BLOB) {
     // Soft disk (alpha-to-coverage), used as a contact shadow under the giant's hand.

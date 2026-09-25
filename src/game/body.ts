@@ -196,6 +196,11 @@ export class PhysBody {
   readonly parts = {} as Record<PartName, RAPIER.RigidBody>;
   readonly colliders: RAPIER.Collider[] = [];
   muscle = 1;
+  /** Overall muscle strength (scales pose matching and joint motors); set by the player. */
+  strength = 1;
+  /** Fastest the parts may move / spin to catch up with their pose (m/s, rad/s). */
+  catchUpSpeed = Infinity;
+  catchUpSpin = Infinity;
   private balls = {} as Record<BallJointName, RAPIER.ImpulseJoint>;
   private hinges = {} as Record<HingeName, RAPIER.RevoluteImpulseJoint>;
   private enabled = true;
@@ -314,7 +319,8 @@ export class PhysBody {
    */
   drive(h: number, targets: Frames, targetVel: Vec3, pose: Pose) {
     const m = this.muscle;
-    const k = STIFFNESS, d = DAMPING;
+    const k = { ball: STIFFNESS.ball * this.strength, hinge: STIFFNESS.hinge * this.strength };
+    const d = { ball: DAMPING.ball * this.strength, hinge: DAMPING.hinge * this.strength };
     const ball = (j: RAPIER.ImpulseJoint, x: number, z = 0) => {
       const raw = rawSet(j);
       if (m <= 0) {
@@ -345,11 +351,11 @@ export class PhysBody {
 
     for (const name of PART_NAMES) {
       const rb = this.parts[name];
-      const w = m * m * MATCH[name]; // squared: recovering from a knock starts gently
+      const w = Math.min(1, m * m * MATCH[name] * this.strength); // squared: recovering starts gently
       const target = targets[name];
 
       const goal: Vec3 = [target[12], target[13], target[14]];
-      const wantV = add(scale(sub(goal, fromV(rb.translation())), MATCH_GAIN / h), targetVel);
+      const wantV = add(clampLength(scale(sub(goal, fromV(rb.translation())), MATCH_GAIN / h), this.catchUpSpeed), targetVel);
       const v = fromV(rb.linvel());
       rb.setLinvel(v3(add(v, scale(sub(wantV, v), w))), true);
 
@@ -358,11 +364,16 @@ export class PhysBody {
       const sinHalf = Math.sqrt(Math.max(0, 1 - err.w * err.w));
       const angle = 2 * Math.acos(Math.min(1, err.w));
       const axis: Vec3 = sinHalf > 1e-4 ? [err.x / sinHalf, err.y / sinHalf, err.z / sinHalf] : [0, 0, 0];
-      const wantW = scale(axis, (angle * MATCH_GAIN) / h);
+      const wantW = scale(axis, Math.min((angle * MATCH_GAIN) / h, this.catchUpSpin));
       const av = fromV(rb.angvel());
       rb.setAngvel(v3(add(av, scale(sub(wantW, av), w))), true);
     }
   }
+}
+
+function clampLength(v: Vec3, max: number): Vec3 {
+  const l = Math.hypot(v[0], v[1], v[2]);
+  return l > max ? scale(v, max / l) : v;
 }
 
 /** Root transform for a standing player: feet position and facing (yaw). */

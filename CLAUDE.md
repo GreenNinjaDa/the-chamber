@@ -19,6 +19,11 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   instead, otherwise the player is caught. If the giant grabs
   the player instead, they are thrown at the dartboard and must steer mid-flight (WASD) into the bullseye to
   survive — anything else is a loss.
+- **Level 2 — Grenade** (`src/levels/grenade/`): junk (fridge, washing machine, bathtub, couch, mattress, crates,
+  tires, a garden gnome...) crashes into the chamber, then a grenade with a blinking 10 s fuse. Blast damage =
+  distance falloff × the fraction that gets through everything in the way (each junk piece has its own pass-through
+  value; heavier = better cover), sampled at head, chest and pelvis. ≥1 kills (ragdoll), ≥0.35 knocks you down.
+  Survive by distance, by hiding behind / dragging junk into cover, or by carrying and throwing the grenade.
 
 ## Commands
 
@@ -28,7 +33,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
 
 ## Layout
 
-- `src/main.ts` — game loop, title screen, level start/restart, dev hook
+- `src/main.ts` — game loop, title screen, the `LEVELS` list (`?level=N` starts at level N; N key after a win goes
+  to the next level), level start/restart, dev hook
 - `src/engine/` — renderer (primitive meshes, sun shadow map, MSAA, patterns), math (column-major,
   WebGPU clip space z ∈ [0,1]), input
 - `src/shaders/*.wgsl` — shaders, imported with `?raw`. Surface patterns (panels, dartboard, blob, skin, sky)

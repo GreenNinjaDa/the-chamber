@@ -9,14 +9,20 @@ import { Hud } from './game/hud';
 import { Interaction } from './game/interaction';
 import { Player } from './game/player';
 import { DartsLevel } from './levels/darts/dartsLevel';
+import { GrenadeLevel } from './levels/grenade/grenadeLevel';
 import type { Level, LevelContext } from './levels/level';
 
 const SPAWN: Vec3 = [0, 0, 6];
+/** The game's levels, in order. */
+const LEVELS: ((ctx: LevelContext) => Level)[] = [
+  (ctx) => new DartsLevel(ctx),
+  (ctx) => new GrenadeLevel(ctx),
+];
 const params = new URLSearchParams(location.search);
-/** `?sandbox` opens the mechanics test room instead of the game. */
-const makeLevel = params.has('sandbox')
-  ? (ctx: LevelContext) => new Sandbox(ctx)
-  : (ctx: LevelContext) => new DartsLevel(ctx);
+/** `?sandbox` opens the mechanics test room; `?level=N` starts at level N. */
+const sandbox = params.has('sandbox');
+let levelIndex = Math.min(LEVELS.length - 1, Math.max(0, (Number(params.get('level')) || 1) - 1));
+const makeLevel = (ctx: LevelContext) => (sandbox ? new Sandbox(ctx) : LEVELS[levelIndex](ctx));
 
 function showError(message: string) {
   const el = document.getElementById('error')!;
@@ -57,6 +63,7 @@ async function main() {
     player.attach(ctx.physics);
     camera.reset(0);
     level = makeLevel(ctx);
+    nextOffered = false;
   }
 
   canvas.addEventListener('click', () => {
@@ -71,10 +78,24 @@ async function main() {
   let last = performance.now();
   let time = 0;
 
+  let nextOffered = false;
+
   function tick(dt: number) {
     time += dt;
     if (playing) {
       if (input.wasPressed('KeyR')) startLevel();
+      // After a win, N moves on to the next chamber.
+      const hasNext = !sandbox && levelIndex < LEVELS.length - 1;
+      if (level.status === 'won' && hasNext) {
+        if (!nextOffered) {
+          nextOffered = true;
+          hud.hint('N — next chamber');
+        }
+        if (input.wasPressed('KeyN')) {
+          levelIndex++;
+          startLevel();
+        }
+      }
       camera.look(dt, input);
       if (player.mode === 'control') player.update(dt, input, camera.yaw, level.obstacles());
       player.syncCollider();
