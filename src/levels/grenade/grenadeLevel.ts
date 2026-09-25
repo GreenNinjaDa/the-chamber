@@ -57,19 +57,22 @@ interface GrenadeSpec {
   push: number;
   maxSpeed: number;
   pushRange: number;
+  /** Floors and walls within this distance (m) get scorched; a surface right at the blast gets a mark this big (radius, m). */
+  scorchRange: number;
+  scorchSize: number;
   color: number[];
 }
 
 const GRENADES: GrenadeSpec[] = [
   {
     // Behind a fridge (lets 30% through) you live from about 6.6 m away.
-    radius: 0.16, mass: 0.6, throwScale: 1, fuse: 10, safeDistance: 12, falloff: 2, shrapnel: 300,
+    radius: 0.16, mass: 0.6, throwScale: 1, fuse: 10, safeDistance: 12, falloff: 2, shrapnel: 300, scorchRange: 3.5, scorchSize: 2.6,
     push: 900, maxSpeed: 18, pushRange: 14, color: [0.13, 0.16, 0.06],
   },
   {
     // 1.5x the size and much heavier. Behind any one object you live only from 80% of the way
     // across the chamber (safeDistance), and the steep falloff makes closer cover hopeless.
-    radius: 0.24, mass: 2.5, throwScale: 0.85, fuse: 10, safeDistance: CHAMBER_DIAGONAL * 0.8, falloff: 3, shrapnel: 450,
+    radius: 0.24, mass: 2.5, throwScale: 0.85, fuse: 10, safeDistance: CHAMBER_DIAGONAL * 0.8, falloff: 3, shrapnel: 450, scorchRange: 5.5, scorchSize: 3.8,
     push: 2200, maxSpeed: 24, pushRange: 30, color: [0.09, 0.1, 0.05],
   },
 ];
@@ -158,6 +161,15 @@ interface Fragment {
   spin: number;
 }
 
+/** A burn mark on a floor or wall. */
+interface Scorch {
+  pos: Vec3;
+  normal: Vec3;
+  radius: number;
+  /** Small per-mark lift off the surface so overlapping marks don't flicker. */
+  lift: number;
+}
+
 interface Tracer {
   from: Vec3;
   to: Vec3;
@@ -186,6 +198,7 @@ export class GrenadeLevel implements Level {
   private lastBlast: { at: number; pos: Vec3; thrownOut: boolean; byShrapnel: boolean } | null = null;
   private fragments: Fragment[] = [];
   private tracers: Tracer[] = [];
+  private scorches: Scorch[] = [];
 
   constructor(private ctx: LevelContext) {
     ctx.hud.setLevel(`The Chamber · Level ${this.number}`);
@@ -285,6 +298,7 @@ export class GrenadeLevel implements Level {
     const away = normalize(add(sub(chest, pos), [0, 0.5, 0]));
 
     // Shrapnel flies before anyone gets launched, so it hits where you were standing.
+    this.scorch(pos, spec);
     const hitBy = this.fireShrapnel(pos, spec.shrapnel);
     let byShrapnel = false;
     if (alive && damage >= 1) {
@@ -334,6 +348,35 @@ export class GrenadeLevel implements Level {
     return hitPlayer;
   }
 
+  /**
+   * Burns every floor or wall surface near the blast. Rays go out in all directions; each surface
+   * they reach (grouped by collider and facing) gets one mark centred on its closest hit, sized by
+   * how close it was. Loose objects aren't scorched.
+   */
+  private scorch(origin: Vec3, spec: GrenadeSpec) {
+    const { physics } = this.ctx;
+    const rays = 96;
+    const nearest = new Map<string, { point: Vec3; normal: Vec3; dist: number }>();
+    for (let i = 0; i < rays; i++) {
+      // Evenly spread directions (Fibonacci sphere).
+      const y = 1 - (2 * (i + 0.5)) / rays;
+      const r = Math.sqrt(1 - y * y);
+      const a = i * Math.PI * (3 - Math.sqrt(5));
+      const dir: Vec3 = [Math.cos(a) * r, y, Math.sin(a) * r];
+      const hit = physics.raycast(origin, dir, spec.scorchRange);
+      if (!hit || hit.collider.parent()?.isDynamic()) continue;
+      const n = hit.normal;
+      const key = `${hit.collider.handle}|${Math.round(n[0])},${Math.round(n[1])},${Math.round(n[2])}`;
+      const prev = nearest.get(key);
+      if (!prev || hit.distance < prev.dist) nearest.set(key, { point: hit.point, normal: n, dist: hit.distance });
+    }
+    for (const { point, normal, dist } of nearest.values()) {
+      const radius = spec.scorchSize * (1 - dist / spec.scorchRange);
+      if (radius < 0.25) continue;
+      this.scorches.push({ pos: point, normal, radius, lift: 0.004 + this.scorches.length * 0.0015 });
+    }
+  }
+
   /** Fraction of the blast that reaches `point` after passing through everything in the way. */
   private exposure(from0: Vec3, point: Vec3): number {
     const { physics } = this.ctx;
@@ -373,6 +416,19 @@ export class GrenadeLevel implements Level {
       drawPineapple(out, fromQuat(g.body.rb.rotation(), [t.x, t.y, t.z]), g.spec.radius / 0.16, g.spec.color, lightOn);
     }
 
+    for (const s of this.scorches) {
+      const helper: Vec3 = Math.abs(s.normal[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+      const x = normalize(cross(helper, s.normal));
+      const z = cross(x, s.normal);
+      out.push({
+        mesh: 'cylinder',
+        model: basis(scale(x, s.radius), scale(s.normal, 0.002), scale(z, s.radius), add(s.pos, scale(s.normal, s.lift))),
+        color: [0.02, 0.02, 0.02],
+        pattern: Pattern.blob,
+        param: 0.85,
+        shadow: false,
+      });
+    }
     for (const f of this.fragments) drawFragment(out, f);
 
     const blast = this.lastBlast;
@@ -381,15 +437,7 @@ export class GrenadeLevel implements Level {
     for (const tr of this.tracers) {
       out.push({ mesh: 'cylinder', model: segment(tr.from, tr.to, 0.012), color: [5, 2.6, 0.8], pattern: Pattern.emissive, shadow: false });
     }
-    // Scorch mark, then a quick fireball that swells and collapses.
-    out.push({
-      mesh: 'cylinder',
-      model: mul(translation([blast.pos[0], 0.02, blast.pos[2]]), scaling([2.6, 0.02, 2.6])),
-      color: [0.02, 0.02, 0.02],
-      pattern: Pattern.blob,
-      param: 0.85,
-      shadow: false,
-    });
+    // A quick fireball that swells and collapses.
     if (e < 0.6) {
       const r = e < 0.12 ? lerp(0.3, 4.5, e / 0.12) : lerp(4.5, 0, (e - 0.12) / 0.48);
       const heat = 1 - e / 0.6;
