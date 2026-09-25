@@ -56,7 +56,11 @@ Shared mechanics available to levels (via `ctx`):
   implement `Usable` and call `physics.registerUsable(collider, thing)` for custom ones.
 - `player.kill(launchVelocity)` — comic death: the player goes limp as a ragdoll (don't use it for Darts).
 - `player.knock(velocity, stunSeconds)` — shove the player loose; they go limp, tumble, then get back up.
-  Loose objects that hit the body fast and heavy enough do this automatically.
+  Hits do this automatically (thresholds at the top of player.ts): the head needs 6 m/s and 40 kg·m/s, the rest
+  of the body 1.5× the speed and 5× the momentum. Loose objects count with their mass, walls/bars/scripted
+  things as 50 kg, nothing heavier than 50 kg. Only head, chest and pelvis count against non-physics things.
+- The player's movement capsule is wider than the body and never pushes things itself: walking pushes loose
+  objects by hand (heavier = slower), and flying objects pass through the capsule to hit the real body.
 - In scripted modes (`held`, `flying`, `stuck`, `splat`) the physical body is switched off and the pose is drawn
   directly; in `control` and `ragdoll` the body is drawn from physics.
 

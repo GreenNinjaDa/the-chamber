@@ -1,11 +1,11 @@
 import type { Input } from '../engine/input';
 import {
-  approachAngle, basis, clamp, cross, dot, length, mul, normalize, scale, sub, translation,
+  approachAngle, basis, clamp, cross, dot, mul, normalize, scale, sub, translation,
   type Mat4, type Vec3,
 } from '../engine/math';
 import { GROUPS_PLAYER_CAPSULE, GROUPS_QUERY_WORLD, RAPIER, type Body, type Physics } from '../engine/physics';
 import type { DrawItem } from '../engine/renderer';
-import { drawBody, PhysBody, poseFrames, REST_POSE, standingRoot, type Pose } from './body';
+import { drawBody, PART_NAMES, PhysBody, poseFrames, REST_POSE, standingRoot, type PartName, type Pose } from './body';
 
 /**
  * control: walking around under player control (pos = feet); the physical body follows the
@@ -29,11 +29,21 @@ const SPRINT_SPEED = 8.5;
 const JUMP_SPEED = 7.5;
 const GRAVITY = 22;
 
-/** A hit knocks you loose if the other object's relative speed and momentum are at least this. */
-const KNOCK_MIN_SPEED = 5;
+/**
+ * A hit to the head knocks you loose if the impact speed (m/s, into the surface) and momentum
+ * (kg·m/s) are at least this. Hits anywhere else on the body need more of both.
+ */
+const KNOCK_MIN_SPEED = 6;
 const KNOCK_MIN_MOMENTUM = 40;
+const BODY_KNOCK_SPEED_SCALE = 1.5;
+const BODY_KNOCK_MOMENTUM_SCALE = 5;
+/** Static and scripted (non-physics) things count as this heavy; nothing counts as heavier. */
+const NON_PHYSICS_MASS = 50;
+const MAX_KNOCK_MASS = 50;
+/** Objects up to this mass get pushed at walking speed; heavier ones move proportionally slower. */
+const PUSH_MASS = 80;
 /** After a knock, muscles stay at this strength for the stun time, then recover over `RECOVER_TIME`. */
-const STUNNED_MUSCLE = 0.05;
+const STUNNED_MUSCLE = 0.07;
 const RECOVER_TIME = 0.3;
 /** Stun time scales with the hit's momentum: STUN_MIN at the knock threshold, up to STUN_MAX. */
 const STUN_MIN = 0.1;
@@ -66,6 +76,8 @@ export class Player {
   private driveVel: Vec3 = [0, 0, 0];
   /** Loose objects near the player and their velocity just before the current physics step. */
   private incoming = new Map<Body, Vec3>();
+  /** Each body part's velocity just before the current physics step (by collider handle). */
+  private partVelocity = new Map<number, Vec3>();
 
   reset(pos: Vec3, facing = 0) {
     this.pos = [...pos];
@@ -90,8 +102,9 @@ export class Player {
     this.controller = physics.world.createCharacterController(0.02);
     this.controller.enableAutostep(0.35, 0.2, true);
     this.controller.enableSnapToGround(0.3);
-    this.controller.setApplyImpulsesToDynamicBodies(true);
-    this.controller.setCharacterMass(80);
+    // Pushing is done by hand in move(): the built-in version also shoves away anything that
+    // flies into the (invisible, wider than the body) capsule, so nothing could ever hit the body.
+    this.controller.setApplyImpulsesToDynamicBodies(false);
 
     this.body = new PhysBody(physics, poseFrames(standingRoot(this.pos, this.facing), REST_POSE));
     this.driveFeet = [...this.pos];
@@ -183,8 +196,33 @@ export class Player {
     if (this.onGround && this.vel[1] < 0) this.vel[1] = 0;
     if (delta[1] > 0 && m.y < delta[1] * 0.5) this.vel[1] = Math.min(this.vel[1], 0); // bumped head
     if (dt > 0 && this.pos[1] < -20) this.pos[1] = 0; // fell out of the world
+    this.pushObstacles(ctrl);
     const n = this.center();
     col.setTranslation({ x: n[0], y: n[1], z: n[2] });
+  }
+
+  /** Pushes loose objects the capsule walked into, along the walking direction only. */
+  private pushObstacles(ctrl: RAPIER.KinematicCharacterController) {
+    for (let i = 0; i < ctrl.numComputedCollisions(); i++) {
+      const hit = ctrl.computedCollision(i);
+      const rb = hit?.collider?.parent();
+      if (!hit || !rb || !rb.isDynamic()) continue;
+      // Push along the horizontal line from the player to the object.
+      const t = rb.translation();
+      const dx = t.x - this.pos[0], dz = t.z - this.pos[2];
+      const len = Math.hypot(dx, dz);
+      if (len < 1e-3) continue;
+      const nx = dx / len, nz = dz / len;
+      const into = this.vel[0] * nx + this.vel[2] * nz;
+      if (into <= 0) continue;
+      // Light things get shoved along at walking speed; heavier ones only budge slowly.
+      const mass = rb.mass();
+      const target = into * Math.min(1, PUSH_MASS / mass);
+      const v = rb.linvel();
+      const dv = target - (v.x * nx + v.z * nz);
+      if (dv <= 0) continue;
+      rb.applyImpulse({ x: nx * dv * mass, y: 0, z: nz * dv * mass }, true);
+    }
   }
 
   /** Call once per tick before the physics step. */
@@ -205,6 +243,8 @@ export class Player {
   private substep(h: number) {
     const body = this.body;
     if (!body) return;
+    // Record velocities before the animation drives the parts, so a limb being pulled
+    // through an obstacle doesn't register as a fast impact.
     this.recordIncoming();
     // Limbs collide with each other only while the body is limp (dead or knocked loose).
     body.setSelfCollision(this.mode === 'ragdoll' || body.muscle < 0.3);
@@ -232,41 +272,92 @@ export class Player {
     body.drive(h, targets, this.driveVel, this.pose);
   }
 
-  /** Before a step: remember how fast nearby loose objects were moving. */
+  /** Before a step: remember how fast nearby loose objects and each body part were moving. */
   private recordIncoming() {
     this.incoming.clear();
-    if (this.mode !== 'control' || !this.physics) return;
+    this.partVelocity.clear();
+    const body = this.body;
+    if (this.mode !== 'control' || !this.physics || !body) return;
     for (const b of this.physics.bodies) {
       const t = b.rb.translation();
       if (Math.hypot(t.x - this.pos[0], t.y - this.pos[1] - 1, t.z - this.pos[2]) > 4) continue;
       const v = b.rb.linvel();
       this.incoming.set(b, [v.x, v.y, v.z]);
     }
+    PART_NAMES.forEach((name, i) => this.partVelocity.set(body.colliders[i].handle, body.velocity(name)));
   }
 
-  /** After a step: anything that just hit the body fast and heavy enough knocks the player loose. */
+  /**
+   * After a step: find the hardest new impact on any body part and knock the player loose if
+   * it clears that part's threshold (the head is more fragile than the rest of the body).
+   *
+   * Loose objects: fast hits are resolved by continuous collision detection and don't reliably
+   * show up as contacts in the step they happen, so a hit is "this object was right next to a
+   * body part and its velocity suddenly changed". The impact speed is how fast it was heading
+   * toward that part. Mass counts up to `MAX_KNOCK_MASS`.
+   *
+   * Walls, bars and other non-physics things: actual contacts, with the impact speed measured
+   * along the contact normal (so grazing past doesn't count), counting as `NON_PHYSICS_MASS`.
+   * Only the head, chest and pelvis count: legs touch the floor all the time, and a swinging
+   * hand clipping a wall shouldn't knock anyone out.
+   */
   private checkHits() {
     const body = this.body, physics = this.physics;
     if (!body || !physics || this.mode !== 'control' || this.stun > 0) return;
-    for (const [b, v] of this.incoming) {
-      if (this.carrying && b.collider.handle === this.carrying.handle) continue;
-      const rel: Vec3 = [v[0] - this.vel[0], v[1] - this.vel[1], v[2] - this.vel[2]];
-      const speed = length(rel);
-      const momentum = speed * b.rb.mass();
-      if (speed < KNOCK_MIN_SPEED || momentum < KNOCK_MIN_MOMENTUM) continue;
-      let touching = false;
-      physics.world.contactPairsWith(b.collider, (other) => {
-        if (touching || !body.owns(other)) return;
-        // Pairs are listed while merely close; require actual contact points.
-        physics.world.contactPair(b.collider, other, (manifold) => {
-          if (manifold.numContacts() > 0) touching = true;
+    const world = physics.world;
+    let best: { severity: number; rel: Vec3; momentum: number } | null = null;
+
+    const consider = (name: PartName, rel: Vec3, impact: number, mass: number) => {
+      const isHead = name === 'head';
+      const minSpeed = KNOCK_MIN_SPEED * (isHead ? 1 : BODY_KNOCK_SPEED_SCALE);
+      const minMomentum = KNOCK_MIN_MOMENTUM * (isHead ? 1 : BODY_KNOCK_MOMENTUM_SCALE);
+      const momentum = impact * Math.min(mass, MAX_KNOCK_MASS);
+      if (impact < minSpeed || momentum < minMomentum) return;
+      const severity = clamp((momentum - minMomentum) / (STUN_MAX_MOMENTUM - minMomentum), 0, 1);
+      if (!best || severity > best.severity) best = { severity, rel, momentum };
+    };
+    const partIndex = new Map(body.colliders.map((c, i) => [c.handle, i]));
+
+    // Loose objects that just bounced off a body part.
+    for (const [prop, vPre] of this.incoming) {
+      if (this.carrying && prop.collider.handle === this.carrying.handle) continue;
+      const lv = prop.rb.linvel();
+      if (Math.hypot(lv.x - vPre[0], lv.y - vPre[1], lv.z - vPre[2]) < 1) continue;
+      const t = prop.rb.translation();
+      world.contactPairsWith(prop.collider, (other) => {
+        const i = partIndex.get(other.handle);
+        if (i === undefined) return;
+        const name = PART_NAMES[i];
+        const partVel = this.partVelocity.get(other.handle);
+        if (!partVel) return;
+        const rel = sub(vPre, partVel);
+        const toPart = normalize(sub(body.position(name), [t.x, t.y, t.z]));
+        consider(name, rel, dot(rel, toPart), prop.rb.mass());
+      });
+    }
+
+    // Non-physics things the body ran into.
+    PART_NAMES.forEach((name, i) => {
+      if (name !== 'head' && name !== 'chest' && name !== 'pelvis') return;
+      const part = body.colliders[i];
+      const partVel = this.partVelocity.get(part.handle);
+      if (!partVel) return;
+      world.contactPairsWith(part, (other) => {
+        const rb = other.parent();
+        if (body.owns(other) || (rb && rb.isDynamic())) return;
+        const lv = rb?.linvel();
+        const rel = sub(lv ? [lv.x, lv.y, lv.z] : [0, 0, 0], partVel);
+        world.contactPair(part, other, (manifold) => {
+          if (manifold.numContacts() === 0 && manifold.numSolverContacts() === 0) return;
+          const n = manifold.normal();
+          consider(name, rel, Math.abs(rel[0] * n.x + rel[1] * n.y + rel[2] * n.z), NON_PHYSICS_MASS);
         });
       });
-      if (!touching) continue;
-      const severity = clamp((momentum - KNOCK_MIN_MOMENTUM) / (STUN_MAX_MOMENTUM - KNOCK_MIN_MOMENTUM), 0, 1);
-      this.knock(scale(normalize(rel), Math.min(9, momentum / 12)), STUN_MIN + (STUN_MAX - STUN_MIN) * severity);
-      return;
-    }
+    });
+
+    if (!best) return;
+    const hit = best as { severity: number; rel: Vec3; momentum: number };
+    this.knock(scale(normalize(hit.rel), Math.min(9, hit.momentum / 12)), STUN_MIN + (STUN_MAX - STUN_MIN) * hit.severity);
   }
 
   /**

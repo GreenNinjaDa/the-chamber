@@ -1,4 +1,4 @@
-import type { Vec3 } from '../engine/math';
+import { mul, scaling, translation, type Vec3 } from '../engine/math';
 import type { Body } from '../engine/physics';
 import type { DrawItem } from '../engine/renderer';
 import { Button, Lever } from '../game/props';
@@ -43,6 +43,21 @@ export class Sandbox implements Level {
     for (let i = 0; i < 3; i++) {
       physics.addCylinder([3 + i * 1.5, 0.6, -8], 0.4, 1.2, { color: [0.2, 0.35, 0.7], mass: 25 });
     }
+
+    // A static bar at head height: the movement capsule fits under it, the head doesn't.
+    // Sprint into it to test head knocks from non-physics objects.
+    const barY = 1.91, barZ = 2, barHalf = 3.5;
+    physics.addStaticBox([0, barY, barZ], [barHalf * 2, 0.12, 0.12]);
+    for (const x of [-barHalf, barHalf]) physics.addStaticBox([x, (barY + 0.06) / 2, barZ], [0.15, barY + 0.06, 0.15]);
+    physics.addDrawable({
+      draw: (out) => {
+        const yellow = [0.95, 0.75, 0.1];
+        out.push({ mesh: 'box', model: mul(translation([0, barY, barZ]), scaling([barHalf * 2, 0.12, 0.12])), color: yellow, spec: 0.3 });
+        for (const x of [-barHalf, barHalf]) {
+          out.push({ mesh: 'box', model: mul(translation([x, (barY + 0.06) / 2, barZ]), scaling([0.15, barY + 0.06, 0.15])), color: [0.15, 0.15, 0.16] });
+        }
+      },
+    });
 
     new Lever(physics, [-10, 0, -9], Math.PI / 2, (on) => { this.raining = on; });
     new Button(physics, [10, 0, -9], [0.85, 0.08, 0.06], () => this.pressedTheButton());
