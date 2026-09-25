@@ -20,13 +20,13 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   the player instead, they are thrown at the dartboard and must steer mid-flight (WASD) into the bullseye to
   survive — anything else is a loss.
 - **Level 2 — Grenade** (`src/levels/grenade/`): junk (fridge, washing machine, bathtub, couch, mattress, crates,
-  tires, a garden gnome...) crashes into the chamber, then a pineapple grenade with a blinking 10 s fuse. In direct line
+  tires, a garden gnome...) crashes into the chamber, then a pineapple grenade with a blinking 5 s fuse. In direct line
   of sight (nothing between it and your chest) a blast is fatal anywhere in the chamber. Behind cover, damage =
   (safeDistance / d) ^ falloff × the average fraction getting through to head/chest/pelvis (walls block completely,
   per-junk pass-through,
   heavier = better cover); ≥1 kills, ≥0.35 knocks you down. Shrapnel (300 / 450 fragments) flies in straight lines,
   sticks in walls, junk and bodies, shoves what it hits, and kills the player on any hit. A red-rimmed hole (r 0.36 m, centre
-  5 m up) in the north wall lets you throw grenades out. Survive the first and a second grenade 1.5× the size arrives:
+  8.5 m up, above carrying reach) in the north wall lets you throw grenades out. Survive the first and a second grenade 1.5× the size arrives:
   behind even the flimsiest object you only live from 80% of the chamber's diagonal away. Survive both to win.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall.
 

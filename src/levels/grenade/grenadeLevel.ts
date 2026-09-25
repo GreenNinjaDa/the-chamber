@@ -26,7 +26,8 @@ const FIRST_GRENADE_AT = 5;
 /** Seconds after surviving the first blast before the second grenade drops. */
 const SECOND_GRENADE_DELAY = 3.5;
 /** The hole in the north wall (centre height and radius, m). The grenades' radii are 0.16 and 0.24. */
-const HOLE = { x: 0, y: 5, radius: 0.36 };
+// High enough that you can't just carry a grenade up to it (you have to throw).
+const HOLE = { x: 0, y: 8.5, radius: 0.36 };
 /** The chamber floor's diagonal (m), for distances like "80% of the way across". */
 const CHAMBER_DIAGONAL = CHAMBER_HALF * 2 * Math.SQRT2;
 /** Damage at or above this (but below 1) knocks you flat instead of killing you. */
@@ -64,13 +65,13 @@ interface GrenadeSpec {
 const GRENADES: GrenadeSpec[] = [
   {
     // Behind a fridge (lets 30% through) you live from about 6.6 m away.
-    radius: 0.16, mass: 0.6, throwScale: 1, fuse: 10, safeDistance: 12, falloff: 2, shrapnel: 300, scorchRange: 3.5, scorchSize: 2.6,
+    radius: 0.16, mass: 0.3, throwScale: 1, fuse: 5, safeDistance: 12, falloff: 2, shrapnel: 300, scorchRange: 3.5, scorchSize: 2.6,
     push: 900, maxSpeed: 18, pushRange: 14, color: [0.13, 0.16, 0.06],
   },
   {
     // 1.5x the size and much heavier. Behind any one object you live only from 80% of the way
     // across the chamber (safeDistance), and the steep falloff makes closer cover hopeless.
-    radius: 0.24, mass: 2.5, throwScale: 0.85, fuse: 10, safeDistance: CHAMBER_DIAGONAL * 0.8, falloff: 3, shrapnel: 450, scorchRange: 5.5, scorchSize: 3.8,
+    radius: 0.24, mass: 0.6, throwScale: 0.95, fuse: 5, safeDistance: CHAMBER_DIAGONAL * 0.8, falloff: 3, shrapnel: 450, scorchRange: 5.5, scorchSize: 3.8,
     push: 2200, maxSpeed: 24, pushRange: 30, color: [0.09, 0.1, 0.05],
   },
 ];

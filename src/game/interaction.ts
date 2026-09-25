@@ -13,6 +13,9 @@ const LIFT_MASS = 40;
 const HOLD_STIFFNESS = 10;
 const MAX_HOLD_SPEED = 14;
 const THROW_SPEED = 14;
+/** Objects lighter than this (kg) are thrown faster, up to MAX_LIGHT_BOOST times the normal speed. */
+const LIGHT_THROW_MASS = 1;
+const MAX_LIGHT_BOOST = 1.8;
 
 /**
  * Crosshair targeting plus the controls for things in the world: E uses what you're aiming
@@ -125,7 +128,8 @@ export class Interaction {
   private throw(dir: Vec3) {
     const rb = this.held!.rb;
     const strength = clamp(LIFT_MASS / rb.mass(), 0.05, 1);
-    const v = scale(dir, THROW_SPEED * strength * this.held!.throwScale);
+    const light = clamp(Math.sqrt(LIGHT_THROW_MASS / rb.mass()), 1, MAX_LIGHT_BOOST);
+    const v = scale(dir, THROW_SPEED * strength * light * this.held!.throwScale);
     rb.setLinvel({ x: v[0], y: v[1] + 2 * strength, z: v[2] }, true);
     this.release();
   }
