@@ -75,8 +75,9 @@ export function drawChamber(out: DrawItem[], opts: ChamberOptions = {}) {
     const center: Vec3 = [hole.x, hole.y, NORTH_Z];
     const side = plateSide(hole.radius);
     out.push({ mesh: 'holeplate', model: mul(translation(center), scaling([side, side, WALL_THICKNESS])), color: WALL, spec: 0.15 });
-    // Red rim lining the hole and ringing it on both faces of the wall.
-    const rim = hole.radius / TUBE_INNER_RATIO;
+    // Red rim ringing the hole on both faces of the wall.
+    // Slightly wider than the hole so its inner surface sits behind the white lining (no flicker).
+    const rim = (hole.radius * 1.03) / TUBE_INNER_RATIO;
     out.push({
       mesh: 'tube',
       model: mul(translation(center), rotationX(Math.PI / 2), scaling([rim, WALL_THICKNESS + 0.04, rim])),
