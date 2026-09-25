@@ -23,8 +23,10 @@ import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type Level
 const JUNK_START = 1.5;
 const JUNK_INTERVAL = 0.22;
 const FIRST_GRENADE_AT = 5;
-/** Seconds after surviving the first blast before the second grenade drops. */
-const SECOND_GRENADE_DELAY = 3.5;
+/** Seconds after the first blast (if you survived it) before the second grenade drops. */
+const SECOND_GRENADE_DELAY = 1;
+/** Seconds after the last blast before the result screen appears. */
+const RESULT_DELAY = 1.4;
 /** The hole in the north wall (centre height and radius, m). The grenades' radii are 0.16 and 0.24. */
 // High enough that you can't just carry a grenade up to it (you have to throw).
 const HOLE = { x: 0, y: 8.5, radius: 0.36 };
@@ -65,13 +67,13 @@ interface GrenadeSpec {
 const GRENADES: GrenadeSpec[] = [
   {
     // Behind a fridge (lets 30% through) you live from about 6.6 m away.
-    radius: 0.16, mass: 0.3, throwScale: 1, fuse: 5, safeDistance: 12, falloff: 2, shrapnel: 300, scorchRange: 3.5, scorchSize: 2.6,
+    radius: 0.16, mass: 0.3, throwScale: 1, fuse: 10, safeDistance: 12, falloff: 2, shrapnel: 300, scorchRange: 3.5, scorchSize: 2.6,
     push: 900, maxSpeed: 18, pushRange: 14, color: [0.13, 0.16, 0.06],
   },
   {
     // 1.5x the size and much heavier. Behind any one object you live only from 80% of the way
     // across the chamber (safeDistance), and the steep falloff makes closer cover hopeless.
-    radius: 0.24, mass: 0.6, throwScale: 0.95, fuse: 5, safeDistance: CHAMBER_DIAGONAL * 0.8, falloff: 3, shrapnel: 450, scorchRange: 5.5, scorchSize: 3.8,
+    radius: 0.24, mass: 0.6, throwScale: 0.95, fuse: 10, safeDistance: CHAMBER_DIAGONAL * 0.8, falloff: 3, shrapnel: 450, scorchRange: 5.5, scorchSize: 3.8,
     push: 2200, maxSpeed: 24, pushRange: 30, color: [0.09, 0.1, 0.05],
   },
 ];
@@ -225,15 +227,16 @@ export class GrenadeLevel implements Level {
       if (this.grenade.fuseLeft <= 0) this.explode(this.grenade);
     }
 
-    // Shortly after each blast, decide what happens next.
+    // After each blast, decide what happens next.
     const blast = this.lastBlast;
-    if (blast && !this.grenade && this.status === 'playing' && this.t - blast.at > 1.4) {
+    if (blast && !this.grenade && this.status === 'playing') {
+      const since = this.t - blast.at;
       if (player.mode === 'ragdoll') {
-        this.finish('lost', 'BOOM', pick(blast.byShrapnel ? QUIPS.shrapnel : QUIPS.died));
+        if (since > RESULT_DELAY) this.finish('lost', 'BOOM', pick(blast.byShrapnel ? QUIPS.shrapnel : QUIPS.died));
       } else if (this.nextGrenade >= GRENADES.length) {
-        this.finish('won', 'SURVIVED', pick(blast.thrownOut ? QUIPS.thrownOut : QUIPS.survived));
+        if (since > RESULT_DELAY) this.finish('won', 'SURVIVED', pick(blast.thrownOut ? QUIPS.thrownOut : QUIPS.survived));
       } else if (this.nextGrenadeAt === Infinity) {
-        this.nextGrenadeAt = blast.at + 1.4 + SECOND_GRENADE_DELAY;
+        this.nextGrenadeAt = blast.at + SECOND_GRENADE_DELAY;
       }
     }
     if (this.tracers.length && blast && this.t - blast.at > 0.12) this.tracers = [];
