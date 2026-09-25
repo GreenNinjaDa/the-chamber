@@ -24,7 +24,7 @@ export class Sandbox implements Level {
   constructor(private ctx: LevelContext) {
     const { physics, hud } = ctx;
     hud.setLevel('Sandbox · mechanics test');
-    hud.show('SANDBOX', 'Hold E to carry · click to throw · E on levers and buttons', 3);
+    hud.show('SANDBOX', 'Hold left click to carry · right-click to throw · E on levers and buttons', 3);
     hud.hint('');
 
     // Loose crates of a few sizes, plus a stack to knock over.

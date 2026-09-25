@@ -5,9 +5,11 @@ export class Input {
   mouseDX = 0;
   mouseDY = 0;
   locked = false;
-  /** Left mouse button went down this frame. */
+  /** Left mouse button went down this frame / is held. */
   mousePressed = false;
   mouseDown = false;
+  /** Right mouse button went down this frame. */
+  rightPressed = false;
   private down = new Set<string>();
   private pressed = new Set<string>();
 
@@ -25,10 +27,13 @@ export class Input {
       this.mouseDY += e.movementY;
     });
     window.addEventListener('mousedown', (e) => {
+      if (e.button === 2) this.rightPressed = true;
       if (e.button !== 0) return;
       this.mousePressed = true;
       this.mouseDown = true;
     });
+    // Right click throws; don't let the browser's context menu pop up over the game.
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('mouseup', (e) => {
       if (e.button === 0) this.mouseDown = false;
     });
@@ -57,6 +62,7 @@ export class Input {
   endFrame() {
     this.pressed.clear();
     this.mousePressed = false;
+    this.rightPressed = false;
     this.mouseDX = 0;
     this.mouseDY = 0;
   }

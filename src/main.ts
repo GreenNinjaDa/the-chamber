@@ -75,7 +75,7 @@ async function main() {
   let playing = false;
   let level: Level = makeLevel(ctx);
   addChamberColliders(ctx.physics, level.chamber);
-  hud.show('THE CHAMBER', 'Click to begin\nWASD move · Mouse look · Shift sprint · Space jump · E use / hold to carry · R restart');
+  hud.show('THE CHAMBER', 'Click to begin\nWASD move · Mouse look · Shift sprint · Space jump · E use · Hold click carry · Right-click throw · R restart');
   hud.setLevel('');
 
   function startLevel() {

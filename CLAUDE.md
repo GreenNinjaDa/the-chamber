@@ -47,8 +47,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   chamber colliders), fixed 120 Hz stepping with pre/post-step hooks, dynamic bodies that draw themselves,
   usables, ray casts, collision groups (the player's body parts and capsule are excluded from queries)
 - `src/game/` — shared pieces every level uses: chamber, player (Rapier character controller), over-the-shoulder
-  camera, HUD (with crosshair), `interaction.ts` (crosshair targeting, E to use, hold E to carry/drag, click to
-  throw), `props.ts` (Lever, Button), `body.ts` (11-part rounded player body: skeleton + poses for drawing,
+  camera, HUD (with crosshair), `interaction.ts` (crosshair targeting, E to use, hold left click to carry/drag,
+  right-click to throw), `props.ts` (Lever, Button), `body.ts` (11-part rounded player body: skeleton + poses for drawing,
   and `PhysBody`, the active ragdoll that follows the animation with joint motors and per-part pose matching)
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`

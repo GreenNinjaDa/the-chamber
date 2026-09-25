@@ -15,8 +15,9 @@ const MAX_HOLD_SPEED = 14;
 const THROW_SPEED = 14;
 
 /**
- * Crosshair targeting plus the E key: tap E on a usable (lever, button) to use it;
- * hold E on a loose object to carry or drag it; click while holding to throw it.
+ * Crosshair targeting plus the controls for things in the world: E uses what you're aiming
+ * at (levers, buttons); hold the left mouse button on a loose object to carry or drag it, and
+ * right-click while carrying to throw it.
  */
 export class Interaction {
   state: CrosshairState = 'hidden';
@@ -53,9 +54,9 @@ export class Interaction {
     const camToChest = length(sub(chest, origin));
 
     if (this.held) {
-      if (!input.isDown('KeyE')) {
+      if (!input.mouseDown) {
         this.release();
-      } else if (input.mousePressed) {
+      } else if (input.rightPressed) {
         this.throw(dir);
       } else {
         this.drag(dt, origin, dir, camToChest);
@@ -76,7 +77,7 @@ export class Interaction {
       this.state = 'target';
     } else if (body?.grabbable && hit) {
       this.setHighlight(body, 1);
-      if (input.wasPressed('KeyE')) this.grab(body, hit.point, hit.distance, camToChest);
+      if (input.mousePressed) this.grab(body, hit.point, hit.distance, camToChest);
       this.state = this.held ? 'holding' : 'target';
     } else {
       this.state = 'idle';
