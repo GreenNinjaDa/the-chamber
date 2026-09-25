@@ -125,7 +125,8 @@ interface PartDef {
 const PARTS: Record<PartName, PartDef> = {
   pelvis: { collider: () => RAPIER.ColliderDesc.roundCuboid(0.15, 0.09, 0.1, 0.03), mass: 12 },
   chest: { collider: () => RAPIER.ColliderDesc.roundCuboid(0.22, 0.21, 0.11, 0.035), mass: 22 },
-  head: { collider: () => RAPIER.ColliderDesc.ball(0.21), mass: 5 },
+  // Slightly smaller than the drawn head so it clears the chest at rest (head-chest contacts are on when limp).
+  head: { collider: () => RAPIER.ColliderDesc.ball(0.19), mass: 5 },
   upperArmL: { collider: () => RAPIER.ColliderDesc.capsule(0.1, 0.07), mass: 2.5 },
   upperArmR: { collider: () => RAPIER.ColliderDesc.capsule(0.1, 0.07), mass: 2.5 },
   foreArmL: { collider: () => RAPIER.ColliderDesc.capsule(0.1, 0.065), mass: 1.8 },
@@ -272,6 +273,9 @@ export class PhysBody {
     if (on === this.selfCollision) return;
     this.selfCollision = on;
     for (const c of this.colliders) c.setCollisionGroups(on ? GROUPS_PLAYER_BODY_LIMP : GROUPS_PLAYER_BODY);
+    // Jointed pairs normally ignore each other; the head and upper arms also collide with the
+    // chest when limp so they can't fold through it (they clear it at rest, unlike the hips).
+    for (const j of [this.balls.neck, this.balls.shoulderL, this.balls.shoulderR]) j.setContactsEnabled(on);
   }
 
   get isEnabled() {
