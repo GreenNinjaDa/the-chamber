@@ -29,6 +29,8 @@ export interface DrawItem {
   spec?: number;
   /** 0..1 pulsing glow for the thing under the crosshair. */
   highlight?: number;
+  /** World-space box outside which a decal (Pattern.blob) isn't drawn. */
+  clip?: { min: Vec3; max: Vec3 };
   /** Set false to keep the item out of the shadow map. */
   shadow?: boolean;
 }
@@ -60,6 +62,8 @@ export const HOLE_PLATE_RATIO = 0.35;
 export const TUBE_INNER_RATIO = 0.5;
 const OBJ_STRIDE = 256; // bytes, satisfies minUniformBufferOffsetAlignment
 const OBJ_FLOATS = OBJ_STRIDE / 4;
+/** Size of the Object struct in scene.wgsl. */
+const OBJ_BYTES = 192;
 const SHADOW_SIZE = 4096;
 const MSAA = 4;
 const DEPTH_FORMAT: GPUTextureFormat = 'depth24plus';
@@ -140,7 +144,7 @@ export class Renderer {
       entries: [{
         binding: 0,
         visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-        buffer: { hasDynamicOffset: true, minBindingSize: 160 },
+        buffer: { hasDynamicOffset: true, minBindingSize: OBJ_BYTES },
       }],
     });
 
@@ -158,7 +162,7 @@ export class Renderer {
     });
     this.objBG = device.createBindGroup({
       layout: objLayout,
-      entries: [{ binding: 0, resource: { buffer: this.objBuffer, size: 160 } }],
+      entries: [{ binding: 0, resource: { buffer: this.objBuffer, size: OBJ_BYTES } }],
     });
 
     const sceneModule = device.createShaderModule({ code: sceneCode });
@@ -264,6 +268,15 @@ export class Renderer {
       od[o + 37] = d.param ?? 0;
       od[o + 38] = d.spec ?? 0.08;
       od[o + 39] = d.highlight ?? 0;
+      const clip = d.clip;
+      od[o + 40] = clip ? clip.min[0] : 0;
+      od[o + 41] = clip ? clip.min[1] : 0;
+      od[o + 42] = clip ? clip.min[2] : 0;
+      od[o + 43] = clip ? 1 : 0;
+      od[o + 44] = clip ? clip.max[0] : 0;
+      od[o + 45] = clip ? clip.max[1] : 0;
+      od[o + 46] = clip ? clip.max[2] : 0;
+      od[o + 47] = 0;
     }
     device.queue.writeBuffer(this.objBuffer, 0, od, 0, n * OBJ_FLOATS);
 

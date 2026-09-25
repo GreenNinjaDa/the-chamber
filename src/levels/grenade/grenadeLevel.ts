@@ -1,5 +1,5 @@
 import {
-  add, basis, cross, distXZ, fromQuat, length, lerp, mul, normalize, rotateByQuat, rotationZ, scale, scaling,
+  add, basis, cross, distXZ, dot, fromQuat, length, lerp, mul, normalize, rotateByQuat, rotationZ, scale, scaling,
   segment, sub, translation,
   type Mat4, type Quat, type Vec3,
 } from '../../engine/math';
@@ -168,6 +168,8 @@ interface Scorch {
   radius: number;
   /** Small per-mark lift off the surface so overlapping marks don't flicker. */
   lift: number;
+  /** The surface's face as a world-space box; the mark is clipped to it. */
+  clip: { min: Vec3; max: Vec3 };
 }
 
 interface Tracer {
@@ -349,14 +351,16 @@ export class GrenadeLevel implements Level {
   }
 
   /**
-   * Burns every floor or wall surface near the blast. Rays go out in all directions; each surface
-   * they reach (grouped by collider and facing) gets one mark centred on its closest hit, sized by
-   * how close it was. Loose objects aren't scorched.
+   * Burns every floor or wall surface near the blast. Rays go out in all directions; the hits
+   * are grouped by plane (so a wall built from several pieces, like the one with the hole, gets
+   * one continuous mark), centred on the plane's closest hit and sized by how close it was. The
+   * mark is drawn on each piece of that plane, clipped to the piece so it never overhangs an
+   * edge. Loose objects and tiny faces aren't scorched.
    */
   private scorch(origin: Vec3, spec: GrenadeSpec) {
     const { physics } = this.ctx;
     const rays = 96;
-    const nearest = new Map<string, { point: Vec3; normal: Vec3; dist: number }>();
+    const planes = new Map<string, { point: Vec3; normal: Vec3; dist: number; colliders: Map<number, RAPIER.Collider> }>();
     for (let i = 0; i < rays; i++) {
       // Evenly spread directions (Fibonacci sphere).
       const y = 1 - (2 * (i + 0.5)) / rays;
@@ -366,14 +370,21 @@ export class GrenadeLevel implements Level {
       const hit = physics.raycast(origin, dir, spec.scorchRange);
       if (!hit || hit.collider.parent()?.isDynamic()) continue;
       const n = hit.normal;
-      const key = `${hit.collider.handle}|${Math.round(n[0])},${Math.round(n[1])},${Math.round(n[2])}`;
-      const prev = nearest.get(key);
-      if (!prev || hit.distance < prev.dist) nearest.set(key, { point: hit.point, normal: n, dist: hit.distance });
+      const key = `${Math.round(n[0])},${Math.round(n[1])},${Math.round(n[2])}|${Math.round(dot(n, hit.point) * 10)}`;
+      let plane = planes.get(key);
+      if (!plane) planes.set(key, (plane = { point: hit.point, normal: n, dist: hit.distance, colliders: new Map() }));
+      if (hit.distance < plane.dist) Object.assign(plane, { point: hit.point, normal: n, dist: hit.distance });
+      plane.colliders.set(hit.collider.handle, hit.collider);
     }
-    for (const { point, normal, dist } of nearest.values()) {
-      const radius = spec.scorchSize * (1 - dist / spec.scorchRange);
+    for (const plane of planes.values()) {
+      const radius = spec.scorchSize * (1 - plane.dist / spec.scorchRange);
       if (radius < 0.25) continue;
-      this.scorches.push({ pos: point, normal, radius, lift: 0.004 + this.scorches.length * 0.0015 });
+      const lift = 0.004 + this.scorches.length * 0.0015;
+      for (const collider of plane.colliders.values()) {
+        const face = faceBox(collider, plane.normal);
+        if (!face) continue; // too small to bother (e.g. the blocks forming the hole's rim)
+        this.scorches.push({ pos: plane.point, normal: plane.normal, radius, lift, clip: face });
+      }
     }
   }
 
@@ -427,6 +438,7 @@ export class GrenadeLevel implements Level {
         pattern: Pattern.blob,
         param: 0.85,
         shadow: false,
+        clip: s.clip,
       });
     }
     for (const f of this.fragments) drawFragment(out, f);
@@ -469,6 +481,34 @@ export class GrenadeLevel implements Level {
     const t = g.body.rb.translation();
     return [{ pos: [t.x, t.y, t.z], radius: g.spec.radius * 1.3 }];
   }
+}
+
+/** Faces smaller than this (m²) don't get scorch marks. */
+const MIN_SCORCH_FACE = 0.6;
+
+/**
+ * The face of a box collider that points along `normal`, as a world-space box (slightly padded
+ * so a decal lifted off the surface still fits). Null for non-boxes and tiny faces.
+ */
+function faceBox(collider: RAPIER.Collider, normal: Vec3): { min: Vec3; max: Vec3 } | null {
+  const he = collider.halfExtents();
+  if (!he) return null;
+  const q = collider.rotation(), t = collider.translation();
+  const axes = [rotateByQuat(q, [1, 0, 0]), rotateByQuat(q, [0, 1, 0]), rotateByQuat(q, [0, 0, 1])];
+  const half = [he.x, he.y, he.z];
+  let k = 0;
+  for (let i = 1; i < 3; i++) if (Math.abs(dot(axes[i], normal)) > Math.abs(dot(axes[k], normal))) k = i;
+  const [i, j] = [0, 1, 2].filter((a) => a !== k);
+  if (4 * half[i] * half[j] < MIN_SCORCH_FACE) return null;
+  const center = add([t.x, t.y, t.z], scale(axes[k], Math.sign(dot(axes[k], normal)) * half[k]));
+  const min: Vec3 = [Infinity, Infinity, Infinity], max: Vec3 = [-Infinity, -Infinity, -Infinity];
+  for (const si of [-1, 1]) for (const sj of [-1, 1]) {
+    const c = add(center, add(scale(axes[i], si * half[i]), scale(axes[j], sj * half[j])));
+    for (let a = 0; a < 3; a++) { min[a] = Math.min(min[a], c[a]); max[a] = Math.max(max[a], c[a]); }
+  }
+  // Room along the normal for the decal's lift; barely any sideways, so it can't overhang an edge.
+  const pad = [0, 1, 2].map((ax) => 0.01 + Math.abs(normal[ax]) * 0.06);
+  return { min: [min[0] - pad[0], min[1] - pad[1], min[2] - pad[2]], max: [max[0] + pad[0], max[1] + pad[1], max[2] + pad[2]] };
 }
 
 /** A "pineapple" frag grenade: segmented olive body, fuse cap, spoon lever and a blinking light. */

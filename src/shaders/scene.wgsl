@@ -14,6 +14,8 @@ struct Object {
   normalMat: mat4x4f,
   color: vec4f,
   params: vec4f,      // x: pattern, y: pattern parameter, z: specular strength, w: highlight
+  clipMin: vec4f,     // world-space clip box for decals; w > 0.5 enables it
+  clipMax: vec4f,
 };
 
 @group(0) @binding(0) var<uniform> frame: Frame;
@@ -142,9 +144,13 @@ fn fs(in: VsOut) -> @location(0) vec4f {
     return vec4f(tonemap(obj.color.rgb), 1.0);
   }
   if (pattern == PAT_BLOB) {
-    // Soft disk (alpha-to-coverage), used as a contact shadow under the giant's hand.
+    // Soft disk (alpha-to-coverage): contact shadows and scorch marks. Decals are clipped to
+    // their surface's box so they never hang off an edge.
     let r = length(in.localPos.xz);
-    let alpha = obj.params.y * (1.0 - r * r);
+    var alpha = obj.params.y * (1.0 - r * r);
+    if (obj.clipMin.w > 0.5 && (any(in.worldPos < obj.clipMin.xyz) || any(in.worldPos > obj.clipMax.xyz))) {
+      alpha = 0.0;
+    }
     return vec4f(tonemap(obj.color.rgb), alpha);
   }
 
