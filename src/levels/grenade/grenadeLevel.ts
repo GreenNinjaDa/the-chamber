@@ -6,7 +6,7 @@ import {
 import { GROUPS_QUERY_WITH_PLAYER, GROUPS_QUERY_WORLD, RAPIER, type Body } from '../../engine/physics';
 import { Pattern, type DrawItem } from '../../engine/renderer';
 import { CHAMBER_HALF, type ChamberOptions } from '../../game/chamber';
-import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus } from '../level';
+import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus, type TrackedTarget } from '../level';
 
 /*
  * Level 2 — Grenade.
@@ -26,7 +26,7 @@ const FIRST_GRENADE_AT = 5;
 /** Seconds after surviving the first blast before the second grenade drops. */
 const SECOND_GRENADE_DELAY = 3.5;
 /** The hole in the north wall (centre height and radius, m). The grenades' radii are 0.16 and 0.24. */
-const HOLE = { x: 0, y: 4.2, radius: 0.3 };
+const HOLE = { x: 0, y: 5, radius: 0.36 };
 /** The chamber floor's diagonal (m), for distances like "80% of the way across". */
 const CHAMBER_DIAGONAL = CHAMBER_HALF * 2 * Math.SQRT2;
 /** Damage at or above this (but below 1) knocks you flat instead of killing you. */
@@ -413,6 +413,13 @@ export class GrenadeLevel implements Level {
 
   cameraShot(): CameraShot | null {
     return null;
+  }
+
+  trackedTargets(): TrackedTarget[] {
+    const g = this.grenade;
+    if (!g) return [];
+    const t = g.body.rb.translation();
+    return [{ pos: [t.x, t.y, t.z], radius: g.spec.radius * 1.3 }];
   }
 }
 

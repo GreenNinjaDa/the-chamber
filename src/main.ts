@@ -1,16 +1,16 @@
 import { Sandbox } from './dev/sandbox';
 import { Input } from './engine/input';
-import { mul, scaling, translation, type Vec3 } from './engine/math';
+import { mul, multiply, scaling, translation, type Mat4, type Vec3 } from './engine/math';
 import { initPhysics, Physics } from './engine/physics';
 import { Pattern, Renderer, type DrawItem } from './engine/renderer';
 import { ThirdPersonCamera } from './game/camera';
 import { addChamberColliders, drawChamber } from './game/chamber';
-import { Hud } from './game/hud';
+import { Hud, type ScreenMarker } from './game/hud';
 import { Interaction } from './game/interaction';
 import { Player } from './game/player';
 import { DartsLevel } from './levels/darts/dartsLevel';
 import { GrenadeLevel } from './levels/grenade/grenadeLevel';
-import type { Level, LevelContext } from './levels/level';
+import type { Level, LevelContext, TrackedTarget } from './levels/level';
 
 const SPAWN: Vec3 = [0, 0, 6];
 /** The game's levels, in order. */
@@ -23,6 +23,31 @@ const params = new URLSearchParams(location.search);
 const sandbox = params.has('sandbox');
 let levelIndex = Math.min(LEVELS.length - 1, Math.max(0, (Number(params.get('level')) || 1) - 1));
 const makeLevel = (ctx: LevelContext) => (sandbox ? new Sandbox(ctx) : LEVELS[levelIndex](ctx));
+
+/** Where each tracked target is on screen: a ring if visible, otherwise an edge arrow toward it. */
+function screenMarkers(targets: TrackedTarget[], view: Mat4, proj: Mat4, fov: number): ScreenMarker[] {
+  const w = window.innerWidth, h = window.innerHeight;
+  const margin = 44;
+  const viewProj = multiply(proj, view);
+  return targets.map(({ pos, radius }) => {
+    const cx = viewProj[0] * pos[0] + viewProj[4] * pos[1] + viewProj[8] * pos[2] + viewProj[12];
+    const cy = viewProj[1] * pos[0] + viewProj[5] * pos[1] + viewProj[9] * pos[2] + viewProj[13];
+    const cw = viewProj[3] * pos[0] + viewProj[7] * pos[1] + viewProj[11] * pos[2] + viewProj[15];
+    const nx = cx / cw, ny = cy / cw;
+    if (cw > 0.05 && Math.abs(nx) <= 1 && Math.abs(ny) <= 1) {
+      const pxPerUnit = h / (2 * Math.tan(fov / 2) * cw);
+      return { onScreen: true, x: (nx * 0.5 + 0.5) * w, y: (0.5 - ny * 0.5) * h, size: Math.max(26, radius * 2 * pxPerUnit + 16), angle: 0 };
+    }
+    // Off screen: point along the target's direction in camera space (right / up), which also
+    // does the sensible thing for targets behind the camera (e.g. behind and below = down).
+    const vx = view[0] * pos[0] + view[4] * pos[1] + view[8] * pos[2] + view[12];
+    const vy = view[1] * pos[0] + view[5] * pos[1] + view[9] * pos[2] + view[13];
+    let dx = vx, dy = -vy;
+    if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) dy = 1;
+    const t = Math.min((w / 2 - margin) / Math.max(Math.abs(dx), 1e-6), (h / 2 - margin) / Math.max(Math.abs(dy), 1e-6));
+    return { onScreen: false, x: w / 2 + dx * t, y: h / 2 + dy * t, size: 0, angle: Math.atan2(dy, dx) };
+  });
+}
 
 function showError(message: string) {
   const el = document.getElementById('error')!;
@@ -132,6 +157,7 @@ async function main() {
     level.draw(draws, time);
 
     renderer.render(draws, view, level.environment(), time);
+    hud.markers(playing ? screenMarkers(level.trackedTargets?.() ?? [], view.view, view.proj, camera.fov) : []);
   }
 
   function frame(now: number) {

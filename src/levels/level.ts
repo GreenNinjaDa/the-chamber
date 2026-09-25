@@ -18,6 +18,12 @@ export interface LevelContext {
   physics: Physics;
 }
 
+export interface TrackedTarget {
+  pos: Vec3;
+  /** World-space radius, so the ring fits around the object. */
+  radius: number;
+}
+
 /** A camera position a level wants instead of the normal over-the-shoulder view. */
 export interface CameraShot {
   pos: Vec3;
@@ -41,6 +47,8 @@ export interface Level {
   /** Extra circular obstacles the player collides with. */
   obstacles(): Circle[];
   cameraShot(): CameraShot | null;
+  /** Things to flag on screen (a pulsing ring when visible, an edge arrow when not), e.g. live grenades. */
+  trackedTargets?(): TrackedTarget[];
 }
 
 export const DEFAULT_ENV: Environment = {

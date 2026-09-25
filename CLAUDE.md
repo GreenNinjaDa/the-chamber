@@ -24,8 +24,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   of sight (nothing between it and your chest) a blast is fatal anywhere in the chamber. Behind cover, damage =
   (safeDistance / d) ^ falloff × the average fraction getting through to head/chest/pelvis (per-junk pass-through,
   heavier = better cover); ≥1 kills, ≥0.35 knocks you down. Shrapnel (300 / 450 fragments) flies in straight lines,
-  sticks in walls, junk and bodies, shoves what it hits, and kills the player on any hit. A red-rimmed hole (r 0.3 m)
-  high in the north wall lets you throw grenades out. Survive the first and a second grenade 1.5× the size arrives:
+  sticks in walls, junk and bodies, shoves what it hits, and kills the player on any hit. A red-rimmed hole (r 0.36 m, centre
+  5 m up) in the north wall lets you throw grenades out. Survive the first and a second grenade 1.5× the size arrives:
   behind even the flimsiest object you only live from 80% of the chamber's diagonal away. Survive both to win.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall.
 
@@ -64,6 +64,8 @@ Shared mechanics available to levels (via `ctx`):
   things can only be dragged. Pass `grabbable: false` for things the player shouldn't pick up.
 - `new Lever(physics, pos, yaw, onToggle)` and `new Button(physics, pos, color, onPress)` for E-usable props;
   implement `Usable` and call `physics.registerUsable(collider, thing)` for custom ones.
+- `trackedTargets()` — optional; returns things to flag on screen (pulsing red ring when visible, pulsing edge
+  arrow when off screen), e.g. live grenades.
 - `player.kill(launchVelocity)` — comic death: the player goes limp as a ragdoll (don't use it for Darts).
 - `player.knock(velocity, stunSeconds)` — shove the player loose; they go limp, tumble, then get back up.
   Hits do this automatically (thresholds at the top of player.ts): the head needs 6 m/s and 40 kg·m/s, the rest
