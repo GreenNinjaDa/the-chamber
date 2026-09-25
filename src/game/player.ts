@@ -1,6 +1,6 @@
 import type { Input } from '../engine/input';
 import {
-  approachAngle, basis, clamp, cross, dot, mul, normalize, scale, sub, translation,
+  approachAngle, basis, clamp, cross, dot, length, mul, normalize, scale, sub, translation,
   type Mat4, type Vec3,
 } from '../engine/math';
 import { GROUPS_PLAYER_CAPSULE, GROUPS_QUERY_WORLD, RAPIER, type Body, type Physics } from '../engine/physics';
@@ -72,6 +72,17 @@ const GETUP_MOVE_SCALE = 0.2;
 const GETUP_DONE_DISTANCE = 0.15;
 /** If the body is stuck (e.g. pinned under crates), give up on the slow get-up after this long (s). */
 const GETUP_MAX_TIME = 3;
+
+// --- Violent deaths ---------------------------------------------------------------------------
+/**
+ * How violent a death is (by default the launch speed, m/s). From DISMEMBER_MIN_VIOLENCE up,
+ * joints can tear apart; the chance per joint rises to DISMEMBER_MAX_CHANCE at
+ * DISMEMBER_FULL_VIOLENCE. Torn-off parts fly off at about DISMEMBER_KICK x violence.
+ */
+const DISMEMBER_MIN_VIOLENCE = 18;
+const DISMEMBER_FULL_VIOLENCE = 40;
+const DISMEMBER_MAX_CHANCE = 0.9;
+const DISMEMBER_KICK = 0.3;
 /**
  * After standing back up, bumping into walls/bars/scripted things can't knock you again for
  * this long (s). Thrown and falling objects still can.
@@ -435,8 +446,11 @@ export class Player {
     }
   }
 
-  /** Goes limp with the given extra velocity (m/s). Comic deaths use this. */
-  kill(launch: Vec3 = [0, 0, 0]) {
+  /**
+   * Goes limp with the given extra velocity (m/s). Comic deaths use this. Violent enough deaths
+   * (`violence`, default the launch speed) can tear the body apart, more so near `origin`.
+   */
+  kill(launch: Vec3 = [0, 0, 0], opts: { violence?: number; origin?: Vec3 } = {}) {
     const body = this.body;
     if (!body || this.mode === 'ragdoll') return;
     if (!body.isEnabled || this.mode !== 'control') {
@@ -449,6 +463,14 @@ export class Player {
     body.parts.chest.setAngvel({ x: (Math.random() - 0.5) * 8, y: (Math.random() - 0.5) * 5, z: (Math.random() - 0.5) * 8 }, true);
     this.mode = 'ragdoll';
     this.collider?.setEnabled(false);
+    this.tearApart(opts.violence ?? length(launch), opts.origin);
+  }
+
+  /** Rips joints apart if `violence` is high enough (dead bodies only). Returns joints broken. */
+  tearApart(violence: number, origin?: Vec3): number {
+    if (!this.body || this.mode !== 'ragdoll' || violence < DISMEMBER_MIN_VIOLENCE) return 0;
+    const t = clamp((violence - DISMEMBER_MIN_VIOLENCE) / (DISMEMBER_FULL_VIOLENCE - DISMEMBER_MIN_VIOLENCE), 0, 1);
+    return this.body.dismember(DISMEMBER_MAX_CHANCE * t, violence * DISMEMBER_KICK, origin);
   }
 
   private scriptedRoot(): Mat4 {

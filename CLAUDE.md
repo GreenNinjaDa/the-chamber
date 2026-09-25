@@ -71,7 +71,10 @@ Shared mechanics available to levels (via `ctx`):
   implement `Usable` and call `physics.registerUsable(collider, thing)` for custom ones.
 - `trackedTargets()` — optional; returns things to flag on screen (pulsing red ring when visible, pulsing edge
   arrow when off screen), e.g. live grenades.
-- `player.kill(launchVelocity)` — comic death: the player goes limp as a ragdoll (don't use it for Darts).
+- `player.kill(launchVelocity, { violence?, origin? })` — comic death: the player goes limp as a ragdoll (don't use
+  it for Darts). Violent deaths (violence = launch speed by default; ≥18 starts tearing joints, ~40 rips most of
+  them) permanently dismember the body; `origin` makes parts nearer it more likely to come off.
+  `player.tearApart(violence, origin)` does the same to an existing corpse.
 - `player.knock(velocity, stunSeconds)` — shove the player loose; they go limp, tumble, then get back up.
   Hits do this automatically (thresholds at the top of player.ts): the head needs 6 m/s and 40 kg·m/s, the rest
   of the body 1.5× the speed and 5× the momentum. Loose objects count with their mass, walls/bars/scripted

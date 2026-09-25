@@ -5,6 +5,7 @@ import {
 } from '../../engine/math';
 import { GROUPS_QUERY_WITH_PLAYER, GROUPS_QUERY_WORLD, RAPIER, type Body } from '../../engine/physics';
 import { Pattern, type DrawItem } from '../../engine/renderer';
+import { PART_NAMES } from '../../game/body';
 import { CHAMBER_HALF, type ChamberOptions } from '../../game/chamber';
 import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus, type TrackedTarget } from '../level';
 
@@ -309,13 +310,23 @@ export class GrenadeLevel implements Level {
     this.scorch(pos, spec);
     const hitBy = this.fireShrapnel(pos, spec.shrapnel);
     let byShrapnel = false;
+    // How violent the death is: close and in plain sight tears you apart; far or behind cover doesn't.
+    const violence = inSight ? Math.max(0, 44 - d) : Math.min(40, 9 * damage);
     if (alive && damage >= 1) {
-      player.kill(scale(away, Math.min(28, 9 * damage)));
+      player.kill(scale(away, Math.min(28, 9 * damage)), { violence, origin: pos });
     } else if (alive && hitBy) {
       byShrapnel = true;
-      player.kill(add(scale(hitBy, 10), scale(away, 3)));
+      player.kill(add(scale(hitBy, 10), scale(away, 3)), { violence: Math.max(violence, 16), origin: pos });
     } else if (alive && damage >= KNOCKDOWN_DAMAGE) {
       player.knock(scale(away, 9 * damage), 0.6 + 1.4 * damage);
+    } else if (!alive && body && damage > 0) {
+      // A body already lying around gets thrown about, and can come apart.
+      for (const part of PART_NAMES) {
+        const p = body.position(part);
+        const push = Math.min(20, (9 * damage) / (1 + length(sub(p, pos)) / 4));
+        body.parts[part].applyImpulse({ x: away[0] * push * 4, y: (away[1] + 0.4) * push * 4, z: away[2] * push * 4 }, true);
+      }
+      player.tearApart(violence, pos);
     }
     this.lastBlast = { at: this.t, pos, thrownOut, byShrapnel };
   }

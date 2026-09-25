@@ -1,5 +1,5 @@
 import {
-  add, basis, fromQuat, mul, quatConj, quatMul, rotationX, rotationZ, scale, scaling, sub, toQuat,
+  add, basis, clamp, fromQuat, length, mul, normalize, quatConj, quatMul, rotationX, rotationZ, scale, scaling, sub, toQuat,
   translation, type Mat4, type Quat, type Vec3,
 } from '../engine/math';
 import { GROUPS_PLAYER_BODY, GROUPS_PLAYER_BODY_LIMP, RAPIER, type Physics } from '../engine/physics';
@@ -139,6 +139,13 @@ const PARTS: Record<PartName, PartDef> = {
 
 type BallJointName = 'waist' | 'neck' | 'shoulderL' | 'shoulderR' | 'hipL' | 'hipR';
 type HingeName = 'elbowL' | 'elbowR' | 'kneeL' | 'kneeR';
+type JointName = BallJointName | HingeName;
+
+/** How much harder than a limb joint each joint is to tear (1 = like a limb). */
+const JOINT_TOUGHNESS: Record<JointName, number> = {
+  waist: 1.6, neck: 1.25, shoulderL: 1, shoulderR: 1, hipL: 1.1, hipR: 1.1,
+  elbowL: 1, elbowR: 1, kneeL: 1, kneeR: 1,
+};
 
 // [parent, child, anchor on parent, anchor on child], anchors relative to each part's centre.
 const BALL_JOINTS: Record<BallJointName, [PartName, PartName, Vec3, Vec3]> = {
@@ -204,6 +211,8 @@ export class PhysBody {
   catchUpSpin = Infinity;
   private balls = {} as Record<BallJointName, RAPIER.ImpulseJoint>;
   private hinges = {} as Record<HingeName, RAPIER.RevoluteImpulseJoint>;
+  /** Joints torn apart by a violent death; they stay broken. */
+  private broken = new Set<JointName>();
   private enabled = true;
   private selfCollision = false;
 
@@ -246,6 +255,38 @@ export class PhysBody {
     }
   }
 
+  /**
+   * Tears joints apart at random: each joint breaks with probability `chance` (scaled down for
+   * tougher joints, and up for parts nearer `origin`, e.g. a blast). Freed parts get kicked
+   * away from the body (or the origin) by `kick` m/s. Returns how many joints broke.
+   */
+  dismember(chance: number, kick: number, origin?: Vec3): number {
+    let count = 0;
+    const centre = this.position('chest');
+    const joints = [...Object.entries(BALL_JOINTS), ...Object.entries(HINGES)] as unknown as [JointName, [PartName, PartName]][];
+    for (const [name, [, child]] of joints) {
+      if (this.broken.has(name)) continue;
+      const childPos = this.position(child);
+      const near = origin ? clamp(1.5 - length(sub(childPos, origin)) / 8, 0.6, 1.5) : 1;
+      if (Math.random() > (chance * near) / JOINT_TOUGHNESS[name]) continue;
+      const joint = name in this.balls ? this.balls[name as BallJointName] : this.hinges[name as HingeName];
+      this.physics.world.removeImpulseJoint(joint, true);
+      this.broken.add(name);
+      count++;
+      const away = normalize(add(sub(childPos, origin ?? centre), [
+        (Math.random() - 0.5) * 0.8, 0.5 + Math.random() * 0.5, (Math.random() - 0.5) * 0.8,
+      ]));
+      const rb = this.parts[child];
+      rb.setLinvel(v3(add(fromV(rb.linvel()), scale(away, kick * (0.6 + Math.random() * 0.6)))), true);
+      rb.setAngvel({ x: (Math.random() - 0.5) * 20, y: (Math.random() - 0.5) * 20, z: (Math.random() - 0.5) * 20 }, true);
+    }
+    return count;
+  }
+
+  get brokenJoints() {
+    return this.broken.size;
+  }
+
   /** Moves every part to the given frames and stops it (used when switching back from scripted poses). */
   teleport(frames: Frames, velocity: Vec3 = [0, 0, 0]) {
     for (const name of PART_NAMES) {
@@ -275,7 +316,9 @@ export class PhysBody {
     for (const c of this.colliders) c.setCollisionGroups(on ? GROUPS_PLAYER_BODY_LIMP : GROUPS_PLAYER_BODY);
     // Jointed pairs normally ignore each other; the head and upper arms also collide with the
     // chest when limp so they can't fold through it (they clear it at rest, unlike the hips).
-    for (const j of [this.balls.neck, this.balls.shoulderL, this.balls.shoulderR]) j.setContactsEnabled(on);
+    for (const name of ['neck', 'shoulderL', 'shoulderR'] as const) {
+      if (!this.broken.has(name)) this.balls[name].setContactsEnabled(on);
+    }
   }
 
   get isEnabled() {
@@ -325,7 +368,9 @@ export class PhysBody {
     const m = this.muscle;
     const k = { ball: STIFFNESS.ball * this.strength, hinge: STIFFNESS.hinge * this.strength };
     const d = { ball: DAMPING.ball * this.strength, hinge: DAMPING.hinge * this.strength };
-    const ball = (j: RAPIER.ImpulseJoint, x: number, z = 0) => {
+    const ball = (name: BallJointName, x: number, z = 0) => {
+      if (this.broken.has(name)) return;
+      const j = this.balls[name];
       const raw = rawSet(j);
       if (m <= 0) {
         for (const axis of [RAPIER.JointAxis.AngX, RAPIER.JointAxis.AngY, RAPIER.JointAxis.AngZ]) {
@@ -337,20 +382,22 @@ export class PhysBody {
       raw.jointConfigureMotorPosition(j.handle, RAPIER.JointAxis.AngY, 0, k.ball * m, d.ball * m);
       raw.jointConfigureMotorPosition(j.handle, RAPIER.JointAxis.AngZ, z, k.ball * m, d.ball * m);
     };
-    const hinge = (j: RAPIER.RevoluteImpulseJoint, angle: number) => {
+    const hinge = (name: HingeName, angle: number) => {
+      if (this.broken.has(name)) return;
+      const j = this.hinges[name];
       if (m <= 0) j.configureMotorVelocity(0, LIMP_FRICTION);
       else j.configureMotorPosition(angle, k.hinge * m, d.hinge * m);
     };
-    ball(this.balls.waist, pose.lean);
-    ball(this.balls.neck, pose.headPitch);
-    ball(this.balls.shoulderL, pose.shoulderL, -pose.armOut);
-    ball(this.balls.shoulderR, pose.shoulderR, pose.armOut);
-    ball(this.balls.hipL, pose.hipL);
-    ball(this.balls.hipR, pose.hipR);
-    hinge(this.hinges.elbowL, pose.elbowL);
-    hinge(this.hinges.elbowR, pose.elbowR);
-    hinge(this.hinges.kneeL, pose.kneeL);
-    hinge(this.hinges.kneeR, pose.kneeR);
+    ball('waist', pose.lean);
+    ball('neck', pose.headPitch);
+    ball('shoulderL', pose.shoulderL, -pose.armOut);
+    ball('shoulderR', pose.shoulderR, pose.armOut);
+    ball('hipL', pose.hipL);
+    ball('hipR', pose.hipR);
+    hinge('elbowL', pose.elbowL);
+    hinge('elbowR', pose.elbowR);
+    hinge('kneeL', pose.kneeL);
+    hinge('kneeR', pose.kneeR);
     if (m <= 0) return;
 
     for (const name of PART_NAMES) {

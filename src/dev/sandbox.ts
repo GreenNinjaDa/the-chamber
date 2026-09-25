@@ -66,7 +66,8 @@ export class Sandbox implements Level {
   private pressedTheButton() {
     const { player, hud } = this.ctx;
     if (player.mode !== 'control') return;
-    player.kill([(Math.random() - 0.5) * 6, 16, (Math.random() - 0.5) * 6]);
+    // Violent enough to sometimes tear a limb or two off.
+    player.kill([(Math.random() - 0.5) * 6, 26, (Math.random() - 0.5) * 6]);
     this.status = 'lost';
     hud.show('WHY', 'It was a big red button. What did you expect?\nPress R to un-die.');
   }
