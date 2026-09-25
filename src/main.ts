@@ -144,7 +144,15 @@ async function main() {
     pauseMenu.close();
     input.lock();
   }
-  input.onUnlock = pause;
+  // Losing the mouse pauses, except in the lobby when it's because you tabbed away (the lobby
+  // is harmless, and its AFK pranks are for exactly those people). Esc still pauses there: that
+  // releases the mouse too, so wait a moment and see whether the window lost focus.
+  input.onUnlock = () => {
+    if (!inLobby) return pause();
+    setTimeout(() => {
+      if (inLobby && document.hasFocus() && !document.hidden) pause();
+    }, 150);
+  };
 
   function begin() {
     if (playing) return;
