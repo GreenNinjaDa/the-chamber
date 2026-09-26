@@ -106,6 +106,19 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   you up; the numbers count touching mines, diagonals included. Right-click (empty-handed) or E plants a flag. The
   smiley face on the north wall reacts, with the mine counter and clock either side. Boards are regenerated until a
   simple logical solver (single-tile rules plus the subset rule) can get from the safe opening to the exit tile.
+- **Level 6 — Red Light, Green Light** (`src/levels/redLight/`): a 7 m doll (`entities/doll.ts`) stands by the east
+  wall at (9.5, -5), back to the room, chanting MUGUNGHWA... KKOCHI... PIEOTSSEUMNIDA! word by word over her head at
+  varying tempos (green lights of 3.2 s, getting shorter; one fake-out where her head starts to turn and doesn't).
+  Then her head whips round 180° (0.5 s, down to 0.35 s later), her eyes glow red and the room goes slightly red:
+  moving (actual displacement over 0.3 m/s, or jumping) from 0.45 s after the turn (+0.5 s / +0.2 s in the first two
+  red lights; stopping from a sprint takes ~0.42 s) while she has clear rays from her eyes to two of your head, chest
+  and pelvis (`SEEN_PARTS`) gets you lasered (two red beams) and flung, violence 22. Moving right behind something tall
+  (fridge, vending machine, bookcase, the stacked crates; the piano and couch are too low from 6 m up) is safe. You arrive at (-9.5, 0) facing east; cross the
+  red tape at x = 7 and the exit (z = 5) opens while her head does a slow 360. A 60 s clock on the north wall: at 0
+  she lasers everyone still short of the line. Six scripted contestants in green tracksuits (`entities/contestant.ts`,
+  the player's body via `drawBody` colours, numbers floating overhead) run on green and freeze on red; 324 keeps
+  running into the first red light, 101 wobbles and steps (3rd), 212 panics and runs back (4th), 218 sneezes (5th),
+  067 makes it and cheers, and old 001 shuffles, stops bothering to freeze from the 5th red light and is never shot.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -137,7 +150,10 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
 - `src/entities/` — things that can appear in more than one level (or the lobby / sandbox), each with its model:
   `junk.ts` (28 pieces of household junk; `spawnJunk(physics, junk('fridge'), pos)`), `grenade.ts` (pineapple
   model), `giant.ts`, `dart.ts`, `portal.ts` (entrance / exit portals), `props.ts` (Lever, Button), `cake.ts`, `companions.ts`,
-  `pressurePlate.ts` (round button, or `{ stone: [w, d] }` for a rock slab), `uselessBox.ts`, `rock.ts` (textured stone: `boulderModel`, `chunkModel`, `slabModel`, `shardModel`, `clusterModel`; `Pattern.rock`). Put new
+  `pressurePlate.ts` (round button, or `{ stone: [w, d] }` for a rock slab), `uselessBox.ts`, `rock.ts` (textured stone: `boulderModel`, `chunkModel`, `slabModel`, `shardModel`, `clusterModel`; `Pattern.rock`),
+  `doll.ts` (the giant doll with a swivelling head and glowing eyes, plus a `BareTree`), `contestant.ts` (scripted
+  NPC in a tracksuit: walk/run, freeze, wobble/sneeze/cheer, dramatic death fall; `drawBody` takes a `BodyColors`
+  to dress the player's body as someone else). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
