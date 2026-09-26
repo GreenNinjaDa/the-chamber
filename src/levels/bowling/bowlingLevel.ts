@@ -230,8 +230,8 @@ export class BowlingLevel implements Level {
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);
     hud.hint('');
-    camera.confine = false;
-    camera.bounds = { min: [-HALF + 0.3, PIT_Y + 0.6, -HALF + 0.3], max: [HALF - 0.3, 40, HALF - 0.3] };
+    // The map has the test chamber's footprint, so the camera's usual chamber confinement (which
+    // lifts it over your shoulder at the walls, and keeps it above the lane) stays on.
     // A pin's-eye view: looking down the lane at the launcher.
     camera.yaw = Math.PI;
 
@@ -311,7 +311,6 @@ export class BowlingLevel implements Level {
     this.exit.update(dt, player);
     if (this.exit.entered && this.status === 'playing') this.status = 'exited';
 
-    this.keepCameraAboveFloor();
     this.runPhase(dt);
     this.updateBalls(dt);
     this.updateGiant(dt);
@@ -337,15 +336,6 @@ export class BowlingLevel implements Level {
         ]);
       }
     }
-  }
-
-  /** The floor is at three heights (lane, gutters, pit): keep the camera above whichever it's over. */
-  private keepCameraAboveFloor() {
-    const { camera } = this.ctx;
-    const b = camera.bounds;
-    if (!b) return;
-    const [x, , z] = camera.pos;
-    b.min[1] = z < PIT_EDGE - 0.3 ? PIT_Y + 0.5 : Math.abs(x) > LANE_HALF + 0.3 ? GUTTER_Y + 0.35 : 0.35;
   }
 
   private setPhase(phase: BowlingLevel['phase']) {
@@ -909,7 +899,7 @@ export class BowlingLevel implements Level {
     else if (this.gutterBallThisFrame && n < 5) this.say('GUTTER BALL', YELLOW, sub);
     else if (n === 0) this.say('MARK IT ZERO', YELLOW, sub);
     else if (n === 9) this.say('SPARE ME', YELLOW, sub);
-    else this.say(pick([`${n} PINS. MEH.`, `${n}. RUDE.`, 'SO CLOSE', 'NICE TRY']), YELLOW, sub);
+    else this.say(pick([`${n} PIN${n === 1 ? '' : 'S'}. MEH.`, `${n}. RUDE.`, 'SO CLOSE', 'NICE TRY']), YELLOW, sub);
   }
 
   labels(): WorldLabel[] {
