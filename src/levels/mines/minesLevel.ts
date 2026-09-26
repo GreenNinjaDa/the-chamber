@@ -167,8 +167,8 @@ export class MinesLevel implements Level {
         this.status = 'lost';
         hud.show('BOOM', `${pick(JOKES)}\nPress R to try again.`);
         hud.tips([
-          ['Hint', 'Each number counts the mines touching that tile, diagonals included. Tiles you have stepped on are safe; work out the rest before you step. Right-click or E plants a flag.'],
-          ['Controls', 'WASD move · Right-click or E flag the tile you aim at · Shift sprint (bold choice)'],
+          ['Hint', 'Each number counts the mines touching that tile, diagonals included. Tiles you have stepped on are safe; work out the rest before you step. E or a click plants a flag on the tile you aim at.'],
+          ['Controls', 'WASD move · E or click flag the tile you aim at · Shift sprint (bold choice)'],
         ]);
       }
     }
@@ -211,13 +211,13 @@ export class MinesLevel implements Level {
       }
     }
 
-    // Right-click (with empty hands) or E: flag the tile under the crosshair.
-    if (input.wasPressed('KeyE') || (input.rightPressed && !player.carrying)) {
+    // E or a click (with empty hands): flag the tile under the crosshair.
+    if (input.actionPressed && !player.carrying) {
       const origin = camera.pos;
       const dir = normalize(sub(camera.target, camera.pos));
       const hit = physics.raycast(origin, dir, 14, player.collider ?? undefined);
       const chest = add(player.pos, [0, 1.2, 0]);
-      if (hit && Math.hypot(hit.point[0] - chest[0], hit.point[2] - chest[2]) < 7) {
+      if (hit && !physics.bodyFor(hit.collider)?.grabbable && Math.hypot(hit.point[0] - chest[0], hit.point[2] - chest[2]) < 7) {
         const f = this.tileAt(hit.point[0], hit.point[2]);
         if (f && !f.revealed) {
           f.flag = !f.flag;

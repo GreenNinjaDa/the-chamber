@@ -188,7 +188,7 @@ export class HipposLevel implements Level {
         hud.show(death.big, `${death.small}\nPress R to try again.`);
         hud.tips([
           ['Hint', "When a hippo's lane lights up, get out of it, sideways. The floor slopes down toward them, so keep moving. Kick or throw marbles into their lanes to end the game sooner."],
-          ['Controls', 'WASD move · Shift sprint · Space jump · Hold click carry · Right-click throw'],
+          ['Controls', 'WASD move · Shift sprint · Space jump · Hold E or click carry · Press another throw'],
         ]);
       }
     }

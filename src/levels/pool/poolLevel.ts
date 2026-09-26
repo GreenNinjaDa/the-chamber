@@ -100,7 +100,7 @@ const DROWN_LINES = [
 
 const TIPS: [string, string][] = [
   ['Hint', 'Push the floating stuff against the side and climb it (Space, right next to it). Stack it if you have to: a crate on the pallet, or the couch. Your energy drops while you swim (faster if you sprint).'],
-  ['Controls', 'WASD swim / move · Space hop, or climb onto something floating · Hold click carry · Right-click throw'],
+  ['Controls', 'WASD swim / move · Space hop, or climb onto something floating · Hold E or click carry · Press another throw'],
 ];
 
 // --- Sound ------------------------------------------------------------------------------------------

@@ -150,7 +150,7 @@ function deathTips(blast: { byShrapnel: boolean; inSight: boolean; big: boolean 
   }
   const tips: [string, string][] = [['Hint', hint]];
   if (Math.random() < 0.5) tips.push(['Also', "That red-rimmed hole in the wall isn't decorative. Grenades fit through it."]);
-  tips.push(['Controls', 'Hold left click to grab and drag junk (or the grenade). Right-click to throw; aim above the hole, it arcs.']);
+  tips.push(['Controls', 'Hold E or a click to grab and drag junk (or the grenade). Press another to throw; aim above the hole, it arcs.']);
   return tips;
 }
 

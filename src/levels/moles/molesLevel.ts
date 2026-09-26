@@ -286,7 +286,7 @@ export class MolesLevel implements Level {
         hud.show(death.big, `${death.small}\nPress R to try again.`);
         hud.tips([
           ['Hint', 'Pop up where the mallet isn’t (a red ring on a hole, or a red light round the pad under it, means it’s coming), grab a carrot, duck. The other moles are decoys: pop up as he winds up to whack one. Don’t hang about up there.'],
-          ['Controls', 'WASD move · Space (hold) pop up · E or click grab · let go of Space to duck'],
+          ['Controls', 'WASD move · Space (hold) pop up · E or a click grab · let go of Space to duck'],
         ]);
       }
     }
@@ -506,7 +506,7 @@ export class MolesLevel implements Level {
     const hc = HOLES[pop.hole];
     pop.t += dt;
     const holdingSpace = input.isDown('Space');
-    const wantGrab = input.wasPressed('KeyE') || input.mousePressed;
+    const wantGrab = input.actionPressed;
     if (wantGrab) pop.grabQueued = true;
     let y = 0;
     if (pop.state === 'rise') {

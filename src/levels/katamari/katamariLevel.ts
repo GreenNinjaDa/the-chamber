@@ -710,7 +710,7 @@ export class KatamariLevel implements Level {
     hud.show(big, `${small}\nPress R to try again.`);
     hud.tips([
       ['Hint', hint],
-      ['Controls', 'WASD move · Shift sprint · Space jump · Hold click carry · Right-click throw'],
+      ['Controls', 'WASD move · Shift sprint · Space jump · Hold E or click carry · Press another throw'],
     ]);
   }
 

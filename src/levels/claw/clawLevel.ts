@@ -130,8 +130,8 @@ const CHROME = [0.78, 0.8, 0.84];
 const BULB_COLORS: Vec3[] = [[3, 2.6, 1.6], [3, 0.9, 1.9], [0.8, 2.6, 3], [3, 2.4, 0.4]];
 const ALIEN_TALK = '#b9ff7a';
 
-const HINT = 'Get under the claw before it comes down, and grab hold (hold E or left mouse): the claw is rigged, it WILL try to drop you. Let go over the chute.';
-const CONTROLS = 'WASD move · Space jump · Hold E or left mouse to hang on';
+const HINT = 'Get under the claw before it comes down, and grab hold (hold E or a mouse button): the claw is rigged, it WILL try to drop you. Let go over the chute.';
+const CONTROLS = 'WASD move · Space jump · Hold E or a click to hang on';
 
 /** What the prize flap says when you press E on it. */
 const FLAP_QUIPS: [string, string][] = [
@@ -158,7 +158,7 @@ const DEATHS: Record<DeathKind, { big: string; small: string[]; hint: string }> 
       'Plush toys bounce. You are not a plush toy.',
       'That was not the chute. That was not near the chute.',
     ],
-    hint: 'Keep holding E (or left mouse) all the way: the claw carries you over the chute and opens by itself.',
+    hint: 'Keep holding on (E or a mouse button) all the way: the claw carries you over the chute and opens by itself.',
   },
   gameover: {
     big: 'LEFT IN THE MACHINE',
@@ -824,10 +824,10 @@ export class ClawLevel implements Level {
 
   // --- Hanging on -----------------------------------------------------------------------------------
 
-  /** Hold E or left mouse with your hands near the claw (while it's down) to hang on to a prong. */
+  /** Hold E or a mouse button with your hands near the claw (while it's down) to hang on to a prong. */
   private updateHang(dt: number) {
     const { player, input } = this.ctx;
-    const holding = input.isDown('KeyE') || input.mouseDown;
+    const holding = input.actionDown;
     const claw = this.claw;
     if (this.hang) {
       if (!holding || this.death) {

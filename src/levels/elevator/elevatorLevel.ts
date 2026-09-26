@@ -21,7 +21,7 @@ import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type Level
  * of the walls), muzak and all, with a piano and a lot of other junk aboard. Then the cable
  * snaps: TWANG, the lights flicker, the shaft whizzes by, and everything in the car, you
  * included, goes weightless. You drift on your momentum, push off whatever you touch (Space,
- * toward where you look), and can grab the handrails round the walls (hold E or left mouse).
+ * toward where you look), and can grab the handrails round the walls (hold E or a mouse button).
  * When it hits the bottom, gravity comes back all at once: anyone not holding a rail is
  * pancaked, and anything heavy that comes down on you crushes you. Survive, and the doors grind
  * open onto the exit, seven floors below the ground floor.
@@ -226,8 +226,8 @@ const SOUND = {
 };
 
 const TIPS: [string, string][] = [
-  ['Hint', "Grab a handrail (hold E or left mouse) and be holding on when it hits the bottom. Don't be under anything heavy."],
-  ['Controls', 'WASD move (A/D slides along a rail) · Space push off · Hold E or left mouse to grab a handrail'],
+  ['Hint', "Grab a handrail (hold E or a mouse button) and be holding on when it hits the bottom. Don't be under anything heavy."],
+  ['Controls', 'WASD move (A/D slides along a rail) · Space push off · Hold E or a click to grab a handrail'],
 ];
 
 // --- Poses ------------------------------------------------------------------------------------
@@ -345,7 +345,7 @@ export class ElevatorLevel implements Level {
   private cargo: Cargo[] = [];
   private rails: Rail[] = carRails();
   /** The rail being held, how far along it, and how long for. */
-  private grip: { rail: Rail; s: number; t: number; byMouse: boolean } | null = null;
+  private grip: { rail: Rail; s: number; t: number } | null = null;
   private indicators: FloorIndicator[];
   private doorOpen = 0;
   private death: Death | null = null;
@@ -561,7 +561,7 @@ export class ElevatorLevel implements Level {
       const v = rb.linvel();
       rb.setLinvel({ x: v.x + rand(-JOLT_SIDE, JOLT_SIDE), y: v.y + rand(JOLT_UP[0], JOLT_UP[1]), z: v.z + rand(-JOLT_SIDE, JOLT_SIDE) }, true);
       rb.setAngvel({ x: rand(-JOLT_SPIN, JOLT_SPIN), y: rand(-JOLT_SPIN, JOLT_SPIN), z: rand(-JOLT_SPIN, JOLT_SPIN) }, true);
-      c.body.grabbable = false; // no carrying things about in zero-g: the left mouse is for rails now
+      c.body.grabbable = false; // no carrying things about in zero-g: the buttons are for rails now
     }
     if (player.mode === 'control') {
       player.gravityScale = 0;
@@ -734,18 +734,17 @@ export class ElevatorLevel implements Level {
   }
 
   /**
-   * Hold E (or the left mouse, when not carrying anything) with your chest near a handrail to grab
+   * Hold E or a mouse button (when not carrying anything) with your chest near a handrail to grab
    * it: you're held there, facing the wall, and A/D (whatever way you're looking) slides you along
    * it. Let go and you stay put (weightless) or stand (not). Space lets go and pushes off.
    */
   private updateGrip(dt: number) {
     const { player, input, camera } = this.ctx;
-    const mouse = input.mouseDown && !player.carrying;
-    const holding = input.isDown('KeyE') || mouse;
+    const holding = input.actionDown && (!player.carrying || this.grip !== null);
     const alive = player.mode === 'control' && !player.inPortal && !this.death;
     const grip = this.grip;
     if (grip) {
-      if (!alive || !holding || (grip.byMouse && !input.isDown('KeyE') && player.carrying) || input.wasPressed('Space')) {
+      if (!alive || !holding || input.wasPressed('Space')) {
         const weightless = this.stage === 'fall';
         const pushing = alive && input.wasPressed('Space') && weightless;
         this.releaseGrip();
@@ -796,7 +795,7 @@ export class ElevatorLevel implements Level {
       if (d < GRAB_REACH && (!best || d < best.d)) best = { rail: r, s, d };
     }
     if (!best) return;
-    this.grip = { rail: best.rail, s: clamp(best.s, 0.35, best.rail.length - 0.35), t: 0, byMouse: !input.isDown('KeyE') };
+    this.grip = { rail: best.rail, s: clamp(best.s, 0.35, best.rail.length - 0.35), t: 0 };
     player.vel = [0, 0, 0];
     this.say(pick(['*grab*', '*clang*', '*grip*']), add(railPoint(best.rail, best.s), [0, 0.5, 0]), 0.3, '#ffffff', 0.8, [0, 0.5, 0]);
     SOUND.clink();

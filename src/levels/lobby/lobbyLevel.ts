@@ -107,7 +107,7 @@ export class LobbyLevel implements Level {
       { pos: [0, 7.2, -WALL], text: 'THE CHAMBER', size: 2.2 },
       { pos: [0, 5.75, -WALL], text: 'Aperture-adjacent. Legally distinct.', size: 0.6 },
       { pos: [-WALL, 4.9, 0], text: 'WASD walk · Shift sprint · Space jump', size: 0.5 },
-      { pos: [-WALL, 4.1, 0], text: 'E use · Hold click carry · Right-click throw · Esc pause', size: 0.5 },
+      { pos: [-WALL, 4.1, 0], text: 'E or click use · Hold E or click carry · Press another throw · Esc pause', size: 0.5 },
     );
     this.allLabels = [...this.fixedLabels, this.startLabel, this.mouseLabel, this.invertLabel, this.soundLabel];
     this.refreshLabels();

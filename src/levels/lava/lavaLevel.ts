@@ -251,7 +251,7 @@ export class LavaLevel implements Level {
         ['Hint', this.box.flips === 0
           ? 'Sprint (Shift) and jump (Space) from rock to rock. The lava will not wait.'
           : 'The box waits one second longer every time. Keep switching it on until it waits long enough for you to get back to the exit.'],
-        ['Controls', 'WASD move · Shift sprint · Space jump · Hold left click to grab the lever and push it'],
+        ['Controls', 'WASD move · Shift sprint · Space jump · Hold E or a click to grab the lever and push it'],
       ]);
     }
   }

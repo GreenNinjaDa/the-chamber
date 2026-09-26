@@ -201,7 +201,7 @@ export class ButtonLevel implements Level {
         hud.show(death.big, `${death.small}\nPress R to try again.`);
         hud.tips([
           ['Hint', "Don't press anything. Anything at all. And don't step on anything that asks you not to: jump it."],
-          ['Controls', 'WASD move · Space jump · E press (please don’t)'],
+          ['Controls', 'WASD move · Space jump · E or click press (please don’t)'],
         ]);
       }
     }
@@ -268,7 +268,7 @@ export class ButtonLevel implements Level {
       hud.show('YOU MAY LEAVE', "Don't touch anything on your way out.", 3);
     }
     // The last sign is a lie too.
-    if (this.exit.open && input.wasPressed('KeyE') && Math.hypot(player.pos[0] - CHAMBER_HALF, player.pos[2] - EXIT_Z) < 5 && alive) {
+    if (this.exit.open && input.actionPressed && Math.hypot(player.pos[0] - CHAMBER_HALF, player.pos[2] - EXIT_Z) < 5 && alive) {
       this.doom('IT SAID PRESS E', 'glove');
     }
   }

@@ -209,7 +209,7 @@ export class SnakeLevel implements Level {
         hud.show('GAME OVER', `${pick(EATEN_QUIPS)}\nSCORE: ${pad(score)}\nPress R to try again.`);
         hud.tips([
           ['Hint', 'The snake is greedy and never turns back. Circle it and let it tie itself in a knot. It goes for the apple when that is nearer than you.'],
-          ['Controls', 'WASD move · Shift sprint · Hold click carry · Right-click throw'],
+          ['Controls', 'WASD move · Shift sprint · Hold E or click carry · Press another throw'],
         ]);
       }
     }

@@ -410,7 +410,7 @@ export class GnomeLevel implements Level {
       hud.show('GNOMED', `${pick(DEATHS[c.kind])}\nPress R to try again.`);
       const tips: [string, string][] = [['Hint', 'The bar only fills while you watch it. The gnomes only move while you don\'t. Pick them up and throw them far away.']];
       if (c.kind === 'blink') tips.push(['Also', 'When the lights flicker, get the close ones far away (or into your arms). In the dark, they all come at once.']);
-      tips.push(['Controls', 'Hold left click to carry a gnome, right-click to throw it · Mouse to look']);
+      tips.push(['Controls', 'Hold E or a click to carry a gnome, press another to throw it · Mouse to look']);
       hud.tips(tips);
     }
   }

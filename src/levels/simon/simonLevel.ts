@@ -382,7 +382,7 @@ export class SimonLevel implements Level {
         hud.show(death.big, `${death.small}\nPress R to try again.`);
         hud.tips([
           ['Hint', death.hint],
-          ['Controls', 'Space jump · Mouse look · Stand still and look down to touch your toes · E press · Hold click carry · Right-click throw'],
+          ['Controls', 'Space jump · Mouse look · Stand still and look down to touch your toes · E or click press · Hold E or click carry · Press another throw'],
         ]);
       }
     }

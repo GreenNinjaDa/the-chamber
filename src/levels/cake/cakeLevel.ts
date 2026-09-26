@@ -123,7 +123,7 @@ export class CakeLevel implements Level {
     camera.addShake(1);
     this.die('DEATH BY CHOCOLATE', 'The chamber is called Piece of Cake, not The Whole Cake.\nPress R to try again, on an empty stomach.', [
       ['Hint', 'Seven slices is a meal. Eight is a eulogy.'],
-      ['Controls', 'E eats cake. That was the whole problem.'],
+      ['Controls', 'E (or a click) eats cake. That was the whole problem.'],
     ]);
   }
 
@@ -135,7 +135,7 @@ export class CakeLevel implements Level {
     camera.addShake(0.9);
     this.die("DON'T BE RUDE. IT'S NOT POISONED.", 'Somebody baked you a cake.\nPress R to try again, and have a slice this time.', [
       ['Hint', 'Eat at least one slice of cake before you leave. It would be rude not to.'],
-      ['Controls', 'E on the cake eats a slice. Hold left click to carry things, right-click to throw.'],
+      ['Controls', 'E or a click on the cake eats a slice. Hold one to carry things; press another to throw.'],
     ]);
   }
 

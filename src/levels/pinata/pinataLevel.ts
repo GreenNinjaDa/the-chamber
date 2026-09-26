@@ -130,7 +130,7 @@ export class PinataLevel implements Level {
         hud.show(death.big, `${death.small}\nPress R to try again.`);
         hud.tips([
           ['Hint', 'He swings at noise: walk, don’t run, and don’t let the balloons touch you. After a noise, get away from it. Throw things to make noise somewhere else.'],
-          ['Controls', 'WASD move (quietly) · Hold left click carry · Right-click throw'],
+          ['Controls', 'WASD move (quietly) · Hold E or click carry · Press another throw'],
         ]);
       }
     }

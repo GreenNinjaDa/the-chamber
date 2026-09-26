@@ -281,7 +281,7 @@ export class SunburnLevel implements Level {
         hud.show(death.big, `${death.small}\nPress R to try again.`);
         hud.tips([
           ['Hint', HINT],
-          ['Controls', 'WASD move · Shift sprint · Hold left click to carry (look up to hold it overhead) · Right-click throw'],
+          ['Controls', 'WASD move · Shift sprint · Hold E or click to carry (look up to hold it overhead) · Press another throw'],
         ]);
       }
     }

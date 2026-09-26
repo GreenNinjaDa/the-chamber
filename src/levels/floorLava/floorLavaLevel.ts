@@ -80,7 +80,7 @@ const BLUE_FABRIC = [0.1, 0.25, 0.72];
 const MUSTARD_FABRIC = [0.78, 0.56, 0.1];
 const ORANGE_FABRIC = [0.95, 0.42, 0.08];
 
-const CONTROLS = 'WASD move · Space jump · Shift sprint · Hold left click drag/carry · Right-click throw';
+const CONTROLS = 'WASD move · Space jump · Shift sprint · Hold E or click drag/carry · Press another throw';
 const HINT = "When something is lava, don't touch it. Get onto something that isn't before the countdown ends. You can drag light furniture to make a path.";
 
 type Kind =

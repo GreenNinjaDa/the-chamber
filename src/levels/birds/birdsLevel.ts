@@ -92,7 +92,7 @@ const SQUASH_SPEED = 4;
 const PIG_POINTS = 5000;
 const STARS = [8000, 16000, 25000];
 const DEATH_SCREEN_DELAY = 1.8;
-const CONTROLS = 'WASD move · Shift sprint · Space jump · Hold left click carry · Right-click throw';
+const CONTROLS = 'WASD move · Shift sprint · Space jump · Hold E or click carry · Press another throw';
 
 type ShotKind = 'red' | 'blues' | 'chuck' | 'bomb' | 'terence';
 

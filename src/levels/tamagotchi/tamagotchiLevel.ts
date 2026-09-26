@@ -149,12 +149,12 @@ const JOKES: Record<Cause, string[]> = {
   flushed: ['Goodbye, little buddy. *flush*', 'Down the pipes to a better place.', 'You were supposed to jump. Tamagotchis can jump. Probably.'],
 };
 const HINTS: Record<Cause, string> = {
-  starved: 'Keep both rows of hearts on the screen up. HUNGRY only fills by eating: walk to the food Timmy drops (the purple marker) and press E. Burgers fill it; candy mostly cheers you up (and makes you fat).',
+  starved: 'Keep both rows of hearts on the screen up. HUNGRY only fills by eating: walk to the food Timmy drops (the purple marker) and press E (or click). Burgers fill it; candy mostly cheers you up (and makes you fat).',
   sad: 'HAPPY drains all the time, faster when you\'re sick or awake in the dark. Dodge the arrow in PLAY (it cheers you up), the flying NO!, and any jab you don\'t need; eat the candy; when the lights go out, stand still on the glowing bed.',
   squashed: 'In PLAY, the half of the floor that flashes is where the arrow lands (the screen points at it too). Be on the other half: the dashed line is the border.',
   flushed: 'When Timmy picks BATHROOM, a wave rises at one wall and sweeps the whole floor. Jump it as it reaches you.',
 };
-const CONTROLS = 'WASD move · Shift sprint · Space jump · E eat';
+const CONTROLS = 'WASD move · Shift sprint · Space jump · E or click eat';
 
 const TIMMY_BORED = ['hmm.', '*yawn*', 'do a trick!', 'it\'s looking at me', 'boring...', 'is it hungry AGAIN?', 'what does B do', 'mum said 1 hour'];
 
@@ -757,7 +757,7 @@ export class TamagotchiLevel implements Level {
     }
     this.foods = this.foods.filter((f) => f.eaten < 0 || f.eaten < 0.6);
     // E next to food eats it, whether or not it's under the crosshair.
-    if (input.wasPressed('KeyE') && this.alive()) {
+    if (input.actionPressed && this.alive()) {
       let best: Food | null = null, bestD = 2.4;
       for (const f of this.foods) {
         if (!f.landed || f.eaten >= 0) continue;

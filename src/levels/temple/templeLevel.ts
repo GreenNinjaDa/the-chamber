@@ -20,7 +20,7 @@ import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type Level
  * boulder chases you home, and the first one rolls ahead of you and drops back down its shaft
  * (now a pit), which you cross on a second vine to reach the portal. Boulders kill on contact.
  *
- * Vines are physical ropes: hold E or left mouse near one to grab it wherever you reach, swing,
+ * Vines are physical ropes: hold E or a mouse button near one to grab it wherever you reach, swing,
  * and let go to fly on. Each snaps after one use, so there's no going back.
  *
  * The map never moves: the view turns (the player's gravity, with the world frozen), then the
@@ -214,7 +214,7 @@ const DEATHS = {
   pit: {
     big: 'SKEWERED',
     small: 'Mind the gap. The gap did not mind you.',
-    hint: 'Jump the pits (Space). The widest ones are too far: jump at the vine, hold E or left mouse to grab it, and let go at the top of the swing.',
+    hint: 'Jump the pits (Space). The widest ones are too far: jump at the vine, hold E or a mouse button to grab it, and let go at the top of the swing.',
   },
 };
 
@@ -645,7 +645,7 @@ export class TempleLevel implements Level {
         this.ctx.hud.show(d.big, `${d.small}\nPress R to try again.`);
         this.ctx.hud.tips([
           ['Hint', d.hint],
-          ['Controls', 'WASD move · Shift sprint · Space jump · Hold E or left mouse to hang on to a vine'],
+          ['Controls', 'WASD move · Shift sprint · Space jump · Hold E or a click to hang on to a vine'],
         ]);
       }
     }
@@ -743,14 +743,14 @@ export class TempleLevel implements Level {
   }
 
   /**
-   * A vine is a rope: hold E or left mouse with your hands near it and you're tied to the pivot at
+   * A vine is a rope: hold E or a mouse button with your hands near it and you're tied to the pivot at
    * that length. Gravity and your own momentum do the swinging; let go and you fly on. It snaps
    * once you let go.
    */
   private updateRope(dt: number) {
     const { player, input } = this.ctx;
     for (const v of this.vines) if (v.used) v.fallT += dt;
-    const holding = input.isDown('KeyE') || input.mouseDown;
+    const holding = input.actionDown;
     const hands = add(player.pos, scale(player.up, GRAB_HEIGHT));
     const rope = this.rope;
     if (rope) {

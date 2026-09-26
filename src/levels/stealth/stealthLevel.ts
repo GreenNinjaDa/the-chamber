@@ -130,8 +130,8 @@ export class StealthLevel implements Level {
         this.status = 'lost';
         hud.show('GAME OVER', `${pick(['Snake? Snake?! SNAAAAKE!', 'Tactical espionage is mostly not being seen. You managed "mostly seen".', 'Kept you waiting, huh? Not for long.'])}\nPress R to try again.`);
         hud.tips([
-          ['Hint', 'Stay out of the cones, behind the crates. Get in a cardboard box (E) and keep still when someone looks your way. The keycard on the far side opens the exit.'],
-          ['Controls', 'WASD move · E get in / out of a box · Shift sprint'],
+          ['Hint', 'Stay out of the cones, behind the crates. Get in a cardboard box (E or click) and keep still when someone looks your way. The keycard on the far side opens the exit.'],
+          ['Controls', 'WASD move · E or click get in / out of a box · Shift sprint'],
         ]);
       }
     }
@@ -142,9 +142,9 @@ export class StealthLevel implements Level {
     const alive = player.mode === 'control' && !this.death && !player.inPortal;
     const started = this.arrival.done;
 
-    // The box: E next to one gets you in; E again gets you out (it stays where you leave it).
+    // The box: E (or a click) next to one gets you in; again gets you out (it stays where you leave it).
     const near = this.boxes.findIndex((b) => Math.hypot(b.pos[0] - player.pos[0], b.pos[2] - player.pos[2]) < 1.3);
-    if (alive && input.wasPressed('KeyE')) {
+    if (alive && input.actionPressed) {
       if (this.inBox >= 0) this.inBox = -1;
       else if (near >= 0) this.inBox = near;
     }

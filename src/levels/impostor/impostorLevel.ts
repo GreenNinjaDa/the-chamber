@@ -184,7 +184,7 @@ const BUTTON_REACTIONS = ['orange why', 'who pressed it', 'this better be good',
 const REPORT_REACTIONS = ['where', 'rip {V}', 'noooo {V}', 'orange found {V}?', 'who was near {P}?', 'self report?'];
 const VENT_WITNESS = ['I SAW {X} VENT!!', '{X} VENTED', '{X} came out of a VENT', 'VENT. {X}. I SAW IT.'];
 const FAKE_WITNESS = ['{X} was faking tasks', "{X}'s screen was off", '{X} did {S} with the screen off??', '{X} just stood at {S}'];
-const DEATH_HINT = "The impostor fakes tasks (its screen stays dark), follows people too closely and uses the vents. Report bodies (E) or press the red button (E), then vote: stand next to someone and press E.";
+const DEATH_HINT = "The impostor fakes tasks (its screen stays dark), follows people too closely and uses the vents. Report bodies (E or click) or press the red button, then vote: stand next to someone and press E (or click).";
 
 /** A body you can report by pressing E on it. */
 class CorpseUsable implements Usable {
@@ -1096,7 +1096,7 @@ export class ImpostorLevel implements Level {
       if (death.t > death.delay) {
         this.status = 'lost';
         hud.show(death.big, `${death.small}\nPress R to try again.`);
-        hud.tips([['Hint', death.hint], ['Controls', 'WASD move · Shift sprint · E use / report / vote · Mouse look']]);
+        hud.tips([['Hint', death.hint], ['Controls', 'WASD move · Shift sprint · E or click use / report / vote · Mouse look']]);
       }
     }
     this.arrival.update(dt);
@@ -1184,7 +1184,7 @@ export class ImpostorLevel implements Level {
     // Bodies: found by whoever walks past (or reported by you: E near one).
     for (const cp of this.corpses) cp.age += dt;
     if (this.phase === 'play' && this.started) {
-      if (this.playerAlive() && input.wasPressed('KeyE')) {
+      if (this.playerAlive() && input.actionPressed) {
         // E near a body reports it; E in front of a station does the task (the crosshair works too).
         const near = this.corpses.find((cp) => flat(cp.pos, player.pos) < PLAYER_REPORT_RANGE);
         if (near) this.report('player', near);
@@ -1397,7 +1397,7 @@ export class ImpostorLevel implements Level {
           this.phaseT = 0;
           // (What they said stays up a moment longer; their VOTED badges come after.)
           for (const n of this.npcs) n.voteAt = rand(2.5, VOTE_TIME - 1.5);
-          hud.show('WHO IS THE IMPOSTOR?', 'Walk up to whoever looks sus and make it official (E). Or SKIP, and let democracy fail.', 3.5);
+          hud.show('WHO IS THE IMPOSTOR?', 'Walk up to whoever looks sus and make it official (E, or click). Or SKIP, and let democracy fail.', 3.5);
           tone(note('A4'), 0.15, { wave: 'square', vol: 0.08 });
           tone(note('E5'), 0.3, { wave: 'square', vol: 0.08, at: 0.15 });
         }
@@ -1410,7 +1410,7 @@ export class ImpostorLevel implements Level {
             sfx.click();
           }
         }
-        if (!m.locked && this.playerAlive() && input.wasPressed('KeyE')) {
+        if (!m.locked && this.playerAlive() && input.actionPressed) {
           const v = this.voteCandidate();
           if (v) {
             m.playerVote = v;
@@ -1473,7 +1473,7 @@ export class ImpostorLevel implements Level {
           if (!e) hud.show('NO ONE WAS EJECTED.', m.tie ? '(Tied. Democracy is hard.)' : '(Skipped. The impostor thanks you for your patience.)', 3);
           else if (e === 'player') {
             hud.show('ORANGE WAS NOT THE IMPOSTOR.', '1 impostor remains. It voted for you too.', 3.5);
-            this.die('DEFEAT', `The crew voted you out. ${this.impostor.c.color.name} was the impostor, and waved you off.`, 'Vote for someone (stand next to them and press E) or stand on SKIP. Stand around doing nothing and the crew might pick you.', null, 3.8);
+            this.die('DEFEAT', `The crew voted you out. ${this.impostor.c.color.name} was the impostor, and waved you off.`, 'Vote for someone (stand next to them and press E or click) or stand on SKIP. Stand around doing nothing and the crew might pick you.', null, 3.8);
           } else if (e.impostor) {
             hud.show(`${e.c.color.name} WAS THE IMPOSTOR.`, '0 impostors remain.', 3);
           } else {
@@ -1676,7 +1676,7 @@ export class ImpostorLevel implements Level {
     list.push(this.buttonLabel, this.barLabel);
     if (this.phase === 'vote') {
       this.wallLabel.text = `VOTING ENDS IN ${Math.max(0, Math.ceil(VOTE_TIME - this.phaseT))}`;
-      this.wallSub.text = 'point fingers (E)';
+      this.wallSub.text = 'point fingers (E or click)';
       list.push(this.wallLabel, this.wallSub, this.skipLabel);
     } else if (this.phase === 'discuss') {
       this.wallLabel.text = 'DISCUSS!';

@@ -25,7 +25,7 @@ export class Sandbox implements Level {
   constructor(private ctx: LevelContext) {
     const { physics, hud } = ctx;
     hud.setLevel('Sandbox · mechanics test');
-    hud.show('SANDBOX', 'Hold left click to carry · right-click to throw · E on levers and buttons', 3);
+    hud.show('SANDBOX', 'E or either click: use levers and buttons, or hold to carry · press another to throw', 3);
     hud.hint('');
 
     // The same junk the levels use: crates of two sizes, plus a stack to knock over.
@@ -70,7 +70,7 @@ export class Sandbox implements Level {
     hud.show('WHY', 'It was a big red button. What did you expect?\nPress R to un-die.');
     hud.tips([
       ['Hint', 'Do not press the big red button.'],
-      ['Controls', 'E uses levers and buttons (evidently). Hold left click to carry things, right-click to throw.'],
+      ['Controls', 'E or a click uses levers and buttons (evidently). Hold one to carry things; press another to throw.'],
     ]);
   }
 

@@ -27,9 +27,9 @@ const LIGHT_THROW_MASS = 1;
 const MAX_LIGHT_BOOST = 1.15;
 
 /**
- * Crosshair targeting plus the controls for things in the world: E uses what you're aiming
- * at (levers, buttons); hold the left mouse button on a loose object to carry or drag it, and
- * right-click while carrying to throw it.
+ * Crosshair targeting plus the controls for things in the world. Any action button (E, left or
+ * right click) uses what you're aiming at (levers, buttons), or on a loose object picks it up:
+ * hold it to carry or drag it, and press any other action button meanwhile to throw it.
  */
 export class Interaction {
   state: CrosshairState = 'hidden';
@@ -66,9 +66,9 @@ export class Interaction {
     const camToChest = length(sub(chest, origin));
 
     if (this.held) {
-      if (!input.mouseDown) {
+      if (!input.actionDown) {
         this.release();
-      } else if (input.rightPressed) {
+      } else if (input.actionPressed) {
         this.throw(dir);
       } else {
         this.drag(dt, origin, dir, camToChest);
@@ -85,11 +85,11 @@ export class Interaction {
 
     if (usable) {
       this.setHighlight(usable, 1);
-      if (input.wasPressed('KeyE')) usable.use();
+      if (input.actionPressed) usable.use();
       this.state = 'target';
     } else if (body?.grabbable && hit) {
       this.setHighlight(body, 1);
-      if (input.mousePressed) this.grab(body, hit.point, hit.distance, camToChest);
+      if (input.actionPressed) this.grab(body, hit.point, hit.distance, camToChest);
       this.state = this.held ? 'holding' : 'target';
     } else {
       this.state = 'idle';

@@ -164,8 +164,8 @@ export class DodgeballLevel implements Level {
         this.status = 'lost';
         hud.show(death.big, `${death.small}\nPress R to try again.`);
         hud.tips([
-          ['Hint', 'Pick up a dodgeball (hold left click), aim at a turret and right-click to throw it: knock them all over. Get behind something when a red laser finds you.'],
-          ['Controls', 'WASD move · Shift sprint · Hold left click carry · Right-click throw'],
+          ['Hint', 'Pick up a dodgeball (hold E or a click), aim at a turret and press another to throw it: knock them all over. Get behind something when a red laser finds you.'],
+          ['Controls', 'WASD move · Shift sprint · Hold E or click carry · Press another throw'],
         ]);
       }
     }

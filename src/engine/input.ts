@@ -1,4 +1,9 @@
 const BLOCKED = new Set(['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+/**
+ * The action buttons: E, left click and right click all do the same thing (use, grab, hang on;
+ * a second one while carrying throws). Mouse buttons show up in the key sets as these codes.
+ */
+const ACTION = ['KeyE', 'Mouse0', 'Mouse2'];
 
 /** Keyboard + pointer-locked mouse state, polled once per frame. */
 export class Input {
@@ -29,14 +34,19 @@ export class Input {
       this.mouseDY += e.movementY;
     });
     window.addEventListener('mousedown', (e) => {
+      if (e.button === 0 || e.button === 2) {
+        this.pressed.add('Mouse' + e.button);
+        this.down.add('Mouse' + e.button);
+      }
       if (e.button === 2) this.rightPressed = true;
       if (e.button !== 0) return;
       this.mousePressed = true;
       this.mouseDown = true;
     });
-    // Right click throws; don't let the browser's context menu pop up over the game.
+    // Right click is an action button; don't let the browser's context menu pop up over the game.
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('mouseup', (e) => {
+      this.down.delete('Mouse' + e.button);
       if (e.button === 0) this.mouseDown = false;
     });
     document.addEventListener('pointerlockchange', () => {
@@ -67,6 +77,16 @@ export class Input {
 
   wasPressed(code: string) {
     return this.pressed.has(code);
+  }
+
+  /** Any action button (E, left or right click) went down this frame. */
+  get actionPressed() {
+    return ACTION.some((c) => this.pressed.has(c));
+  }
+
+  /** Any action button is held. */
+  get actionDown() {
+    return ACTION.some((c) => this.down.has(c));
   }
 
   endFrame() {
