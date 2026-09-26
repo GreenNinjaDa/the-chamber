@@ -82,7 +82,7 @@ const FALL_STUN = 0.1;
 
 // Spikes: rows across the floor (the way out) and the ceiling (the way back), and spikes sticking
 // out of the walls. They're not solid: touching one knocks you loose for a moment.
-const SPIKE_STUN = 0.5;
+const SPIKE_STUN = 0.01;
 const SPIKE_R = 0.16;
 /** Spike lengths vary by this factor; full rows (which have to be jumped) stay shorter. */
 const SPIKE_LENGTH: [number, number] = [0.8, 1.5];
