@@ -63,6 +63,10 @@ export class Cabinet {
   private booted: boolean[] = [];
   /** The rest of the deck, the burrow and its props: drawn as they are. */
   private statics: DrawItem[] = [];
+  /** The dirt over the exit portal (east wall, round z = 0): gone once the exit opens. */
+  private exitDirt: DrawItem[] = [];
+  /** Set when the exit opens, so the dirt in front of it isn't drawn. */
+  exitOpen = false;
   /** Arcade trim on the walls, shown once the deck boots. */
   private trim: DrawItem[] = [];
   /** Reused draw items (only their colours change): bulbs along the deck edge, the rims once up, and the pads at rest. */
@@ -176,7 +180,9 @@ export class Cabinet {
       wall([c, UNDER / 2, -H + 0.03], [3, UNDER, 0.06]);
       wall([c, UNDER / 2, H - 0.03], [3, UNDER, 0.06]);
       wall([-H + 0.03, UNDER / 2, c], [0.06, UNDER, 3]);
-      wall([H - 0.03, UNDER / 2, c], [0.06, UNDER, 3]);
+      if (Math.abs(c) < 3) {
+        this.exitDirt.push({ mesh: 'box', model: mul(translation([H - 0.03, UNDER / 2, c]), scaling([0.06, UNDER, 3])), color: WALL_DIRT, pattern: Pattern.rock, param: 1.2 });
+      } else wall([H - 0.03, UNDER / 2, c], [0.06, UNDER, 3]);
     }
     // Pit props with a beam under the deck.
     for (const [x, z] of POSTS) {
@@ -280,6 +286,7 @@ export class Cabinet {
   draw(out: DrawItem[], time: number) {
     for (const band of this.bands) for (const it of band) out.push(it);
     for (const it of this.statics) out.push(it);
+    if (!this.exitOpen) for (const it of this.exitDirt) out.push(it);
     if (this.booted[0]) for (const it of this.trim) out.push(it);
     // Rims pop up out of the deck as their band boots; lids shrink away when the holes open.
     for (let i = 0; i < HOLES.length; i++) {

@@ -424,6 +424,7 @@ export class MolesLevel implements Level {
       board.setMessage(this.wonT < 3 ? 'TILT' : Math.floor(this.wonT) % 2 ? 'TILT' : 'MOLE ESCAPED');
       if (this.wonT >= 1.0 && this.wonT - dt < 1.0) {
         this.exit.openNow();
+        this.cabinet.exitOpen = true;
         this.timmySay('MOOOM! THE MOLE CHEATED!', 2.6);
       }
       if (this.wonT >= 2.2 && this.wonT - dt < 2.2) this.ms.tantrum = 6;
@@ -438,7 +439,7 @@ export class MolesLevel implements Level {
     this.cabinet.openLids();
     noise(0.35, { freq: 1500, to: 300, type: 'bandpass', q: 1.5, vol: 0.3 });
     tone(90, 0.25, { to: 50, wave: 'square', vol: 0.12 });
-    const hole = this.nearestHole(player.pos, 99);
+    const hole = this.nearestFreeHole(player.pos);
     // If they've wandered off it, the hole sucks them back over (it's that kind of hole).
     const dist = Math.hypot(player.pos[0] - HOLES[hole][0], player.pos[2] - HOLES[hole][2]);
     this.drop = { t: 0, from: [...player.pos], hole, slide: 0.2 + dist * 0.08 };
@@ -485,10 +486,19 @@ export class MolesLevel implements Level {
 
   private updatePlayer(dt: number) {
     const { player, input, camera } = this.ctx;
-    const canPop = this.phase === 'ready' || this.phase === 'play' || this.phase === 'break' || this.phase === 'won';
+    const canPop = this.phase === 'ready' || this.phase === 'play' || this.phase === 'won';
     if (!this.pop && canPop && !this.death && player.mode === 'control' && !player.inPortal && input.wasPressed('Space') &&
         player.pos[1] < 0.35 && !player.gettingUp && player.stun <= 0) {
       const h = this.nearestHole(player.pos, POP_RANGE);
+      const user = h >= 0 ? this.holeUser[h] : null;
+      if (typeof user === 'number') {
+        const n = this.moles[user];
+        const away = Math.hypot(n.m.pos[0] - HOLES[h][0], n.m.pos[2] - HOLES[h][2]);
+        if (n.state === 'walk' || n.state === 'wait' || n.state === 'idle' ? away > 1.5 : false) {
+          this.holeUser[h] = null;
+          this.moleGoSomewhere(n, user);
+        }
+      }
       if (h >= 0 && (this.holeUser[h] === null || this.holeUser[h] === 'player')) this.startPop(h);
     }
     const pop = this.pop;
@@ -1315,6 +1325,20 @@ export class MolesLevel implements Level {
   // --- Queries ------------------------------------------------------------------------------------
 
   /** The hole nearest `p` horizontally, if within `range` (else -1). */
+  /** The nearest hole no mole is using (or the nearest at all, if they all are). */
+  private nearestFreeHole(p: Vec3) {
+    let best = -1, bd = Infinity;
+    for (let h = 0; h < HOLES.length; h++) {
+      if (this.holeUser[h] !== null && this.holeUser[h] !== 'player') continue;
+      const d = Math.hypot(HOLES[h][0] - p[0], HOLES[h][2] - p[2]);
+      if (d < bd) {
+        bd = d;
+        best = h;
+      }
+    }
+    return best >= 0 ? best : this.nearestHole(p, 99);
+  }
+
   private nearestHole(p: Vec3, range: number) {
     let best = -1, bd = range;
     for (let h = 0; h < HOLES.length; h++) {
