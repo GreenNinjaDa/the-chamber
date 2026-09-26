@@ -27,7 +27,7 @@ import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type Level
 
 const params = new URLSearchParams(location.search);
 /** Seconds on the clock (`?katTime=N`). */
-const ROUND_TIME = Number(params.get('katTime')) || 100;
+const ROUND_TIME = Number(params.get('katTime')) || 90;
 /** The goal (m of diameter), and the ball's diameter at the start (`?katSize=D` to start bigger, for testing). */
 const GOAL = 5;
 const START_DIAMETER = Number(params.get('katSize')) || 0.62;
@@ -37,6 +37,8 @@ const PICK = 0.5;
 const PLAYER_SIZE = 1.7;
 /** Growth: diameter² grows by GROW × (the thing's two biggest extents multiplied). */
 const GROW = 0.9;
+/** Things the player carried or threw in grow it this many times as much. */
+const FED_BONUS = 1.6;
 /** Top speed (m/s) while gathering: BASE + PER_M × diameter, at most SPEED_MAX (a sprint is 8.5 m/s). */
 const SPEED_BASE = 1.6;
 const SPEED_PER_M = 0.9;
@@ -49,10 +51,10 @@ const DAWDLE_EVERY: [number, number] = [5, 9];
 const DAWDLE_FOR = 1.1;
 /**
  * Once it can roll you up, the King helps his prince: every DELIVERY_EVERY seconds (up to
- * DELIVERIES) something big it can roll up drops in from the sky, usually in its path, marked by
- * a beam for DELIVERY_WARN seconds first.
+ * DELIVERIES) something big it can roll up drops in from the sky: every third one straight into
+ * its path, the rest somewhere to lead it to, marked by a beam for DELIVERY_WARN seconds first.
  */
-const DELIVERY_EVERY = 5.5;
+const DELIVERY_EVERY = 6;
 const DELIVERIES = 14;
 const DELIVERY_WARN = 1.3;
 const DELIVERY_ITEMS = ['couch', 'mattress', 'bookcase', 'fridge', 'vending machine', 'bathtub', 'piano', 'filing cabinet', 'washing machine'];
@@ -73,8 +75,11 @@ const EAT_REACH = 0.42;
  * (m²) within SNACK_REACH of its surface, ahead of it.
  */
 const SNACK_AREA = 0.4;
-const SNACK_REACH = 2.5;
+const SNACK_REACH = 2.2;
 const SNACK_TIME = 1.4;
+/** Things too big to roll up are shoved at most this much faster than it's going (m/s), and this fast upward. */
+const SHOVE_EXTRA = 0.5;
+const SHOVE_UP = 2;
 /** A target it can't get to in this long is ignored for a while. */
 const GIVE_UP_AFTER = 4;
 const IGNORE_FOR = 10;
@@ -216,6 +221,7 @@ export class KatamariLevel implements Level {
   private noCircles: Circle[] = [];
   private shot: CameraShot = { pos: [0, 0, 0], target: [0, 0, 0], sharpness: 3 };
   private targets: TrackedTarget[] = [];
+  private ballTarget: TrackedTarget = { pos: [0, 0, 0], radius: 1 };
   private displayItems: DrawItem[] = [];
   private barFill: DrawItem;
   private barTick: DrawItem;
@@ -363,9 +369,21 @@ export class KatamariLevel implements Level {
     if (this.phase !== 'rolling' && this.phase !== 'eaten') return;
     const physics = this.ctx.physics, world = physics.world;
     const ball = this.kat.body.collider;
+    const bv = this.kat.body.rb.linvel();
+    const cap = Math.hypot(bv.x, bv.z) + SHOVE_EXTRA;
     world.contactPairsWith(ball, (other) => {
       const b = physics.bodyFor(other);
-      if (!b || b === this.kat.body || !this.byBody.has(b)) return;
+      if (!b || b === this.kat.body) return;
+      const thing = this.byBody.get(b);
+      if (!thing) return;
+      // Too big to roll up: it gets shoved along, but not launched across the room (a flying
+      // mattress knocking you over just before it catches you isn't fair).
+      if (!this.canPick(thing.size)) {
+        const v = b.rb.linvel();
+        const hs = Math.hypot(v.x, v.z);
+        const k = hs > cap ? cap / hs : 1;
+        if (k < 1 || v.y > SHOVE_UP) b.rb.setLinvel({ x: v.x * k, y: Math.min(v.y, SHOVE_UP), z: v.z * k }, true);
+      }
       world.contactPair(ball, other, (m) => {
         if (m.numSolverContacts() > 0 || m.numContacts() > 0) this.touching.add(b);
       });
@@ -402,7 +420,8 @@ export class KatamariLevel implements Level {
       this.byBody.delete(b);
       this.things.splice(this.things.indexOf(thing), 1);
       if (this.target === thing) this.target = null;
-      this.grow(thing.area);
+      // Royal gratitude: things you bring it count for more.
+      this.grow(thing.area * (fed ? FED_BONUS : 1));
       this.stickSound(thing.size);
       if (fed && !this.said.has('fed') && this.phase === 'rolling') {
         this.said.add('fed');
@@ -814,7 +833,7 @@ export class KatamariLevel implements Level {
       const reach = this.reachAtPlayer();
       const side = reach > 0 && Math.hypot(player.pos[0] - c[0], player.pos[2] - c[2]) < reach + EAT_REACH;
       // (Or on top of it, somehow.)
-      const top = Math.hypot(player.pos[0] - c[0], player.pos[1] + 0.9 - c[1], player.pos[2] - c[2]) < this.kat.radius + 0.9 + EAT_REACH;
+      const top = player.pos[1] > c[1] && Math.hypot(player.pos[0] - c[0], player.pos[1] - c[1], player.pos[2] - c[2]) < this.kat.radius + EAT_REACH;
       if (side || top) {
         this.rollUp();
         return;
@@ -857,10 +876,10 @@ export class KatamariLevel implements Level {
     const clearOf = (x: number, z: number, fromPlayer: number) => Math.abs(x) < 9.8 && Math.abs(z) < 9.8 &&
       Math.hypot(x - player.pos[0], z - player.pos[2]) > fromPlayer && Math.hypot(x - c[0], z - c[2]) > R + 1.2 &&
       !(x > 7 && Math.abs(z) < 3);
-    // Every other one lands between it and you (it'll roll straight into it); the rest somewhere to lead it to.
+    // Every third one lands between it and you (it will roll straight into it); the rest somewhere to lead it to.
     let spot: Vec3 | null = null;
     let warn = 0;
-    if (this.delivered % 2 === 0) {
+    if (this.delivered % 3 === 0) {
       // Straight onto its path, where it'll be when this lands (a quick flash, no warning: you're well clear).
       const v = this.kat.body.rb.linvel();
       const dx = player.pos[0] - c[0], dz = player.pos[2] - c[2], dist = Math.hypot(dx, dz);
@@ -1077,6 +1096,16 @@ export class KatamariLevel implements Level {
 
   trackedTargets(): TrackedTarget[] {
     this.targets.length = 0;
+    // Hunting you and getting close: flag it (an arrow at the edge of the screen when it's behind you).
+    const { player } = this.ctx;
+    if (this.hunting && player.mode === 'control') {
+      const c = this.kat.centre();
+      if (Math.hypot(c[0] - player.pos[0], c[2] - player.pos[2]) - this.kat.radius < 9) {
+        this.ballTarget.pos = c;
+        this.ballTarget.radius = this.kat.radius;
+        this.targets.push(this.ballTarget);
+      }
+    }
     const exit = this.exit.target();
     if (exit) this.targets.push(exit);
     return this.targets;
