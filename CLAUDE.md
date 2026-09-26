@@ -369,6 +369,25 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   scores the birds points (popups; "BIRDS: 12,450" and three stars on the north wall; a popped pig is 5,000).
   Survive all six (~60 s): the slingshot wilts, LEVEL FAILED (for the birds), the pig laughs, the exit opens.
   `?birdShot=N` starts with the Nth bird.
+- **Level 35 — Pinball** (`src/levels/pinball/`): you are the ball. The chamber is a pinball table (`entities/pinball.ts`):
+  one fixed slab sloping 10° down to the south (surface 2 m up at the drain edge, z = 9.9, ~5.9 m at the north wall),
+  a glossy navy playfield with a sunburst, stars and lamp inserts, cabinet side art and GI bulbs on the walls, a
+  backglass on the north wall (orange dot-matrix display with score and messages, E X I T lamps, "SPACE CADAVER") and a
+  coin door on the front. The room lights go down as the machine boots (INSERT COIN → coin → PLAYER 1 → BALL 1).
+  The portal drops you into the shooter lane (east, behind a clear wall); resting on the plunger pulls it back (a camera
+  looks back down the lane) and it fires you up the lane, round the top-right arc and tumbling into the three pop
+  bumpers (a scripted `flying` path, then `player.emerge`). Standing still slides you downhill (`player.platformVel`:
+  2 m/s, 3 in the air, 0.9 while getting up; `speedScale` 0.88 on the polished playfield). Pop bumpers and slingshots
+  kick you (knocks) and the steel balls (1.3 m chrome, 110 kg, real physics); two auto flippers flip whenever you or a
+  ball is on one toward its tip (and twitch now and then), batting balls for real (kinematic) and launching you up the
+  table (8-16 m/s by where they hit). Between the flippers and down the outlanes is the drain: a pit, DRAINED /
+  OUTLANE (death screens end in GAME OVER. INSERT COIN.). Balls knock you from 2.5 m/s; from 14 (straight off a flipper)
+  they kill, STEEL BALL RUN (fast balls glow and streak). Four drop targets, knocked down in order, spell E-X-I-T
+  (right-low, top-left, left-low, top-centre; blinking arrows and the display's SHOOT X point at the next): E brings an
+  EXTRA BALL, X MULTIBALL, T the JACKPOT light show, one more ball and the exit (east wall, top right). Drained balls
+  get BALL SAVED back into the lane; the plunger fires every ball in the lane at once, but holds while you're in it;
+  a ball sitting still 3 s gets a BALL SEARCH kick. Every jump nudges the table: DANGER after ~6 quick hops, TILT after
+  ~9 (flippers, bumpers and lights dead for 6 s; drain meanwhile = TILT). Hum, music, chimes, BONGs, knocker.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -419,7 +438,12 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   `blocks.ts` (Angry Birds building kit: `spawnBlock(physics, 'wood' | 'glass' | 'stone' | 'tnt', centre, size)`,
   per-material damage tunables in `MATERIALS`; the level deals the damage), `birds.ts` (`drawBird` for Red, Blue,
   Chuck, Bomb, Terence with angry brows; the giant `Slingshot` with `pullTo` / `release` / `rise` / `sag`;
-  `drawPigFace(out, headFrame, pop)` puts a snout, ears and eyes on any head; `drawStar` for score boards). Put new
+  `drawPigFace(out, headFrame, pop)` puts a snout, ears and eyes on any head; `drawStar` for score boards),
+  `pinball.ts` (`TableFrame`: a sloped table surface to build on (`y(z)`, `point`, `frame`, `quat`, `addBox`);
+  `Flipper` (kinematic, swings about the table normal; `step(h)` from a physics substep hook, `relative` for hits),
+  `PopBumper`, `Slingshot`, `DropTarget` (letter on its face, sinks when `drop()`ped), `spawnSteelBall`, `drawPlunger`,
+  `drawStar` / `drawChevron` / `triangleModel` (any triangle from the 'wedge' mesh), `DotMatrix` (orange pixel-text
+  display), `pinSfx` (bumper chimes, flipper, knocker, jackpot, tilt...)). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`

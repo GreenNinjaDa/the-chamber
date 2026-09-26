@@ -45,6 +45,7 @@ import { BowlingLevel } from './levels/bowling/bowlingLevel';
 import { FloorLavaLevel } from './levels/floorLava/floorLavaLevel';
 import { ElevatorLevel } from './levels/elevator/elevatorLevel';
 import { BirdsLevel } from './levels/birds/birdsLevel';
+import { PinballLevel } from './levels/pinball/pinballLevel';
 import type { Level, LevelContext, TrackedTarget, WorldLabel } from './levels/level';
 import { LobbyLevel } from './levels/lobby/lobbyLevel';
 
@@ -88,6 +89,7 @@ const LEVELS: [string, (ctx: LevelContext) => Level][] = [
   ['flappy', (ctx) => new FlappyLevel(ctx)],
   ['rock', (ctx) => new RockLevel(ctx)],
   ['birds', (ctx) => new BirdsLevel(ctx)],
+  ['pinball', (ctx) => new PinballLevel(ctx)],
 ];
 const params = new URLSearchParams(location.search);
 /** `?sandbox` opens the mechanics test room; `?level=N` skips the lobby and starts at level N. */
