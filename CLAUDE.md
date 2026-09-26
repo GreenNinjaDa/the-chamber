@@ -509,10 +509,11 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   jump; hit = FLUSHED) from a wall across the floor, carrying the poops away; LIGHT (8 s dark with a lullaby: a
   glowing bed appears 6-11 m away; standing still on it sits you down asleep, HAPPY stops draining and 3 s of sleep
   is +1; awake after 1.6 s drains 0.32/s); DISCIPLINE ("NO!" flashes, then its letters fly out of the screen and
-  slide at where you're going, 12 m/s: a hit knocks you over, -0.75 HAPPY); MEDICINE (only when sick: a giant
-  syringe chases you; its jab cures you, knocks you and costs 0.5 HAPPY; dodge it 7.5 s and you stay sick). Hearts
-  drain (HUNGRY 1/14 s, HAPPY 1/14 s, +35% by the end); Timmy feeds a hungry pet (≤ 2.4) and plays with a sad one
-  (≤ 1.6) first, and nothing starts that would outlast its life. Either row at zero: YOUR TAMAGOTCHI HAS DIED (the
+  slide at where you're going, 12 m/s: a hit knocks you over, -0.75 HAPPY, then 1.2 s before another can); MEDICINE
+  (a giant syringe chases you for 7.5 s; its jab knocks you and cures you for 0.5 HAPPY, or, the one time Timmy
+  gives a healthy pet a shot for fun, just costs 0.75: "OW! I WASN'T EVEN SICK"). Hearts drain (HUNGRY 1/14 s,
+  HAPPY 1/14 s, +35% by the end); Timmy feeds a hungry pet (≤ 2) and plays with a sad one (≤ 1.6) first, gets
+  round to the flush, a night and a scolding sooner or later, and starts nothing that would outlast its life. Either row at zero: YOUR TAMAGOTCHI HAS DIED (the
   LCD shows a ghost and a grave, a gravestone rises by your body and your see-through ghost floats up with a halo
   and wings). 80 s of life: WHAT? It evolves (flashing), into A SLIGHTLY OLDER TEST SUBJECT with a moustache;
   Timmy is bored ("MUM! can I get a PHONE?"), drops it (whistle, crash, cracked LCD) and the exit opens. Weight

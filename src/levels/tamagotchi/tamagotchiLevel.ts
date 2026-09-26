@@ -54,6 +54,8 @@ const PLAY_SWEEP = 0.6;
 const SLEEP_HAPPY = 1;
 const SCOLD_HAPPY = 0.75;
 const JAB_HAPPY = 0.5;
+/** A jab when you weren't even sick. */
+const JAB_HEALTHY = 0.75;
 /** Weight (lb): above WEIGHT_SLOW each pound takes this much off your speed (down to SLOWEST). */
 const START_WEIGHT = 5;
 const WEIGHT_SLOW = 8;
@@ -331,6 +333,7 @@ export class TamagotchiLevel implements Level {
   private nights = 0;
   private lastNight = -99;
   private lastScold = -99;
+  private shots = 0;
 
   // FOOD
   private foodMenu: { choice: number; t: number } | null = null;
@@ -529,15 +532,17 @@ export class TamagotchiLevel implements Level {
     if (this.eventCount === 2) return 'play';
     const foodOut = this.foods.filter((f) => f.eaten < 0).length;
     // Even Timmy notices a starving pet, or a miserable one.
-    if (this.hunger <= 2.4 && foodOut === 0 && fits('feed')) return 'feed';
+    if (this.hunger <= 2.0 && foodOut === 0 && fits('feed')) return 'feed';
     if (this.happy <= 1.6 && this.lastKind !== 'play' && fits('play')) return 'play';
     if (this.sick && this.sickT > 2 && fits('med')) return 'med';
     if (this.poops.some((p) => !p.gone && !p.carried && p.age > this.flushDelay) && fits('flush')) return 'flush';
     const weights: [Kind, number][] = [];
-    if (foodOut < 2) weights.push(['feed', this.hunger <= 2.0 ? 6 : this.hunger <= 2.8 ? 1.5 : 0.2]);
+    if (foodOut < 2) weights.push(['feed', this.hunger <= 2.0 ? 6 : this.hunger <= 2.8 ? 1.0 : 0.15]);
     weights.push(['play', this.happy <= 2.2 ? 5 : 1.6]);
-    if (this.nights < 2 && this.lifeT > 22 && this.lifeT - this.lastNight > 25) weights.push(['light', this.nights === 0 && this.lifeT > 35 ? 6 : 1.8]);
-    if (this.lifeT > 12 && this.lifeT - this.lastScold > 14 && this.happy > 2) weights.push(['scold', this.lastScold < 0 && this.lifeT > 30 ? 5 : 1.4]);
+    if (this.nights < 2 && this.lifeT > 22 && this.lifeT - this.lastNight > 25) weights.push(['light', this.nights === 0 && this.lifeT > 32 ? 6 : 1.8]);
+    if (this.lifeT > 12 && this.lifeT - this.lastScold > 14 && this.happy > 2) weights.push(['scold', this.lastScold < 0 && this.lifeT > 25 ? 5 : 1.4]);
+    // Now and then a shot for a perfectly healthy pet (once): worth dodging.
+    if (!this.sick && this.shots === 0 && this.lifeT > 20 && this.happy > 2) weights.push(['med', 0.7]);
     const options = weights.filter(([k]) => (k !== this.lastKind || k === 'feed') && fits(k));
     const total = options.reduce((s, [, w]) => s + w, 0);
     let r = Math.random() * total;
@@ -633,12 +638,13 @@ export class TamagotchiLevel implements Level {
         break;
       }
       case 'med': {
+        this.shots++;
         const p = this.ctx.player.pos;
         const a = Math.random() * Math.PI * 2;
         const from: Vec3 = [clamp(p[0] + Math.cos(a) * 9, -9.5, 9.5), 1.15, clamp(p[2] + Math.sin(a) * 9, -9.5, 9.5)];
         this.syringe = { pos: [from[0], 18, from[2]], yaw: 0, t: 0, phase: 'drop', from, plunge: 0 };
         sound.whoosh();
-        if (Math.random() < 0.6) this.peek(pick(['medicine time!', 'hold STILL', 'is it supposed to be green']), 3.5);
+        if (this.sick || Math.random() < 0.6) this.peek(this.sick ? pick(['medicine time!', 'hold STILL', 'is it supposed to be green']) : pick(['what does this one do', 'shots are FUN', 'boop']), 3.5);
         break;
       }
     }
@@ -1119,16 +1125,17 @@ export class TamagotchiLevel implements Level {
         s.phase = 'jab';
         s.t = 0;
         sound.jab();
+        const wasSick = this.sick;
         this.sick = false;
-        this.addHearts('happy', -JAB_HAPPY);
+        this.addHearts('happy', wasSick ? -JAB_HAPPY : -JAB_HEALTHY);
         const d = normalize([-Math.sin(s.yaw), 0, -Math.cos(s.yaw)]);
         player.knock([d[0] * 7, 5, d[2] * 7], 0.8);
-        this.popup('OW!  CURED', '#7cff6b');
+        this.popup(wasSick ? 'OW!  CURED' : 'OW! I WASN\'T EVEN SICK  -♥', '#7cff6b');
         this.burst(tip, 8, [[0.3, 1, 0.4]], 2, 0.1, true);
       } else if (s.t > SYRINGE_TIME || this.death) {
         s.phase = 'leave';
         s.t = 0;
-        if (!this.death) this.popup('fine. stay sick.', '#7cff6b', add(s.pos, [0, 1.5, 0]), 0.45);
+        if (!this.death) this.popup(this.sick ? 'fine. stay sick.' : 'missed. rats.', '#7cff6b', add(s.pos, [0, 1.5, 0]), 0.45);
       }
     } else if (s.phase === 'jab') {
       s.plunge = clamp(s.t / 0.3, 0, 1);
