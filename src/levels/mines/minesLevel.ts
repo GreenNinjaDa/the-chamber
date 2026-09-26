@@ -62,7 +62,7 @@ interface Death {
 }
 
 export class MinesLevel implements Level {
-  readonly number = 8;
+  readonly number: number;
   readonly title = 'Minesweeper';
   status: LevelStatus = 'playing';
   private arrival: PortalArrival;
@@ -82,6 +82,7 @@ export class MinesLevel implements Level {
   private spawn: Vec3;
 
   constructor(private ctx: LevelContext) {
+    this.number = ctx.number;
     const { physics, hud } = ctx;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);

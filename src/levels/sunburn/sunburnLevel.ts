@@ -20,7 +20,7 @@ import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type Level
 
 /** Seconds after the arrival when the day starts (the giant is up), and how long it lasts. */
 const DAWN_AT = 4;
-const DAY = 80;
+const DAY = 64;
 const DINNER_AT = DAWN_AT + DAY + 1;
 const EXIT_AT = DINNER_AT + 4;
 /** The sun rises and sets this far above the horizon, and lingers overhead at noon (higher = longer). */
@@ -103,7 +103,7 @@ interface Death {
 }
 
 export class SunburnLevel implements Level {
-  readonly number = 7;
+  readonly number: number;
   readonly title = 'Magnifying Glass';
   status: LevelStatus = 'playing';
   private arrival: PortalArrival;
@@ -136,6 +136,7 @@ export class SunburnLevel implements Level {
   private labelList: WorldLabel[] = [];
 
   constructor(private ctx: LevelContext) {
+    this.number = ctx.number;
     const { physics, hud } = ctx;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);

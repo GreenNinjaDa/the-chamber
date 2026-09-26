@@ -53,7 +53,7 @@ interface Death {
 }
 
 export class CakeLevel implements Level {
-  readonly number = 3;
+  readonly number: number;
   readonly title = 'Piece of Cake';
   status: LevelStatus = 'playing';
   private arrival: PortalArrival;
@@ -65,6 +65,7 @@ export class CakeLevel implements Level {
   private death: Death | null = null;
 
   constructor(private ctx: LevelContext) {
+    this.number = ctx.number;
     const { physics, hud } = ctx;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show('PIECE OF CAKE', '', 2.5);

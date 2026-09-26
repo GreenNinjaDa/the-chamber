@@ -12,6 +12,7 @@ import { Player } from './game/player';
 import { settings } from './game/settings';
 import { DartsLevel } from './levels/darts/dartsLevel';
 import { CakeLevel } from './levels/cake/cakeLevel';
+import { ClawLevel } from './levels/claw/clawLevel';
 import { GrenadeLevel } from './levels/grenade/grenadeLevel';
 import { LavaLevel } from './levels/lava/lavaLevel';
 import { TempleLevel } from './levels/temple/templeLevel';
@@ -21,10 +22,18 @@ import { MinesLevel } from './levels/mines/minesLevel';
 import { FroggerLevel } from './levels/frogger/froggerLevel';
 import { ChairsLevel } from './levels/chairs/chairsLevel';
 import { HexagoneLevel } from './levels/hexagone/hexagoneLevel';
+import { TetrisLevel } from './levels/tetris/tetrisLevel';
+import { DodgeballLevel } from './levels/dodgeball/dodgeballLevel';
+import { ButtonLevel } from './levels/button/buttonLevel';
+import { MicrowaveLevel } from './levels/microwave/microwaveLevel';
+import { QuizLevel } from './levels/quiz/quizLevel';
+import { DuckHuntLevel } from './levels/duckhunt/duckHuntLevel';
 import { RedLightLevel } from './levels/redLight/redLightLevel';
 import { LaserLevel } from './levels/lasers/laserLevel';
 import { GnomeLevel } from './levels/gnomes/gnomeLevel';
 import { SnakeLevel } from './levels/snake/snakeLevel';
+import { PacmanLevel } from './levels/pacman/pacmanLevel';
+import { BowlingLevel } from './levels/bowling/bowlingLevel';
 import type { Level, LevelContext, TrackedTarget, WorldLabel } from './levels/level';
 import { LobbyLevel } from './levels/lobby/lobbyLevel';
 
@@ -40,14 +49,23 @@ const LEVELS: ((ctx: LevelContext) => Level)[] = [
   (ctx) => new LavaLevel(ctx),
   (ctx) => new TempleLevel(ctx),
   (ctx) => new SimonLevel(ctx),
-  (ctx) => new SunburnLevel(ctx),
-  (ctx) => new MinesLevel(ctx),
   (ctx) => new RedLightLevel(ctx),
-  (ctx) => new LaserLevel(ctx),
-  (ctx) => new GnomeLevel(ctx),
-  (ctx) => new FroggerLevel(ctx),
-  (ctx) => new SnakeLevel(ctx),
+  (ctx) => new ButtonLevel(ctx),
+  (ctx) => new MinesLevel(ctx),
   (ctx) => new ChairsLevel(ctx),
+  (ctx) => new GnomeLevel(ctx),
+  (ctx) => new QuizLevel(ctx),
+  (ctx) => new DodgeballLevel(ctx),
+  (ctx) => new SunburnLevel(ctx),
+  (ctx) => new FroggerLevel(ctx),
+  (ctx) => new DuckHuntLevel(ctx),
+  (ctx) => new ClawLevel(ctx),
+  (ctx) => new SnakeLevel(ctx),
+  (ctx) => new MicrowaveLevel(ctx),
+  (ctx) => new BowlingLevel(ctx),
+  (ctx) => new TetrisLevel(ctx),
+  (ctx) => new LaserLevel(ctx),
+  (ctx) => new PacmanLevel(ctx),
   (ctx) => new HexagoneLevel(ctx),
 ];
 const params = new URLSearchParams(location.search);
@@ -56,8 +74,10 @@ const sandbox = params.has('sandbox');
 let levelIndex = Math.min(LEVELS.length - 1, Math.max(0, (Number(params.get('level')) || 1) - 1));
 /** The lobby is the main menu: a chamber you walk around in, with a START portal. */
 let inLobby = !params.has('level');
-const makeLevel = (ctx: LevelContext) =>
-  sandbox ? new Sandbox(ctx) : inLobby ? new LobbyLevel(ctx, LEVELS.length) : LEVELS[levelIndex](ctx);
+const makeLevel = (ctx: LevelContext) => {
+  ctx.number = sandbox || inLobby ? 0 : levelIndex + 1;
+  return sandbox ? new Sandbox(ctx) : inLobby ? new LobbyLevel(ctx, LEVELS.length) : LEVELS[levelIndex](ctx);
+};
 
 /** Where each tracked target is on screen: a ring if visible, otherwise an edge arrow toward it. */
 function screenMarkers(targets: TrackedTarget[], view: Mat4, proj: Mat4, fov: number): ScreenMarker[] {
@@ -123,7 +143,7 @@ async function main() {
   // Chamber colliders are added after the level is created, since levels can tweak the chamber.
   const freshPhysics = () => new Physics();
 
-  const ctx: LevelContext = { player, camera, hud, input, physics: freshPhysics() };
+  const ctx: LevelContext = { number: 0, player, camera, hud, input, physics: freshPhysics() };
   player.attach(ctx.physics);
 
   let playing = false;

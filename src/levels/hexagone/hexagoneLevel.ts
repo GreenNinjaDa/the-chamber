@@ -128,7 +128,7 @@ const pick = <T>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
 export class HexagoneLevel implements Level {
-  readonly number = 15;
+  readonly number: number;
   readonly title = 'Hex-A-Gone';
   status: LevelStatus = 'playing';
   private arrival: PortalArrival;
@@ -168,6 +168,7 @@ export class HexagoneLevel implements Level {
   readonly chamber = { none: true };
 
   constructor(private ctx: LevelContext) {
+    this.number = ctx.number;
     const { hud, physics } = ctx;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);

@@ -126,7 +126,7 @@ function blinkPattern(): [number, number][] {
 }
 
 export class GnomeLevel implements Level {
-  readonly number = 6;
+  readonly number: number;
   readonly title = 'Gnome Alone';
   status: LevelStatus = 'playing';
   private arrival: PortalArrival;
@@ -172,6 +172,7 @@ export class GnomeLevel implements Level {
   private statusKey = '';
 
   constructor(private ctx: LevelContext) {
+    this.number = ctx.number;
     const { hud, physics } = ctx;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);
