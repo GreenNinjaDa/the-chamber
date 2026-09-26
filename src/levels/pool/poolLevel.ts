@@ -4,7 +4,7 @@ import {
   type Mat4, type Quat, type Vec3,
 } from '../../engine/math';
 import { GRAVITY, RAPIER, type Body } from '../../engine/physics';
-import { Pattern, type DrawItem } from '../../engine/renderer';
+import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
 import { junk, spawnJunk } from '../../entities/junk';
 import { drawLounger, drawParasol, drawPoolLadder, spawnFloatingCouch, spawnPoolFloat, Water, type PoolFloatKind } from '../../entities/pool';
 import { ExitPortal, PortalArrival } from '../../entities/portal';
@@ -66,6 +66,14 @@ const LADDER_AT = OVERVIEW_END + 0.6;
 /** Price per square metre of pool (Simoleons). */
 const POOL_PRICE = 16;
 
+/** The lights when the Grim Reaper turns up. */
+const GLOOM = {
+  sunColor: [0.55, 0.6, 0.85] as Vec3,
+  skyColor: [0.06, 0.08, 0.16] as Vec3,
+  groundColor: [0.05, 0.05, 0.08] as Vec3,
+  fogColor: [0.1, 0.12, 0.2] as Vec3,
+};
+
 const WALL = [0.86, 0.87, 0.88];
 const FLOOR = [0.6, 0.61, 0.63];
 const DECK = [0.84, 0.79, 0.69];
@@ -82,7 +90,7 @@ const SIMLISH_WALL = ['Hnnng!', 'Nib! Nib!', 'Grah!', 'Frabbit!', 'Ooof...'];
 const SIMLISH_TIRED = ['Zzz... blub.', 'Nooboo...', 'Hoo... hoo...', 'Blub.'];
 const DROWN_LINES = [
   'The ladder was right there. Then it wasn\'t.',
-  'Cause of death: pool. Contributing factor: no ladder.',
+  'Contributing factors: no ladder. Also, the cursor.',
   'Your Sim was having a great time. The needs panel said so.',
   'Somewhere, a player is laughing. It was always going to be this way.',
 ];
@@ -341,6 +349,7 @@ export class PoolLevel implements Level {
   private needs: NeedsPanel;
   private reaper: { pos: Vec3; from: Vec3; to: Vec3; t: number; yaw: number } | null = null;
   private music = new Tune(BUILD_TUNE, 118, { wave: 'triangle', vol: 0.045, bass: true });
+  private env: Environment = { ...DEFAULT_ENV, sunColor: [...DEFAULT_ENV.sunColor], skyColor: [...DEFAULT_ENV.skyColor], groundColor: [...DEFAULT_ENV.groundColor], fogColor: [...DEFAULT_ENV.fogColor] };
   private drownHooked = false;
 
   constructor(private ctx: LevelContext) {
@@ -981,7 +990,7 @@ export class PoolLevel implements Level {
           const at = sub(cursor.tip, [0, what === 'couch' ? 0.95 : 1.55, 0]);
           const body = this.spawnProp(what, at, rand(-0.4, 0.4));
           body.rb.setLinvel({ x: 0, y: -1, z: 0 }, true);
-          this.say(what === 'couch' ? 'Couch  -§180' : 'Fridge  -§400', add(at, [0, 1.6, 0]), 0.4, '#ffffff', 2, [0, 0.4, 0]);
+          this.say(what === 'couch' ? 'Couch  -§180  (floats, apparently)' : 'Fridge  -§400  (does not float)', add(at, [0, 1.6, 0]), 0.4, '#ffffff', 2.8, [0, 0.35, 0]);
           if (what === 'fridge') this.speak('Fwah?', 1.4);
           this.task = 'decor-away';
           this.taskT = 0;
@@ -999,7 +1008,7 @@ export class PoolLevel implements Level {
         // Circling over the pool, watching.
         this.idleAngle += dt * 0.35;
         const p = player.pos;
-        const around: Vec3 = [clamp(p[0] + Math.cos(this.idleAngle) * 5, -X_HALF, X_HALF), 6.5 + Math.sin(this.time * 0.8) * 0.5, clamp(p[2] + Math.sin(this.idleAngle) * 5, -Z_HALF, Z_HALF)];
+        const around: Vec3 = [clamp(p[0] + Math.cos(this.idleAngle) * 6.5, -X_HALF, X_HALF), 3.4 + Math.sin(this.time * 0.8) * 0.4, clamp(p[2] + Math.sin(this.idleAngle) * 6.5, -Z_HALF, Z_HALF)];
         cursor.follow(around, dt, 0.8);
         break;
       }
@@ -1342,7 +1351,7 @@ export class PoolLevel implements Level {
     const list = this.labelList;
     list.length = 0;
     for (const l of this.needs.labels()) list.push(l);
-    for (const s of this.says) list.push(s.label);
+    if (this.status !== 'lost') for (const s of this.says) list.push(s.label);
     if (this.bubble && this.bubbleLabel.text && this.ctx.player.mode !== 'hidden' && !this.ctx.player.inPortal) list.push(this.bubbleLabel);
     // Build mode: the pool's size and price while dragging.
     if (this.dragTo && this.t < RELEASE_AT) {
@@ -1368,7 +1377,17 @@ export class PoolLevel implements Level {
   }
 
   environment() {
-    return DEFAULT_ENV;
+    // When the Reaper comes, the lights go down to a cold gloom.
+    const k = this.death?.drowned ? clamp((this.death.t - 0.8) / 1.5, 0, 1) * 0.72 : 0;
+    if (k <= 0) return DEFAULT_ENV;
+    const env = this.env;
+    for (let i = 0; i < 3; i++) {
+      env.sunColor[i] = lerp(DEFAULT_ENV.sunColor[i], GLOOM.sunColor[i], k);
+      env.skyColor[i] = lerp(DEFAULT_ENV.skyColor[i], GLOOM.skyColor[i], k);
+      env.groundColor[i] = lerp(DEFAULT_ENV.groundColor[i], GLOOM.groundColor[i], k);
+      env.fogColor[i] = lerp(DEFAULT_ENV.fogColor[i], GLOOM.fogColor[i], k);
+    }
+    return env;
   }
 
   obstacles() {
