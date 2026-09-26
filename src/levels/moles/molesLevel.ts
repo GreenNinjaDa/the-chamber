@@ -44,11 +44,11 @@ const SINK_TIME = 0.17;
 /** How close to under a hole (m, horizontally) Space pops you up. */
 const POP_RANGE = 0.95;
 /** Fully up this long by a carrot and you grab it anyway; the grab takes GRAB_TIME. */
-const AUTO_GRAB = 0.45;
+const AUTO_GRAB = 0.6;
 const GRAB_TIME = 0.16;
 /** A head whose top is above this gets hit. */
 const HIT_LINE = DECK_TOP + 0.03;
-const MOLE_COUNT = 5;
+const MOLE_COUNT = 4;
 const MOLE_SPEED = 2.4;
 const DEATH_SCREEN_DELAY = 2.6;
 /** How long you lie flattened on the hole before slipping down it. */
@@ -59,13 +59,13 @@ const CARROT_LEN = 1.15;
 const CARROT_R = 0.17;
 
 /** The mallet's pace, from calm (heat 0) to frantic (heat 1): [calm, frantic]. */
-const REACTION = [0.45, 0.2];
+const REACTION = [0.4, 0.1];
 /** Up longer than this and you're his target, however many moles pop up after you. */
-const PATIENCE = [2.0, 1.1];
-const TRAVEL_SPEED = [11, 19];
-const WINDUP = [0.62, 0.36];
-const SMASH = [0.12, 0.085];
-const RECOVER = [0.5, 0.3];
+const PATIENCE = [2.0, 1.0];
+const TRAVEL_SPEED = [11, 22];
+const WINDUP = [0.6, 0.26];
+const SMASH = [0.12, 0.08];
+const RECOVER = [0.5, 0.28];
 
 const ORANGE = [0.95, 0.28, 0.02];
 const LEAF = [0.22, 0.62, 0.14];
@@ -176,6 +176,9 @@ export class MolesLevel implements Level {
     tantrum: 0,
     /** What the swing hit (for Timmy's reaction). */
     hitMole: false,
+    /** The carrot hole he's hovering over while nothing's up, and for how much longer. */
+    campHole: -1,
+    camp: 0,
   };
   private death: Death | null = null;
   private pancake: { feet: Vec3; facing: number; t: number } | null = null;
@@ -256,7 +259,7 @@ export class MolesLevel implements Level {
 
   /** 0 (calm) to 1 (frantic): rises with carrots taken, rounds played and Timmy's score. */
   private heat() {
-    return clamp(this.collected * 0.11 + (this.round - 1) * 0.22 + this.score / 4000, 0, 1);
+    return clamp(this.collected * 0.17 + (this.round - 1) * 0.2 + this.score / 5000, 0, 1);
   }
 
   private tune01(range: number[]) {
@@ -275,7 +278,7 @@ export class MolesLevel implements Level {
         this.status = 'lost';
         hud.show(death.big, `${death.small}\nPress R to try again.`);
         hud.tips([
-          ['Hint', 'Pop up where the mallet isn’t (a red ring on a hole, or a red light round the pad under it, means it’s coming), grab a carrot, duck. The other moles are decoys: pop up just as he goes for one. Don’t hang about up there.'],
+          ['Hint', 'Pop up where the mallet isn’t (a red ring on a hole, or a red light round the pad under it, means it’s coming), grab a carrot, duck. The other moles are decoys: pop up as he winds up to whack one. Don’t hang about up there.'],
           ['Controls', 'WASD move · Space (hold) pop up · E or click grab · let go of Space to duck'],
         ]);
       }
@@ -579,6 +582,7 @@ export class MolesLevel implements Level {
       hud.show('TILT!', 'The machine has detected an unauthorised mole.', 2.4);
       this.win();
     } else {
+      if (!this.death) this.timmySay(this.collected === 1 ? 'HEY! MY CARROT!' : pick(['THIEF!', 'MOM! A MOLE TOOK A CARROT!', 'HEY!!', 'GIVE IT BACK!']), 1.8);
       hud.show(`${this.collected} / ${CARROTS_NEEDED}`, quips[Math.min(quips.length - 1, this.collected - 1)], 1.4);
       if (this.collected + this.carrots.length < CARROTS_NEEDED) this.carrotRespawn = 1.1;
     }
@@ -853,7 +857,8 @@ export class MolesLevel implements Level {
       n.path.shift();
       if (!n.path.length) {
         m.pos = [...to];
-        this.moleWait(n, rand(0.25, 1.5));
+        // They get jumpier as Timmy warms up: longer and longer before they dare pop up.
+        this.moleWait(n, rand(0.5, 2.2) * (1 + this.heat() * 1.5));
       }
     }
     void i;
@@ -888,6 +893,8 @@ export class MolesLevel implements Level {
     const pop = this.pop;
     const up = pop && !this.death && (pop.state === 'rise' || pop.state === 'up');
     if (up && this.t - pop.since > this.tune01(PATIENCE)) return { hole: pop.hole, since: pop.since };
+    // Once he's noticed carrots going missing, anyone popping up by one is the prime suspect.
+    if (up && this.collected > 0 && this.carrots.some((c) => c.hole === pop.hole)) return { hole: pop.hole, since: pop.since };
     let best: { hole: number; since: number } | null = null;
     for (const n of this.moles) {
       if ((n.state === 'rise' || n.state === 'up') && (!best || n.since > best.since)) best = { hole: n.hole, since: n.since };
@@ -935,7 +942,7 @@ export class MolesLevel implements Level {
       case 'idle': {
         const best = this.phase === 'break' ? null : this.newestTarget();
         // (Higher near the south wall, so his hand clears it.)
-        const high = mal.aim[2] > 6 ? 4 : 0.9;
+        const high = 0.9 + clamp((mal.aim[2] - 6.5) / 2, 0, 1) * 3.1;
         mal.lift += (high + Math.sin(this.t * 2.1) * 0.25 - mal.lift) * k(3);
         mal.swing += (0.55 + Math.sin(this.t * 1.7) * 0.08 - mal.swing) * k(4);
         if (this.phase === 'break') {
@@ -957,7 +964,17 @@ export class MolesLevel implements Level {
           aimTo(HOLES[best.hole], this.tune01(TRAVEL_SPEED) * 0.3);
           if (this.t - best.since >= this.tune01(REACTION) && ms.t > 0.05) this.commit(best.hole);
         } else {
-          aimTo(wander, 3);
+          // Nothing up: he hovers over the carrots, which is where the moles keep turning up.
+          ms.camp -= dt;
+          const carrotHoles = this.carrots.map((c) => c.hole);
+          if (ms.camp <= 0 || !carrotHoles.includes(ms.campHole)) {
+            ms.camp = rand(2.5, 4.5);
+            ms.campHole = carrotHoles.length ? pick(carrotHoles) : -1;
+          }
+          if (ms.campHole >= 0) {
+            const hc = HOLES[ms.campHole];
+            aimTo([hc[0] + Math.sin(this.t * 1.3) * 0.6, DECK_TOP, hc[2] + Math.cos(this.t * 1.1) * 0.6], 6);
+          } else aimTo(wander, 3);
           ms.bored += dt;
           if (ms.bored > ms.boredLimit && this.phase !== 'ready') {
             // Bored: slam a hole anyway (often one with a carrot by it).
@@ -968,6 +985,13 @@ export class MolesLevel implements Level {
         break;
       }
       case 'travel': {
+        // On his way to a mole he'll change his mind for a carrot thief (not once he's winding up).
+        const pop = this.pop;
+        if (pop && !this.death && ms.tantrum <= 0 && pop.hole !== ms.hole && (pop.state === 'rise' || pop.state === 'up') &&
+            this.collected > 0 && this.carrots.some((c) => c.hole === pop.hole) && this.t - pop.since >= this.tune01(REACTION)) {
+          this.commit(pop.hole);
+          this.timmySay(pick(['HEY!', 'THERE YOU ARE!', 'CARROT THIEF!']), 1.2);
+        }
         const fast = ms.tantrum > 0 || this.phase === 'won' ? 22 : this.tune01(TRAVEL_SPEED);
         const left = aimTo(HOLES[ms.hole], fast);
         mal.lift += (1.0 - mal.lift) * k(6);
