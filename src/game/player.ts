@@ -210,7 +210,10 @@ export class Player {
    * entirely, so they drift on their momentum (e.g. weightless, with the level doing the steering).
    */
   airControl = 1;
-  /** A pose the level wants drawn while in control instead of the usual animation (e.g. clinging to a rail); null = normal. */
+  /**
+   * A pose the level wants drawn while in control instead of the usual animation (e.g. clinging to
+   * a rail), or in 'swinging' mode instead of the hanging pose; null = normal.
+   */
   poseOverride: Pose | null = null;
   /**
    * Puppet mode (startPuppet): the joint angles the body's motors chase, per-joint strength
@@ -858,7 +861,8 @@ export class Player {
           kneeL: -0.7 - Math.sin(t * 15) * 0.5, kneeR: -0.7 + Math.sin(t * 15) * 0.5,
         };
       case 'swinging':
-        return hangingPose(t);
+        // A level can pose a scripted player its own way (e.g. popping out of a hole).
+        return this.poseOverride ?? hangingPose(t);
       case 'puppet':
         return this.puppetPose;
       case 'flying':

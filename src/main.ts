@@ -51,6 +51,7 @@ import { KatamariLevel } from './levels/katamari/katamariLevel';
 import { PoolLevel } from './levels/pool/poolLevel';
 import { ImpostorLevel } from './levels/impostor/impostorLevel';
 import { QwopLevel } from './levels/qwop/qwopLevel';
+import { MolesLevel } from './levels/moles/molesLevel';
 import type { Level, LevelContext, TrackedTarget, WorldLabel } from './levels/level';
 import { LobbyLevel } from './levels/lobby/lobbyLevel';
 
@@ -83,6 +84,7 @@ const LEVELS: [string, (ctx: LevelContext) => Level][] = [
   ['rock', (ctx) => new RockLevel(ctx)],
   ['claw', (ctx) => new ClawLevel(ctx)],
   ['snake', (ctx) => new SnakeLevel(ctx)],
+  ['moles', (ctx) => new MolesLevel(ctx)],
   ['birds', (ctx) => new BirdsLevel(ctx)],
   ['sunburn', (ctx) => new SunburnLevel(ctx)],
   ['dominoes', (ctx) => new DominoesLevel(ctx)],
