@@ -188,13 +188,20 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   along each ball's path) and you're out through a trapdoor. Balls pile up everywhere: carry one, aim, right-click
   to throw it back; a fast ball hitting a turret knocks it over (with a helping shove), and tipped past ~50° it's
   down for good ("I don't blame you."). All four down: the exit opens.
-- **Level 20 — Rock Star** (`src/levels/rock/`; a Guitar Hero parody): the floor is a five-lane note highway, the camera
+- **Level 20 — Plinko** (`src/levels/plinko/`; The Price Is Right): the east wall is a giant pegboard (8 staggered rows,
+  2.6 m apart) and you're the chip. The portal drops you on a railed shelf along its top ("COME ON DOWN!"); standing
+  0.5 s on one of its seven hatches drops you in above that column. Falling is scripted (`flying`, tumbling): 2D bounces
+  off pegs, dividers and the sides in the board's plane, a random kick off dead-centre hits, plinks, and A / D steer a
+  little, with a side-on camera. Seven slots: TRAP, 100, 500, EXIT, 500, 100, TRAP. EXIT has the exit portal right behind
+  it; cash is added to the total and a spring throws you back up to the shelf for another go; a trapdoor catapults you
+  out (THE PRICE IS WRONG). After three cash landings, NEW RULES: every slot but EXIT is a trapdoor.
+- **Level 21 — Rock Star** (`src/levels/rock/`; a Guitar Hero parody): the floor is a five-lane note highway, the camera
   looks down it from behind you, and 44 coloured gems (a fixed chart at 120 bpm: single notes, sustains, two-lane chords,
   a solo that needs a sprint) slide toward the strike line by your feet. Be in a gem's lane as it crosses (a chord: on the
   line between its lanes) and the note plays (the lead only sounds when you hit; drums and bass run on song time). Misses
   drain the rock meter on the north wall; the crowd down both sides cheers, bobs or boos with it. Empty it and you're
   booed off (tomatoes, then the stage catapults you); finish the song and the exit opens for the encore.
-- **Level 21 — The Claw** (`src/levels/claw/`): you're a prize in a claw machine, a closed cabinet (dark felt
+- **Level 22 — The Claw** (`src/levels/claw/`): you're a prize in a claw machine, a closed cabinet (dark felt
   floor, a glass front, starry backdrops, chasing marquee bulbs, a ceiling of fluorescent tubes that casts no
   shadows). 48 plush toys (`entities/plush.ts`: three-eyed aliens, teddies, giant ducks, beach balls; light, bouncy,
   settled into heaps before you arrive) slow you down when you wade through them. The exit is the prize chute in
@@ -209,7 +216,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   (landing speed; ~3 m just knocks you down). Grabbed without holding on, you always slip at the jiggle. Out of
   credits, the lights go out and every alien turns to stare at you, eyes glowing. The aliens chant ("Ooooh...
   the claaaw!") as world labels.
-- **Level 22 — Snake** (`src/levels/snake/`): you are the apple. After the arrival the floor boots up row by row
+- **Level 23 — Snake** (`src/levels/snake/`): you are the apple. After the arrival the floor boots up row by row
   into an old phone LCD (pale olive, 16 x 16 grid of 1.5 m cells), "NOKLA — Connecting people." appears on the north
   wall, a panel there slides open and the phone-game snake (`entities/snake.ts`) comes out: dark pixel blocks 1.35 m
   wide and 1.6 m tall (too tall to jump), each a static collider moved one cell per step (60 ms slide), head with
@@ -225,7 +232,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   later. Caught (it enters your cell, you're right in front of its mouth, or its head pushes into you) = swallowed
   whole (shrink into its mouth, gulp, +3 blocks, a bulge runs down to the tail), then GAME OVER with the snake's
   length as SCORE. The score also shows in pixel digits on the north wall.
-- **Level 23 — Angry Birds** (`src/levels/birds/`): you are the pig. You land just east of a fortress
+- **Level 24 — Angry Birds** (`src/levels/birds/`): you are the pig. You land just east of a fortress
   (`entities/blocks.ts`: wood planks and posts, glass, stone, TNT crates; a west wall, two three-storey towers, the
   pig's house with TNT in the living room, loose planks and blocks to build with). A giant slingshot rises behind
   the west wall (the view turns to it) and six birds pop up onto the wall top (`entities/birds.ts`); then "YOU ARE
@@ -244,7 +251,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   scores the birds points (popups; "BIRDS: 12,450" and three stars on the north wall; a popped pig is 5,000).
   Survive all six (~60 s): the slingshot wilts, LEVEL FAILED (for the birds), the pig laughs, the exit opens.
   `?birdShot=N` starts with the Nth bird.
-- **Level 24 — Magnifying Glass** (`src/levels/sunburn/`): the giant is back, with a magnifying glass, and you're the
+- **Level 25 — Magnifying Glass** (`src/levels/sunburn/`): the giant is back, with a magnifying glass, and you're the
   ant. A day passes in ~64 s: the sun (`Environment.sunDir`, light colours) rises in the east, lingers overhead and
   sets in the west, so the shade moves: along the east wall in the morning, nothing but umbrellas at noon, the west
   wall in the afternoon. The burning spot is a real ray down the sun's direction from the lens to his aim point: it
@@ -252,19 +259,19 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   chases where you're heading (faster than a sprint at noon, but turning sluggishly: dodge it), and while you hide he
   burns things out in the sun (the duck melts, the beach ball pops, umbrellas, boxes and the mattress burn away) or
   lurks at the edge of your shade. At dusk his mum calls him in for dinner and the exit opens.
-- **Level 25 — Dominoes** (`src/levels/dominoes/`): a world-record attempt: 22 giant ivory dominoes (2.6 m, 60 kg physics
+- **Level 26 — Dominoes** (`src/levels/dominoes/`): a world-record attempt: 22 giant ivory dominoes (2.6 m, 60 kg physics
   boxes with pips) in an S across the chamber, one missing, its gap marked by a chalk outline exactly your size. The
   giant's finger flicks the first. Stand in the gap and the one before it knocks you flat, you carry the chain on,
   and the last domino hits the button that opens the exit. Anywhere else in a falling domino's path: FLATTENED. Not
   in the gap when the chain gets there: it stops, and the finger flicks you instead (FLICKED). If anything else
   stalls the chain for 3.5 s, the giant nudges it on.
-- **Level 26 — Microwave** (`src/levels/microwave/`): the chamber is the inside of one. A 45 s cook (a green display and keypad on
+- **Level 27 — Microwave** (`src/levels/microwave/`): the chamber is the inside of one. A 45 s cook (a green display and keypad on
   the north wall): the floor is a glass turntable that carries you round (`player.platformVel`; loose things ride it
   too), and standing-wave hot spots on a hex grid glow on it without turning, bigger on HIGH power from 20 s: 1.4 s
   in them cooks you (COOKED, `player.char`). Popcorn kernels pop from 12 s (knocking you about), and the fork left
   on the plate sparks from 18 s and arcs every 1-2.5 s, zapping anyone within 4.2 m of its tines (ZAPPED). DING: the
   door (exit) opens.
-- **Level 27 — Katamari** (`src/levels/katamari/`): the chamber is littered with stuff: ~100 tiny things in heaps
+- **Level 28 — Katamari** (`src/levels/katamari/`): the chamber is littered with stuff: ~100 tiny things in heaps
   (`entities/trinkets.ts`), most of the junk, three teddies, and the big pieces against the walls. After the arrival
   a rainbow beam drops a tiny green prince and a 0.62 m sticky ball (`entities/katamari.ts`) into the NW corner, the
   King (`entities/king.ts`, a giant crowned head) rises over the north wall, and the board under him says MAKE IT 5
@@ -283,14 +290,14 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   fleeing runs out of time (the prince alone reaches 3.4 m at 70-85 s); feeding it gets there at 40-55 s, and then
   running laps round the middle is never caught, while leading it through the deliveries wins at 60-85 s.
   `?katTime=N` sets the clock, `?katSize=D` the starting diameter.
-- **Level 28 — Piñata** (`src/levels/pinata/`): Timmy's 8th birthday (the magnifying-glass giant, `giant.blindfold`: a
+- **Level 29 — Piñata** (`src/levels/pinata/`): Timmy's 8th birthday (the magnifying-glass giant, `giant.blindfold`: a
   blindfold and a party hat) and he has a baseball bat. He swings at the loudest noise he heard in the last 1.2 s
   (wind-up 0.5 s with a shadow on the floor, smash, 2 m kill radius; bored after 7 s of quiet: a wild swing).
   Walking is silent; sprinting, landing a jump, things crashing down (thrown or knocked) and popping balloons are
   not, and every noise shows as a ring. Balloons drift toward you and pop when they touch you (or when anything
   flies through them); more keep coming. After 60 s he finds the real piñata (candy everywhere), it's CAKE TIME,
   and the exit opens.
-- **Level 29 — Hex-A-Gone** (`src/levels/hexagone/`; Fall Guys' disappearing floor): no test chamber but an 18 m white shaft
+- **Level 30 — Hex-A-Gone** (`src/levels/hexagone/`; Fall Guys' disappearing floor): no test chamber but an 18 m white shaft
   (`chamber: { none: true }`, same 24 x 24 footprint) with three floors of candy hex tiles (`entities/hexFloor.ts`,
   corner radius 0.95 m, 295 per floor, tops at 13.5 / 9 / 4.5 m: pink, yellow, blue) over glowing goo (1.2 m, with a
   green point light). You land on the top floor with six contestants; a 3-2-1-GO on the LED board on the north wall
@@ -306,7 +313,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   view, kept under the floor overhead and above the one underfoot wherever there are tiles (after a fall it follows
   you down through your hole); dissolved, it looks down at the splash. `?hexTime=N` sets the round length, `?hexSolo`
   leaves the contestants out.
-- **Level 30 — The Pool** (`src/levels/pool/`; The Sims' pool-ladder prank): its own room (`none`: the walls, and a
+- **Level 31 — The Pool** (`src/levels/pool/`; The Sims' pool-ladder prank): its own room (`none`: the walls, and a
   deck round an 18 x 16 pool, 4.2 m deep, the water 1.7 m under the deck). Once the Sim is up after the arrival a
   green plumbob pops over their head ("Sul sul!"), a needs panel lights up on the north wall (ENERGY, FUN "Very high",
   HYGIENE, SOCIAL "The cursor is your friend", BLADDER "Don't. Just don't."), and the camera swings up into a
@@ -325,7 +332,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   scribble*", "Drowned. Classic.") and it's SIM DIED. Way out: a crate (or the couch) pushed against the side and
   jumped from (a pallet or the air mattress alone is too low; a crate on the pallet works in two jumps). Out on
   the deck, the cursor flies to the exit, "DELETE DOOR?", hesitates... "...nah." and the exit opens.
-- **Level 31 — The Floor Is Lava** (`src/levels/floorLava/`): the kids' game, taken literally, in a living room (red and blue
+- **Level 32 — The Floor Is Lava** (`src/levels/floorLava/`): the kids' game, taken literally, in a living room (red and blue
   sofas, blue and mustard armchairs, coffee table, beanbags, a blue rug, piano and bench, fridge, washing machine,
   bathtub, mattress, bookcase, crates, pillows; `entities/livingRoom.ts` plus junk). A host on four wall TVs announces
   rules ("RULE #n"), each with a 3-2-1 countdown (the digit also big on the HUD with the rule under it); meanwhile
@@ -341,7 +348,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   marker; landing on you is QUACKED), 5 s to get on it; everything else melts and sinks into lava rising to 0.55 m,
   "THE DUCK IS A BOAT NOW." and it sails you to the exit ("THE EXIT IS NOT LAVA. PROBABLY."). ~95 s in all.
   `?lavaStep=N` starts at step N of the script (8 = the duck).
-- **Level 32 — Pinball** (`src/levels/pinball/`): you are the ball. The chamber is a pinball table (`entities/pinball.ts`):
+- **Level 33 — Pinball** (`src/levels/pinball/`): you are the ball. The chamber is a pinball table (`entities/pinball.ts`):
   one fixed slab sloping 10° down to the south (surface 2 m up at the drain edge, z = 9.9, ~5.9 m at the north wall),
   a glossy navy playfield with a sunburst, stars and lamp inserts, cabinet side art and GI bulbs on the walls, a
   backglass on the north wall (orange dot-matrix display with score and messages, E X I T lamps, "SPACE CADAVER") and a
@@ -360,7 +367,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   get BALL SAVED back into the lane; the plunger fires every ball in the lane at once, but holds while you're in it;
   a ball sitting still 3 s gets a BALL SEARCH kick. Every jump nudges the table: DANGER after ~6 quick hops, TILT after
   ~9 (flippers, bumpers and lights dead for 6 s; drain meanwhile = TILT). Hum, music, chimes, BONGs, knocker.
-- **Level 33 — Bowling** (`src/levels/bowling/`; map in `lane.ts`): its own map (`none`), with the chamber's footprint so
+- **Level 34 — Bowling** (`src/levels/bowling/`; map in `lane.ts`): its own map (`none`), with the chamber's footprint so
   the camera keeps its usual chamber confinement: a honey-wood lane
   (boards, arrows, dots, pin spots), sunken gutters (2.7 m wide, 0.7 m deep) along the east and west walls, a dark pit
   across the north end, a scoreboard on the north wall (and a small one over the hatch) with sarcastic verdicts
@@ -374,12 +381,12 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   and pushes everything into the pit (jump it; swept = "CLEARED"), then ten pins come down on strings onto their
   spots (standing on one = "PINNED"). After the giant, the last ball is fired 0.8 s after the exit (east wall, in
   the gutter halfway down the lane) opens, and more keep coming until you leave.
-- **Level 34 — Falling Blocks** (`src/levels/tetris/`): a glass-fronted well one cell deep and ten wide against the east wall,
+- **Level 35 — Falling Blocks** (`src/levels/tetris/`): a glass-fronted well one cell deep and ten wide against the east wall,
   seen side-on (the level's camera shot; A / D move along it). Tetrominoes fall a row at a time, steering toward
   wherever you stand (a column every other row) and committing 4 rows up (a ghost shows where they'll land); what
   lands is what you climb, up to the exit (open from the start, 5 m up the east wall). Full rows clear and drop
   everything above. Crushed = GAME OVER; the stack reaching the top of the well = TOPPED OUT.
-- **Level 35 — Laser Show** (`src/levels/lasers/`; Fall Guys' Jump Club meets the Resident Evil laser hallway): the
+- **Level 36 — Laser Show** (`src/levels/lasers/`; Fall Guys' Jump Club meets the Resident Evil laser hallway): the
   lights go down (dark red) and an emitter pylon (`entities/laser.ts`, `LaserPylon`) rises out of a floor hatch.
   A low beam (0.35 m) grows out opposite the player and sweeps round, speeding up from 5 s to 2.5 s a turn: jump it.
   Then a mast rises and a high beam (1.6 m) joins, turning the other way at a different speed: duck it (stand still and
@@ -390,7 +397,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   4.2 m/s. Any beam touching a body part (`BodySlicer`: the real part frames as slightly shrunk capsules/boxes, swept
   in 4 cm steps so fast beams can't skip a limb) slices you: `player.kill` with violence 30 (42 for the grid) at the
   cut. One red point light rides with the pylon, then with each wall. `?laserSkip=N` starts the show N s in.
-- **Level 36 — Going Down** (`src/levels/elevator/`): the chamber is an elevator car (`entities/elevator.ts`: sliding doors in
+- **Level 37 — Going Down** (`src/levels/elevator/`): the chamber is an elevator car (`entities/elevator.ts`: sliding doors in
   the east wall, brass handrails round the walls at 1 m, a yellow crosshead and grate over the top (it stops anything
   floating out) with the hoist cables up to a sheave on the roof, two amber LED floor indicators (`FloorIndicator`),
   and the shaft, drawn sliding up past the wall tops by `drawShaft(depth, speed)`: landing doors, slabs, streaking
@@ -412,7 +419,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   sarcastic remarks. Sound: dings, a muzak `Tune` (record-scratches off at the TWANG), motor hum, creak / ping /
   groan, brake screech, rushing wind, countdown beeps, the crash, thuds, a rail clink. `?quickRide` snaps the cable
   4 s after the ding.
-- **Level 37 — Pac-Man** (`src/levels/pacman/`): after the arrival the floor goes dark navy, the sun dims to a moon
+- **Level 38 — Pac-Man** (`src/levels/pacman/`): after the arrival the floor goes dark navy, the sun dims to a moon
   and a 13×13-cell maze (`maze.ts`: black blocks outlined in glowing arcade blue, 1.5 m tall so you can't jump
   onto them but the camera sees over; 2.25 m corridors; a ghost house with a pink door in the middle) rises out of
   the floor, shoving the player out of its way, while the camera shows the whole board from above (READY!). 81

@@ -45,6 +45,7 @@ import { BowlingLevel } from './levels/bowling/bowlingLevel';
 import { FloorLavaLevel } from './levels/floorLava/floorLavaLevel';
 import { ElevatorLevel } from './levels/elevator/elevatorLevel';
 import { BirdsLevel } from './levels/birds/birdsLevel';
+import { PlinkoLevel } from './levels/plinko/plinkoLevel';
 import { PinballLevel } from './levels/pinball/pinballLevel';
 import { KatamariLevel } from './levels/katamari/katamariLevel';
 import { PoolLevel } from './levels/pool/poolLevel';
@@ -76,6 +77,7 @@ const LEVELS: [string, (ctx: LevelContext) => Level][] = [
   ['stealth', (ctx) => new StealthLevel(ctx)],
   ['chess', (ctx) => new ChessLevel(ctx)],
   ['dodgeball', (ctx) => new DodgeballLevel(ctx)],
+  ['plinko', (ctx) => new PlinkoLevel(ctx)],
   ['rock', (ctx) => new RockLevel(ctx)],
   ['claw', (ctx) => new ClawLevel(ctx)],
   ['snake', (ctx) => new SnakeLevel(ctx)],
