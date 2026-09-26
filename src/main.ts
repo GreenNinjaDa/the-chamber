@@ -36,6 +36,7 @@ import { RedLightLevel } from './levels/redLight/redLightLevel';
 import { LaserLevel } from './levels/lasers/laserLevel';
 import { GnomeLevel } from './levels/gnomes/gnomeLevel';
 import { SnakeLevel } from './levels/snake/snakeLevel';
+import { HipposLevel } from './levels/hippos/hipposLevel';
 import { ChessLevel } from './levels/chess/chessLevel';
 import { PacmanLevel } from './levels/pacman/pacmanLevel';
 import { BowlingLevel } from './levels/bowling/bowlingLevel';
@@ -80,6 +81,7 @@ const LEVELS: ((ctx: LevelContext) => Level)[] = [
   (ctx) => new ElevatorLevel(ctx),
   (ctx) => new PacmanLevel(ctx),
   (ctx) => new ChessLevel(ctx),
+  (ctx) => new HipposLevel(ctx),
 ];
 const params = new URLSearchParams(location.search);
 /** `?sandbox` opens the mechanics test room; `?level=N` skips the lobby and starts at level N. */

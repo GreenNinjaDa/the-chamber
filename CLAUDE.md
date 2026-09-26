@@ -332,6 +332,13 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   the wall when it's yours). The AI aims at your square or where you're heading, closes in otherwise, and once you're
   in its half keeps the back row home and plugs its holes. Reach an empty square of the far row to promote (a crown);
   the king topples over (BLACK RESIGNS), the pieces sink away and the exit opens.
+- **Level 99 — Hungry Hungry Hippos** (): you're a marble. The floor is a plastic dome (a huge static ball
+  collider, 2 m high in the middle) that slopes down to four giant toy hippos (), one poking out of a
+  hole in each wall, and 26 marbles pour in (16 more at 15 s). The slope drifts you outward (). Each hippo
+  picks the lane (aimable right round to the corners) with the most marbles, or you, lights it up on the floor for
+  0.85 s while it rears back, then shoots its neck out and CHOMPS everything in the lane: marbles, or you (swallowed,
+  chewed, burped). When the marbles are gone the winner is announced, the others doze off and the east (yellow) one
+  yawns with the exit portal in its mouth.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -378,7 +385,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   beanbag, piano bench: `spawnFurniture`, sofas and armchairs with seat / back / arm colliders so you stand on the
   cushions; `drawRug`, `drawPainting`), `giantDuck.ts` (a 4 m rubber duck you can stand on: a fixed body the level
   moves with `moveTo`, which carries a rider along), `elevator.ts` (the chamber as an elevator car: doors, handrails,
-  LED floor indicator `FloorIndicator`, button panel `CarPanel`, crosshead and grate, the scrolling shaft). `chess.ts` (chess pieces, a crown). Put new
+  LED floor indicator `FloorIndicator`, button panel `CarPanel`, crosshead and grate, the scrolling shaft). `chess.ts` (chess pieces, a crown), `hippo.ts` (a toy hippo head on an extending neck). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
