@@ -5,6 +5,7 @@ import {
 } from '../../entities/laser';
 import { ExitPortal, PortalArrival } from '../../entities/portal';
 import { CHAMBER_HALF } from '../../game/chamber';
+import type { Circle } from '../../game/player';
 import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus, type TrackedTarget, type WorldLabel } from '../level';
 
 /*
@@ -131,6 +132,7 @@ const HINTS: Record<DeathKind, string> = {
 const CONTROLS = 'Space jump · Stand still and look down to duck · Shift sprint';
 
 const pick = <T>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
+const NO_OBSTACLES: Circle[] = [];
 /** 0 up to x = 0, 1 from x = 1, smooth in between. */
 const smooth = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 
@@ -257,6 +259,7 @@ export class LaserLevel implements Level {
   };
   private sign: WorldLabel = { pos: [0, 6.2, -H + 0.05], text: 'DO NOT LOOK INTO LASER WITH REMAINING EYE', size: 0.6, color: '#ff4a3a' };
   private labelList: WorldLabel[] = [];
+  private pylonObstacle: Circle[] = [{ x: 0, z: 0, r: PYLON_RADIUS }];
 
   constructor(private ctx: LevelContext) {
     const { physics, hud } = ctx;
@@ -449,12 +452,15 @@ export class LaserLevel implements Level {
     const lo = Math.min(s.prevW, s.w), hi = Math.max(s.prevW, s.w);
     if (here < lo - BODY_REACH || here > hi + BODY_REACH) return false;
     const n = clamp(Math.ceil((hi - lo) / HIT_STEP), 1, 32);
-    const test = (a: Vec3, b: Vec3) => this.slicer.test(a[0], a[1], a[2], b[0], b[1], b[2]);
+    const slicer = this.slicer, alongZ = s.spec.axis === 'z';
+    // A beam from (u0, v0) to (u1, v1) on the wall at w, in world space.
+    const test = (u0: number, v0: number, u1: number, v1: number, w: number) =>
+      alongZ ? slicer.test(u0, v0, w, u1, v1, w) : slicer.test(w, v0, u0, w, v1, u1);
     for (let i = 1; i <= n; i++) {
       const w = s.prevW + ((s.w - s.prevW) * i) / n;
       if (Math.abs(w - here) > BODY_REACH) continue;
-      for (const l of s.hLines) if (test(s.point(l.u0, l.v, w), s.point(l.u1, l.v, w))) return true;
-      for (const l of s.vLines) if (test(s.point(l.u, l.v0, w), s.point(l.u, l.v1, w))) return true;
+      for (const l of s.hLines) if (test(l.u0, l.v, l.u1, l.v, w)) return true;
+      for (const l of s.vLines) if (test(l.u, l.v0, l.u, l.v1, w)) return true;
     }
     return false;
   }
@@ -506,7 +512,6 @@ export class LaserLevel implements Level {
   }
 
   private drawSweep(out: DrawItem[], s: Sweep) {
-    if (s.done && !this.finale) return;
     if (s.done) return;
     const k = s.intensity;
     const w = s.w;
@@ -587,7 +592,8 @@ export class LaserLevel implements Level {
   }
 
   obstacles() {
-    return this.pylon.rise > 0.3 ? [{ x: 0, z: 0, r: PYLON_RADIUS }] : [];
+    // Also shoves anyone standing on the hatch aside as it comes up.
+    return this.pylon.rise > 0.01 ? this.pylonObstacle : NO_OBSTACLES;
   }
 
   cameraShot(): CameraShot | null {
