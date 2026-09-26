@@ -85,6 +85,8 @@ export class JengaTower {
   tip = 0;
   /** Each layer's frame (origin at its bottom centre, tilted with the lean), recomputed by update(). */
   frames: Mat4[] = [];
+  /** How many layers it started with (all full): the ones above are blocks stacked on top. */
+  originalLayers = 0;
   /** Smoothed bend share of each layer. */
   private bend: number[] = [];
   private time = 0;
@@ -140,11 +142,6 @@ export class JengaTower {
     return 0;
   }
 
-  /** Whether a layer has all three blocks. */
-  full(k: number) {
-    return this.layers[k]?.every((b) => b && b.out < 0.5) ?? false;
-  }
-
   /** Presence (0-1) of each slot of layer k, counting a block sliding out as partly gone. */
   presence(k: number): number[] {
     return this.layers[k].map((b) => (b ? 1 - b.out : 0));
@@ -155,9 +152,6 @@ export class JengaTower {
     return this.presence(k).reduce((s, p) => s + (1 - p), 0);
   }
 
-  /** The height the original, full layers reach: layers above are the added ones. */
-  originalLayers = 0;
-
   /**
    * The lean the missing blocks and the extra blocks on top push toward (before amplification
    * and outside loads), as [x, z].
@@ -165,20 +159,20 @@ export class JengaTower {
   bias(): [number, number] {
     const out: [number, number] = [0, 0];
     const top = this.topLayer();
-    this.layers.forEach((row, k) => {
+    for (let k = 0; k < this.layers.length; k++) {
       const axis = k % 2 === 0 ? 0 : 1; // even layers: blocks along z, spread along x
       const pres = this.presence(k);
       const sum = pres[0] + pres[1] + pres[2];
-      if (sum < 1e-3) return;
+      if (sum < 1e-3) continue;
       if (k >= this.originalLayers || k === top) {
         // Stacked on top: their weight off-centre.
         for (let j = 0; j < 3; j++) out[axis] += pres[j] * SLOT_OFFSETS[j] * PLACE_BIAS_PER_M;
-        return;
+        continue;
       }
+      // A layer missing blocks: the rest of the tower leans toward the side that lost support.
       const centroid = (pres[0] * SLOT_OFFSETS[0] + pres[1] * SLOT_OFFSETS[1] + pres[2] * SLOT_OFFSETS[2]) / sum;
       out[axis] += -centroid * BIAS_PER_M;
-      void row;
-    });
+    }
     return out;
   }
 
