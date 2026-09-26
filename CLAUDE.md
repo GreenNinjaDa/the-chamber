@@ -25,7 +25,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   south-west corner two buttons change mouse speed and levers invert looking up/down and turn sound off
   (`src/game/settings.ts`, remembered in localStorage). Signs are floating world text
   (`Level.labels()`). **Pause menu** (`src/game/pauseMenu.ts`): Esc, or losing pointer lock (except by tabbing away in the lobby), opens Resume /
-  Restart / Back to the lobby.
+  Restart / Skip to the next chamber (or N while paused; doesn't count as beaten) / Back to the lobby.
   Idle in the lobby for 20 s (alive, no input at all) and it pranks you (`lobby/afk.ts`): a fridge on the head
   (gone after 5 s), a floor/air portal loop that bounces you 3–5 times (any input makes the portals vanish and
   drops you), or rarely a live grenade. The 20 s restart after each prank.

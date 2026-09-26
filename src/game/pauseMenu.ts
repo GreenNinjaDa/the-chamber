@@ -1,5 +1,5 @@
 /*
- * The pause menu: a DOM overlay with Resume / Restart / Lobby. Opens on Esc (or when the mouse
+ * The pause menu: a DOM overlay with Resume / Restart / Skip (N) / Lobby. Opens on Esc (or when the mouse
  * is released some other way, e.g. alt-tab).
  */
 
@@ -27,6 +27,8 @@ const QUIPS = [
 export interface PauseActions {
   resume(): void;
   restart(): void;
+  /** Skip ahead to the next chamber (also N while paused). */
+  next(): void;
   lobby(): void;
 }
 
@@ -35,6 +37,7 @@ export class PauseMenu {
   private root: HTMLDivElement;
   private quip: HTMLDivElement;
   private restartButton: HTMLButtonElement;
+  private nextButton: HTMLButtonElement;
   private lobbyButton: HTMLButtonElement;
 
   constructor(actions: PauseActions) {
@@ -60,8 +63,9 @@ export class PauseMenu {
       return b;
     };
     this.restartButton = button('Restart chamber', actions.restart);
+    this.nextButton = button('Skip to the next chamber (N)', actions.next);
     this.lobbyButton = button('Back to the lobby', actions.lobby);
-    box.append(title, this.quip, button('Resume', actions.resume), this.restartButton, this.lobbyButton);
+    box.append(title, this.quip, button('Resume', actions.resume), this.restartButton, this.nextButton, this.lobbyButton);
     this.root.append(box);
     // Clicking the backdrop resumes too.
     this.root.addEventListener('click', (e) => {
@@ -70,11 +74,12 @@ export class PauseMenu {
     document.body.appendChild(this.root);
   }
 
-  open(inLobby: boolean) {
+  open(inLobby: boolean, hasNext: boolean) {
     this.isOpen = true;
     this.quip.textContent = QUIPS[Math.floor(Math.random() * QUIPS.length)];
     this.restartButton.textContent = inLobby ? 'Restart lobby' : 'Restart chamber';
     this.lobbyButton.style.display = inLobby ? 'none' : 'block';
+    this.nextButton.style.display = hasNext ? 'block' : 'none';
     this.root.classList.add('open');
   }
 

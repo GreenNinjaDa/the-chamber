@@ -214,17 +214,28 @@ async function main() {
       startLevel();
       resume();
     },
+    next: skipToNext,
     lobby: () => {
       inLobby = true;
       startLevel();
       resume();
     },
   });
+  /** From the pause menu: on to the next chamber without beating this one. */
+  function canSkip() {
+    return !sandbox && !inLobby && levelIndex < LEVELS.length - 1;
+  }
+  function skipToNext() {
+    if (!canSkip()) return;
+    levelIndex++;
+    startLevel();
+    resume();
+  }
   function pause() {
     if (!playing || pauseMenu.isOpen) return;
     stopTunes();
     pausedAt = performance.now();
-    pauseMenu.open(inLobby);
+    pauseMenu.open(inLobby, canSkip());
     hud.crosshair('hidden');
     interaction.release();
   }
@@ -270,7 +281,8 @@ async function main() {
       else if (performance.now() - pausedAt > 300) resume();
     }
     if (playing && pauseMenu.isOpen) {
-      // Frozen: keep drawing, advance nothing.
+      // Frozen: keep drawing, advance nothing (N skips to the next chamber).
+      if (input.wasPressed('KeyN')) skipToNext();
     } else if (playing) {
       if (input.wasPressed('KeyR')) startLevel();
       // After a win, N moves on to the next chamber.
