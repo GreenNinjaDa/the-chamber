@@ -87,9 +87,9 @@ const HANG_OUT = 0.3;
 /** Feet below the hub when the claw grabs you (your head against the hub). */
 const GRIPPED = 2.3;
 const HEAD_TOP = 1.9;
-/** Landing faster than this (m/s) is fatal (about a 4.5 m fall); faster than HARD_LANDING knocks you down. */
+/** Landing faster than this (m/s) is fatal (about a 4.5 m fall); faster than HARD_LANDING (about 3 m) knocks you down. */
 const SPLAT_SPEED = 14;
-const HARD_LANDING = 10.5;
+const HARD_LANDING = 11.5;
 /** Wading: each toy crowding your legs takes this much off your speed, down to WADE_MIN. */
 const WADE_SLOW = 0.16;
 const WADE_MIN = 0.5;
@@ -249,9 +249,9 @@ export class ClawLevel implements Level {
     this.signs = [
       { pos: [0, 7.3, CHAMBER_HALF - 0.15], text: 'THE CLAW', size: 1.7, color: '#ffd23f' },
       { pos: [0, 6.25, CHAMBER_HALF - 0.15], text: 'A game of skill. Allegedly.', size: 0.42, color: '#f3dcff' },
-      { pos: [-CHAMBER_HALF + 0.15, 6.8, 0], text: 'WIN EVERY TIME!*', size: 1.0, color: '#7cf0ff' },
-      { pos: [-CHAMBER_HALF + 0.15, 5.9, 0], text: '*not every time', size: 0.34, color: '#f3dcff' },
-      { pos: [CHAMBER_HALF - 0.15, 6.8, 2], text: 'PLEASE DO NOT TAUNT THE CLAW', size: 0.6, color: '#ff9ad5' },
+      { pos: [-CHAMBER_HALF + 0.15, 4.2, 0], text: 'WIN EVERY TIME!*', size: 1.0, color: '#7cf0ff' },
+      { pos: [-CHAMBER_HALF + 0.15, 3.3, 0], text: '*not every time', size: 0.34, color: '#f3dcff' },
+      { pos: [CHAMBER_HALF - 0.15, 3.4, 2], text: 'PLEASE DO NOT TAUNT THE CLAW', size: 0.55, color: '#ff9ad5' },
       { pos: [CHUTE_IN - CHUTE_T - 0.05, 4.05, -CHUTE_IN + CHUTE_T + 0.05], text: 'PRIZES', size: 0.5, color: '#ffd23f' },
       { pos: [CHUTE_IN - CHUTE_T - 0.03, 1.05, -10.7], text: 'NO CLIMBING', size: 0.2, color: '#202020' },
       this.creditLabel,
@@ -520,7 +520,9 @@ export class ClawLevel implements Level {
         const hub = claw.hub();
         const hit = this.ctx.physics.raycast(hub, [0, -1, 0], 20, claw.collider);
         const surface = hit ? hit.point[1] : 0;
-        let stop = Math.max(surface + TIP_DEPTH - SINK, 1.1);
+        // Tips sink a little into a soft toy, and just touch a hard floor.
+        const soft = hit ? this.ctx.physics.bodyFor(hit.collider) !== undefined : false;
+        let stop = Math.max(surface + TIP_DEPTH - (soft ? SINK : 0.05), 1.1);
         let bonk = false;
         if (player.mode === 'control' && !player.inPortal && !this.death && distXZ(player.pos, hub) < 0.5) {
           const head = player.pos[1] + HEAD_TOP + HUB_BOTTOM;
@@ -1064,6 +1066,20 @@ export class ClawLevel implements Level {
     drawPortal(out, [CHUTE_C[0], PORTAL_Y, CHUTE_C[2]], [0, 1, 0], PORTAL_R * (1 + Math.sin(time * 3) * 0.02), false);
     this.claw.draw(out);
     this.arrival.draw(out);
+    // A soft pool of light on the floor right under the claw while it's out looking for something,
+    // so you can tell where it's going to come down.
+    if (this.phase === 'move' || this.phase === 'hover' || this.phase === 'drop' || this.phase === 'bottom') {
+      const hub = this.claw.hub();
+      const intent = this.phase === 'move' ? 0.3 : 0.55;
+      out.push({
+        mesh: 'cylinder',
+        model: mul(translation([hub[0], 0.03, hub[2]]), scaling([1.7, 0.02, 1.7])),
+        color: [0.55, 0.5, 0.95],
+        pattern: Pattern.blob,
+        param: intent,
+        shadow: false,
+      });
+    }
   }
 
   trackedTargets(): TrackedTarget[] {

@@ -86,6 +86,19 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   does the player from when the first boulder starts rolling until 5 m before the last jump (over the shaft), when the
   torch also goes out. The map is one fixed body (not kinematic: Rapier's character
   controller won't climb slopes on kinematic colliders).
+- **Level 6 — The Claw** (`src/levels/claw/`): you're a prize in a claw machine (dark felt floor, a glass
+  front, starry backdrops, chasing marquee bulbs). 44 plush toys (`entities/plush.ts`: three-eyed aliens, teddies,
+  giant ducks, beach balls; light, bouncy, settled into heaps before you arrive) slow you down when you wade through
+  them. The exit is the prize chute in the north-east corner (too tall to climb, a clear guard on top) with a portal
+  at the bottom. An unseen kid has three credits (display over the glass: CREDITS / TIME): each one the claw
+  (`entities/claw.ts`, on a gantry, swinging on its cable) wanders, decides (an alien, or more often each credit the
+  spot you're on), hovers till the clock runs out (a light pool marks the spot), drops (a direct hit on the head
+  knocks you), closes on whatever is nearest its axis, rises, jiggles (grabbed toys usually slip; the first one
+  usually makes it), and carries what's left to the chute. Hold E or left mouse near it while it's down to hang
+  off a prong (`player.mode = 'swinging'`) and it takes you to the chute; let go above ~4.5 m and you splat
+  (landing speed; ~3 m just knocks you down). Grabbed without holding on, you always slip at the jiggle. Out of
+  credits, the lights go out and every alien turns to stare at you, eyes glowing. The aliens chant ("Ooooh...
+  the claaaw!") as world labels.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -117,7 +130,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
 - `src/entities/` — things that can appear in more than one level (or the lobby / sandbox), each with its model:
   `junk.ts` (28 pieces of household junk; `spawnJunk(physics, junk('fridge'), pos)`), `grenade.ts` (pineapple
   model), `giant.ts`, `dart.ts`, `portal.ts` (entrance / exit portals), `props.ts` (Lever, Button), `cake.ts`, `companions.ts`,
-  `pressurePlate.ts`, `uselessBox.ts`, `rock.ts` (textured stone: `boulderModel`, `chunkModel`, `slabModel`, `shardModel`, `clusterModel`; `Pattern.rock`). Put new
+  `pressurePlate.ts`, `uselessBox.ts`, `rock.ts` (textured stone: `boulderModel`, `chunkModel`, `slabModel`, `shardModel`, `clusterModel`; `Pattern.rock`), `plush.ts` (plush toys: `spawnPlush(physics, 'alien', pos, look)`),
+  `claw.ts` (claw-machine claw and gantry: `driveTo`, hub height `y`, prong `angle`, `distanceTo` for grabbing it). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
