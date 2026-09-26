@@ -1,4 +1,4 @@
-import { noise, note, sfx, tone, Tune } from '../../engine/audio';
+import { Drone, noise, note, sfx, tone, Tune } from '../../engine/audio';
 import { basis, clamp, cross, mul, normalize, quatMul, rotationX, rotationY, rotationZ, scaling, segment, toQuat, translation, type Vec3 } from '../../engine/math';
 import { RAPIER, type Body } from '../../engine/physics';
 import { Pattern, type DrawItem } from '../../engine/renderer';
@@ -47,21 +47,33 @@ const HUNT_PER_M = 1.25;
 const DAWDLE_EVERY: [number, number] = [5, 9];
 const DAWDLE_FOR = 1.1;
 /**
- * Once it can roll you up, the King drops in something big every DELIVERY_EVERY seconds (up to
- * DELIVERIES), marked by a beam for DELIVERY_WARN seconds first.
+ * Once it can roll you up, the King helps his prince: every DELIVERY_EVERY seconds (up to
+ * DELIVERIES) something big it can roll up drops in from the sky, usually in its path, marked by
+ * a beam for DELIVERY_WARN seconds first.
  */
-const DELIVERY_EVERY = 8;
-const DELIVERIES = 6;
+const DELIVERY_EVERY = 5.5;
+const DELIVERIES = 14;
 const DELIVERY_WARN = 1.3;
-const DELIVERY_ITEMS = ['fridge', 'vending machine', 'piano', 'couch', 'bathtub', 'bookcase', 'mattress', 'washing machine'];
+const DELIVERY_ITEMS = ['couch', 'mattress', 'bookcase', 'fridge', 'vending machine', 'bathtub', 'piano', 'filing cabinet', 'washing machine'];
 /** Acceleration (m/s²): BASE + PER_M × diameter, at most ACCEL_MAX. */
 const ACCEL_BASE = 3.5;
 const ACCEL_PER_M = 1.2;
 const ACCEL_MAX = 8;
+/** Sideways (turning) acceleration is limited to this share of that. */
+const TURN_SHARE = 0.6;
 /** When hunting it aims where you'll be this far ahead (s). */
 const LEAD = 0.35;
+/** When it first gets big enough to roll you up, it stops and "notices" you for this long (s) first. */
+const NOTICE_TIME = 1.4;
 /** Rolled up if your middle comes within this of its surface (m). */
 const EAT_REACH = 0.42;
+/**
+ * Hunting, it still takes a detour of up to SNACK_TIME seconds for anything of at least SNACK_AREA
+ * (m²) within SNACK_REACH of its surface, ahead of it.
+ */
+const SNACK_AREA = 0.4;
+const SNACK_REACH = 2.5;
+const SNACK_TIME = 1.4;
 /** A target it can't get to in this long is ignored for a while. */
 const GIVE_UP_AFTER = 4;
 const IGNORE_FOR = 10;
@@ -99,6 +111,10 @@ const rainbow = (h: number) => [1.5 + Math.sin(h) * 1.3, 1.5 + Math.sin(h + 2.1)
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
 type Phase = 'arrival' | 'intro' | 'rolling' | 'star' | 'timeout' | 'eaten';
+
+/** A junk definition's full extents. */
+const dimsOfDef = (def: JunkDef): Vec3 =>
+  def.shape === 'box' ? def.size : def.shape === 'ball' ? [def.size[0] * 2, def.size[0] * 2, def.size[0] * 2] : [def.size[0] * 2, def.size[1], def.size[0] * 2];
 
 /** A royal delivery: a rainbow shaft of light from the sky down onto `spot`, `k` (0-1) strong. */
 function drawBeam(out: DrawItem[], time: number, spot: Vec3, k: number) {
@@ -151,6 +167,9 @@ export class KatamariLevel implements Level {
   private touching = new Set<Body>();
   /** What the prince is heading for, and how he's getting on. */
   private target: Thing | null = null;
+  /** While hunting: something big it has spotted right in front of it, and for how much longer it'll try. */
+  private snack: Thing | null = null;
+  private snackT = 0;
   private targetBest = Infinity;
   private targetSince = 0;
   private ignored = new Map<Thing, number>();
@@ -161,6 +180,9 @@ export class KatamariLevel implements Level {
   private dodgeDir: [number, number] = [1, 0];
   private hunting = false;
   private dangerous = false;
+  /** Seconds left of the pause when the prince first notices you're bite-sized. */
+  private noticeT = 0;
+  private alert: WorldLabel = { pos: [0, 0, 0], text: '', size: 1.1, color: '#ff3b2f' };
   private dawdleIn = rand(DAWDLE_EVERY[0], DAWDLE_EVERY[1]);
   private dawdleT = 0;
   /** Royal deliveries: how many so far, the countdown to the next, and the one on its way. */
@@ -174,6 +196,7 @@ export class KatamariLevel implements Level {
   private stickSoundT = 0;
   private bonkT = 0;
   private tune = new Tune(ROLLING_TUNE, 150, { wave: 'square', vol: 0.07, bass: true });
+  private rumble = new Drone(45, { wave: 'sawtooth', vol: 0.09, wobble: 4 });
   /** Rolled up: which way the player sticks out of the ball (in its frame) and their head's direction. */
   private riderDir: Vec3 = [0, 1, 0];
   private riderUp: Vec3 = [1, 0, 0];
@@ -202,7 +225,9 @@ export class KatamariLevel implements Level {
   private kingLine1: WorldLabel = { pos: [0, 0, 0], text: '', size: 1, color: '#ffffff' };
   private kingLine2: WorldLabel = { pos: [0, 0, 0], text: '', size: 1, color: '#ffffff' };
   private kingT = 0;
-  private labelList: WorldLabel[] = [this.title1, this.title2, this.readout, this.clockLabel, this.youLabel, this.kingHead, this.kingLine1, this.kingLine2];
+  private labelList: WorldLabel[] = [
+    this.title1, this.title2, this.readout, this.clockLabel, this.youLabel, this.alert, this.kingHead, this.kingLine1, this.kingLine2,
+  ];
 
   constructor(private ctx: LevelContext) {
     this.number = ctx.number;
@@ -427,11 +452,35 @@ export class KatamariLevel implements Level {
       if (left - dt <= 0) this.ignored.delete(thing);
       else this.ignored.set(thing, left - dt);
     }
-    this.hunting = this.phase === 'rolling' && this.dangerous && player.mode === 'control' && !player.inPortal;
+    this.hunting = this.phase === 'rolling' && this.dangerous && this.noticeT <= 0 && player.mode === 'control' && !player.inPortal;
     if (this.hunting) {
       this.target = null;
+      // Hunting, but anything big and tasty right in front of it gets a quick detour.
+      if (this.snack) {
+        this.snackT -= dt;
+        if (!this.byBody.has(this.snack.body)) this.snack = null;
+        else if (this.snackT <= 0) {
+          this.ignored.set(this.snack, 4);
+          this.snack = null;
+        }
+      }
+      if (!this.snack && (this.rethink -= dt) <= 0) {
+        this.rethink = 0.3;
+        const h = this.kat.heading, R = this.kat.radius;
+        for (const thing of this.things) {
+          if (thing.area < SNACK_AREA || !this.canPick(thing.size) || this.ignored.has(thing)) continue;
+          const p = thing.body.rb.translation();
+          const dx = p.x - c[0], dz = p.z - c[2], dist = Math.hypot(dx, dz);
+          if (dist - R < SNACK_REACH && (dx * h[0] + dz * h[1]) > 0.3 * dist) {
+            this.snack = thing;
+            this.snackT = SNACK_TIME;
+            break;
+          }
+        }
+      }
       return;
     }
+    this.snack = null;
     this.rethink -= dt;
     if (this.target && this.rethink > 0) return;
     this.rethink = 0.8;
@@ -462,7 +511,10 @@ export class KatamariLevel implements Level {
     const c = this.kat.centre();
     const d = this.kat.diameter;
     let goal: Vec3;
-    if (this.hunting) {
+    if (this.hunting && this.snack) {
+      const p = this.snack.body.rb.translation();
+      goal = [p.x, 0, p.z];
+    } else if (this.hunting) {
       goal = [player.pos[0] + player.vel[0] * LEAD, 0, player.pos[2] + player.vel[2] * LEAD];
     } else if (this.target) {
       const p = this.target.body.rb.translation();
@@ -498,6 +550,7 @@ export class KatamariLevel implements Level {
         this.dawdleT = DAWDLE_FOR;
       }
     } else this.dawdleT = 0;
+    if (this.noticeT > 0) speed = 0;
     this.kat.cheer = this.dawdleT > 0 ? Math.min(1, this.dawdleT * 4, (DAWDLE_FOR - this.dawdleT) * 6) : 0;
     // Wedged against something big: back off to one side for a moment.
     const hs = Math.hypot(v.x, v.z);
@@ -519,6 +572,16 @@ export class KatamariLevel implements Level {
     } else this.stuckT = 0;
     const accel = Math.min(ACCEL_MAX, ACCEL_BASE + ACCEL_PER_M * d);
     let ax = dx * speed - v.x, az = dz * speed - v.z;
+    // A big ball has momentum: it can speed up or brake harder than it can swerve.
+    if (hs > 0.5) {
+      const fx = v.x / hs, fz = v.z / hs;
+      const along = ax * fx + az * fz;
+      const side = -ax * fz + az * fx;
+      const sideMax = accel * TURN_SHARE * dt;
+      const s = clamp(side, -sideMax, sideMax);
+      ax = fx * along - fz * s;
+      az = fz * along + fx * s;
+    }
     const a = Math.hypot(ax, az), maxA = accel * dt;
     if (a > maxA) {
       ax *= maxA / a;
@@ -634,6 +697,14 @@ export class KatamariLevel implements Level {
     }
     if (this.phase === 'rolling' || this.phase === 'eaten') this.tune.start();
     else this.tune.stop();
+    // A rumble when it's big enough to eat you and bearing down.
+    const c = this.kat.centre();
+    const gap = Math.hypot(c[0] - player.pos[0], c[2] - player.pos[2]) - this.kat.radius;
+    if (this.phase === 'rolling' && this.dangerous && gap < 7 && player.mode === 'control') {
+      const v = this.kat.body.rb.linvel();
+      this.rumble.setFreq(38 + Math.hypot(v.x, v.z) * 3);
+      this.rumble.start();
+    } else this.rumble.stop();
 
     // Keep the player out of the ball (it doesn't push the capsule by itself).
     this.circles = this.noCircles;
@@ -698,6 +769,8 @@ export class KatamariLevel implements Level {
 
     if (!this.dangerous && d >= PLAYER_SIZE / PICK) {
       this.dangerous = true;
+      this.noticeT = NOTICE_TIME;
+      this.alert.text = '!';
       this.tune.bpm = 184;
       this.ctx.camera.addShake(0.25);
       // A sting: something is now the right size.
@@ -708,9 +781,15 @@ export class KatamariLevel implements Level {
     }
     this.milestones(d);
     if (this.dangerous) this.updateDeliveries(dt);
+    if (this.noticeT > 0) {
+      // The prince has noticed you: a moment's pause (and a '!') before it comes for you.
+      const c = this.kat.centre();
+      this.alert.pos = [c[0], c[1] + this.kat.radius + 0.9 + Math.sin(this.noticeT * 20) * 0.08, c[2]];
+      if ((this.noticeT -= dt) <= 0) this.alert.text = '';
+    }
 
     // Rolled up: you count as stuff now.
-    if (this.dangerous && player.mode === 'control' && !player.inPortal) {
+    if (this.dangerous && this.noticeT <= 0 && player.mode === 'control' && !player.inPortal) {
       const c = this.kat.centre();
       const reach = this.reachAtPlayer();
       if (reach > 0 && Math.hypot(player.pos[0] - c[0], player.pos[2] - c[2]) < reach + EAT_REACH) {
@@ -752,14 +831,35 @@ export class KatamariLevel implements Level {
     }
     if (this.delivered >= DELIVERIES || (this.deliveryIn -= dt) > 0) return;
     const c = this.kat.centre(), R = this.kat.radius;
-    let spot: Vec3 = [0, 0, 0];
-    for (let tries = 0; tries < 40; tries++) {
-      spot = [rand(-9.5, 9.5), 0, rand(-9.5, 9.5)];
-      const clear = Math.hypot(spot[0] - player.pos[0], spot[2] - player.pos[2]) > 4.5 &&
-        Math.hypot(spot[0] - c[0], spot[2] - c[2]) > R + 2.5 && !(spot[0] > 7 && Math.abs(spot[2]) < 3);
-      if (clear) break;
+    const clearOf = (x: number, z: number, fromPlayer: number) => Math.abs(x) < 9.8 && Math.abs(z) < 9.8 &&
+      Math.hypot(x - player.pos[0], z - player.pos[2]) > fromPlayer && Math.hypot(x - c[0], z - c[2]) > R + 1.2 &&
+      !(x > 7 && Math.abs(z) < 3);
+    // Every other one lands between it and you (it'll roll straight into it); the rest somewhere to lead it to.
+    let spot: Vec3 | null = null;
+    let warn = 0;
+    if (this.delivered % 2 === 0) {
+      // Straight onto its path, where it'll be when this lands (a quick flash, no warning: you're well clear).
+      const v = this.kat.body.rb.linvel();
+      const dx = player.pos[0] - c[0], dz = player.pos[2] - c[2], dist = Math.hypot(dx, dz);
+      const x = c[0] + v.x * 0.9 + (dx / dist) * (R + 1.3), z = c[2] + v.z * 0.9 + (dz / dist) * (R + 1.3);
+      if (clearOf(x, z, 3.6) && Math.hypot(x - c[0], z - c[2]) < dist) {
+        spot = [x, 0, z];
+        warn = DELIVERY_WARN - 0.3;
+      }
     }
-    this.delivery = { spot, t: 0, name: DELIVERY_ITEMS[(this.delivered + Math.floor(rand(0, 3))) % DELIVERY_ITEMS.length] };
+    // Not where you're running to, either.
+    const pv = player.vel, ps = Math.hypot(pv[0], pv[2]);
+    for (let tries = 0; !spot && tries < 60; tries++) {
+      const x = rand(-9.5, 9.5), z = rand(-9.5, 9.5);
+      const rx = x - player.pos[0], rz = z - player.pos[2], dist = Math.hypot(rx, rz);
+      const ahead = ps > 1 && (rx * pv[0] + rz * pv[2]) / (dist * ps) > 0.5;
+      if (clearOf(x, z, 5.5) && dist < 12 && !ahead) spot = [x, 0, z];
+    }
+    if (!spot) return;
+    // Something it can roll up right away: one of the biggest that fit.
+    const edible = DELIVERY_ITEMS.filter((n) => this.canPick(bigTwo(dimsOfDef(junk(n)))[0]));
+    if (!edible.length) return;
+    this.delivery = { spot, t: warn, name: edible[Math.floor(Math.random() * Math.min(3, edible.length))] };
     this.delivered++;
     this.deliveryIn = DELIVERY_EVERY;
     tone(note('E6'), 0.6, { to: note('E5'), wave: 'sine', vol: 0.14 });
