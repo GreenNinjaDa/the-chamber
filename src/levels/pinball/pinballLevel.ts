@@ -622,7 +622,8 @@ export class PinballLevel implements Level {
         if (this.phaseT > 7) this.startPlay();
         break;
       case 'play':
-        if (this.ballQueue > 0) {
+        // (New balls are dropped into the shooter lane, so not while the player is in it.)
+        if (this.ballQueue > 0 && !this.playerInLane()) {
           this.ballQueueT -= dt;
           if (this.ballQueueT <= 0) {
             this.ballQueue--;
@@ -1092,7 +1093,7 @@ export class PinballLevel implements Level {
       const p = rb.translation();
       const v = rb.linvel();
       if (b.state === 'drained') {
-        if (b.t > 1.4) {
+        if (b.t > 1.4 && !this.playerInLane()) {
           // Ball save: back into the shooter lane.
           b.state = 'play';
           b.t = 0;
