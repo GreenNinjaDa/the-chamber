@@ -84,6 +84,13 @@ const FALL_STUN = 0.1;
 // out of the walls. They're not solid: touching one knocks you loose for a moment.
 const SPIKE_STUN = 0.5;
 const SPIKE_R = 0.16;
+/** Spike lengths vary by this factor; full rows (which have to be jumped) stay shorter. */
+const SPIKE_LENGTH: [number, number] = [0.8, 1.5];
+const FULL_ROW_LENGTH: [number, number] = [0.6, 1.2];
+/** Extra spikes scattered at random. */
+const RANDOM_WALL_SPIKES = 40;
+const RANDOM_FLOOR_SPIKES = 12;
+const RANDOM_CEILING_SPIKES = 12;
 /** x positions of a row: some leave a way past, a full row has to be jumped. */
 const ROWS = {
   left: [-1.8, -1.2, -0.6, 0],
@@ -311,16 +318,44 @@ export class TempleLevel implements Level {
   }
 
   private placeSpikes() {
-    // Every spike a different length (0.8-1.5x) and a little off the grid, so they look hand-set.
-    const add1 = (base: Vec3, dir: Vec3, len: number) => {
-      const k = 0.8 + Math.random() * 0.7;
+    // Every spike a different length and a little off the grid, so they look hand-set. Full rows
+    // (which have to be jumped) stay on the short side.
+    const add1 = (base: Vec3, dir: Vec3, len: number, [lo, hi] = SPIKE_LENGTH) => {
+      const k = lo + Math.random() * (hi - lo);
       const tip = add(base, scale(dir, len * k));
       this.pathSpikes.push({ base, tip, radius: SPIKE_R * (0.85 + k * 0.15) });
     };
     const jitter = () => (Math.random() - 0.5) * 0.3;
-    for (const [z, xs] of FLOOR_ROWS) for (const x of xs) add1([x + jitter(), 0, z + jitter() * 1.5], [0, 1, 0], 0.7);
-    for (const [z, xs] of CEILING_ROWS) for (const x of xs) add1([x + jitter(), H, z + jitter() * 1.5], [0, -1, 0], 0.7);
+    const range = (xs: number[]) => (xs === ROWS.full ? FULL_ROW_LENGTH : SPIKE_LENGTH);
+    for (const [z, xs] of FLOOR_ROWS) for (const x of xs) add1([x + jitter(), 0, z + jitter() * 1.5], [0, 1, 0], 0.7, range(xs));
+    for (const [z, xs] of CEILING_ROWS) for (const x of xs) add1([x + jitter(), H, z + jitter() * 1.5], [0, -1, 0], 0.7, range(xs));
     for (const [z, side, y] of WALL_SPIKES) add1([(side * W) / 2, y + jitter(), z + jitter() * 1.5], [-side, 0, 0], 0.9);
+
+    // And plenty more at random: mostly on the walls (any height), some single ones on the floor
+    // and ceiling. Kept clear of the arrival spot, the plate and the portal, and off pit openings.
+    const clear = (z: number) => z > SPAWN_Z + 3 && Math.abs(z - PLATE_Z) > 2.5 && z < END_Z - 1;
+    const overGap = (z: number, gaps: [number, number][]) => gaps.some(([a, b]) => z > a - 0.3 && z < b + 0.3);
+    const pick = (ok: (z: number) => boolean) => {
+      for (let tries = 0; tries < 40; tries++) {
+        const z = Z_START + 4 + Math.random() * (END_Z - Z_START - 5);
+        if (clear(z) && ok(z)) return z;
+      }
+      return null;
+    };
+    for (let i = 0; i < RANDOM_WALL_SPIKES; i++) {
+      const z = pick(() => true);
+      if (z === null) continue;
+      const side = Math.random() < 0.5 ? -1 : 1;
+      add1([(side * W) / 2, 0.3 + Math.random() * (H - 0.6), z], [-side, 0, 0], 0.6 + Math.random() * 0.7);
+    }
+    for (let i = 0; i < RANDOM_FLOOR_SPIKES; i++) {
+      const z = pick((z) => !overGap(z, FLOOR_PITS));
+      if (z !== null) add1([(Math.random() * 2 - 1) * (W / 2 - 0.4), 0, z], [0, 1, 0], 0.7);
+    }
+    for (let i = 0; i < RANDOM_CEILING_SPIKES; i++) {
+      const z = pick((z) => !overGap(z, [...CEILING_PITS, SHAFT]));
+      if (z !== null) add1([(Math.random() * 2 - 1) * (W / 2 - 0.4), H, z], [0, -1, 0], 0.7);
+    }
   }
 
   private scatterRocks() {
