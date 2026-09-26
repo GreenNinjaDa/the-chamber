@@ -91,6 +91,8 @@ const FULL_ROW_LENGTH: [number, number] = [0.6, 1.2];
 const RANDOM_WALL_SPIKES = 40;
 const RANDOM_FLOOR_SPIKES = 12;
 const RANDOM_CEILING_SPIKES = 12;
+/** No spikes at all within this far of where the player arrives (m, along the tunnel). */
+const SPAWN_CLEAR = 8.5;
 /** x positions of a row: some leave a way past, a full row has to be jumped. */
 const ROWS = {
   left: [-1.8, -1.2, -0.6, 0],
@@ -334,7 +336,7 @@ export class TempleLevel implements Level {
 
     // And plenty more at random: mostly on the walls (any height), some single ones on the floor
     // and ceiling. Kept clear of the arrival spot, the plate and the portal, and off pit openings.
-    const clear = (z: number) => z > SPAWN_Z + 3 && Math.abs(z - PLATE_Z) > 2.5 && z < END_Z - 1;
+    const clear = (z: number) => Math.abs(z - SPAWN_Z) > SPAWN_CLEAR && Math.abs(z - PLATE_Z) > 2.5 && z < END_Z - 1;
     const overGap = (z: number, gaps: [number, number][]) => gaps.some(([a, b]) => z > a - 0.3 && z < b + 0.3);
     const pick = (ok: (z: number) => boolean) => {
       for (let tries = 0; tries < 40; tries++) {
@@ -357,6 +359,8 @@ export class TempleLevel implements Level {
       const z = pick((z) => !overGap(z, [...CEILING_PITS, SHAFT]));
       if (z !== null) add1([(Math.random() * 2 - 1) * (W / 2 - 0.4), H, z], [0, -1, 0], 0.7);
     }
+    // Nothing right where you arrive (the placed rows and wall spikes included).
+    this.pathSpikes = this.pathSpikes.filter((sp) => Math.abs(sp.base[2] - SPAWN_Z) > SPAWN_CLEAR);
   }
 
   private scatterRocks() {
