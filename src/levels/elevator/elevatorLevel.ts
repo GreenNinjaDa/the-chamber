@@ -5,8 +5,8 @@ import {
 import { GRAVITY, type Body } from '../../engine/physics';
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
 import {
-  addCarColliders, CABLE_OFFSETS, cableTop, carRails, DOOR_Z, drawCarTop, drawDoors, drawRails, drawShaft, floorAt, floorLabel, FloorIndicator,
-  FLOOR_H, HITCH, landingY, RAIL_Y, railNearest, railPoint, SHAFT_HALF, TOP_FLOOR, type Rail,
+  addCarColliders, CABLE_OFFSETS, cableTop, CarPanel, carRails, DOOR_Z, drawCarTop, drawDoors, drawRails, drawShaft, floorAt, floorLabel, FloorIndicator,
+  FLOOR_H, HITCH, landingY, RAIL_Y, railNearest, railPoint, SHAFT_HALF, STOP_BUTTON, TOP_FLOOR, type Rail,
 } from '../../entities/elevator';
 import { junk, spawnJunk } from '../../entities/junk';
 import { drawPortal, ExitPortal, PortalArrival } from '../../entities/portal';
@@ -143,6 +143,22 @@ const CRUSHES: Record<string, [string, string]> = {
   bookcase: ['BOOKED', 'You always said you wanted to get into a good book.'],
   'oil drum': ['DRUMMED OUT', 'Ba-dum-tss.'],
 };
+
+/** What the EMERGENCY STOP button says, depending on how things are going. */
+const STOP_RIDING = [
+  'EMERGENCY STOP: this is not an emergency.',
+  'Stopping between floors is a premium feature.',
+  'Please stop pressing the button.',
+  'The button has been reported to the button.',
+];
+const STOP_FALLING = [
+  'Your emergency is important to us. Please hold.',
+  'Emergency noted. Gravity has not been informed.',
+  'You are caller number 99. No, 80. No, 61...',
+  'Have you tried turning it off and on again?',
+];
+const STOP_LANDED = ["Stopped. You're welcome.", 'Emergency over. Mostly.'];
+const STOP_COLOR = '#ffd9d0';
 
 const TIPS: [string, string][] = [
   ['Hint', "Grab a handrail (hold E or left mouse) and be holding on when it hits the bottom. Don't be under anything heavy."],
@@ -288,6 +304,8 @@ export class ElevatorLevel implements Level {
   /** The car's fixed fittings (crosshead, grate, lights, rails, signs), and its strip lights' glow. */
   private fittings: DrawItem[] = [];
   private glow = [...STRIP_LIGHT];
+  private panel: CarPanel;
+  private stopQuips: string[] = [];
   /** The weightless player's position and velocity after the last update (to spot bumping into things). */
   private lastPos: Vec3 = [0, 0, 0];
   private lastVel: Vec3 = [0, 0, 0];
@@ -337,6 +355,7 @@ export class ElevatorLevel implements Level {
     for (let i = 0; i < 12; i++) this.landingLabels.push({ pos: [0, 0, 0], text: '', size: 1.3, color: '#d9d3bf' });
 
     drawCarTop(this.fittings, this.glow);
+    this.panel = new CarPanel(physics, () => this.pressedStop());
     drawRails(this.fittings, this.rails);
     this.drawSigns(this.fittings);
 
@@ -390,6 +409,7 @@ export class ElevatorLevel implements Level {
     this.updateGrip(dt);
     if (this.stage === 'fall') this.updateWeightless(dt);
     this.updateCargo(dt);
+    this.panel.update(dt);
     this.updateEffects(dt);
     this.updateIndicators(dt);
     this.updateEnvironment(dt);
@@ -585,6 +605,19 @@ export class ElevatorLevel implements Level {
       this.die(big, small);
       return;
     }
+  }
+
+  /** The big red EMERGENCY STOP button. It has opinions, and no wiring. */
+  private pressedStop() {
+    const quips = this.stage === 'fall' ? STOP_FALLING : this.stage === 'landed' ? STOP_LANDED : STOP_RIDING;
+    // Go through them in order of the list before repeating any.
+    const unused = quips.filter((q) => !this.stopQuips.includes(q));
+    const text = unused.length ? unused[0] : pick(quips);
+    this.stopQuips.push(text);
+    // One at a time: the new one replaces the last.
+    for (const s of this.sfx) if (s.label.color === STOP_COLOR) s.ttl = 0;
+    this.say(text, add(STOP_BUTTON, [-0.4, 0.55, 0]), 0.16, STOP_COLOR, 2.6, [0, 0.12, 0]);
+    this.ctx.camera.addShake(0.05);
   }
 
   private die(big: string, small: string) {
@@ -914,6 +947,7 @@ export class ElevatorLevel implements Level {
     drawDoors(out, this.doorOpen);
     if (this.doorOpen > 0.3) drawPortal(out, this.exit.centre, [-1, 0, 0], 1.2 * clamp((this.doorOpen - 0.3) / 0.4, 0, 1), true);
     for (const d of this.indicators) d.draw(out);
+    this.panel.draw(out);
     this.drawCables(out, time);
     for (const p of this.puffs) {
       const k = p.age / p.life;

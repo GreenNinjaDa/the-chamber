@@ -1,5 +1,5 @@
 import { add, clamp, cross, easeInOut, mul, rotationZ, scale, scaling, segment, translation, type Vec3 } from '../engine/math';
-import type { Physics } from '../engine/physics';
+import type { Physics, Usable } from '../engine/physics';
 import { Pattern, type DrawItem } from '../engine/renderer';
 import { CHAMBER_HALF, WALL_HEIGHT } from '../game/chamber';
 import { PixelText } from './pixelText';
@@ -129,6 +129,55 @@ export function drawDoors(out: DrawItem[], open: number) {
   out.push({ mesh: 'box', model: mul(translation([CHAMBER_HALF - 0.3, 0.01, DOOR_Z]), scaling([0.6, 0.02, DOOR_W + JAMB * 2])), color: [0.4, 0.41, 0.43], spec: 0.9 });
   // Mind the gap.
   out.push({ mesh: 'box', model: mul(translation([CHAMBER_HALF - 0.52, 0.012, DOOR_Z]), scaling([0.1, 0.022, DOOR_W])), color: [0.95, 0.75, 0.05] });
+}
+
+/** The button panel beside the doors (south of them), and where its big red button is. */
+const PANEL_Z = DOOR_Z + DOOR_W / 2 + JAMB + 0.5;
+const PANEL_Y = 1.8;
+export const STOP_BUTTON: Vec3 = [CHAMBER_HALF - 0.08, PANEL_Y - 0.38, PANEL_Z];
+
+/**
+ * The car's button panel: two columns of little floor buttons and a big red EMERGENCY STOP that
+ * E presses (it calls `onPress`; what that achieves is up to the level. Usually nothing).
+ */
+export class CarPanel implements Usable {
+  highlight = 0;
+  private time = 0;
+  private pressedAt = -10;
+  private items: DrawItem[] = [];
+
+  constructor(physics: Physics, private onPress: () => void) {
+    const collider = physics.addStaticBox(STOP_BUTTON, [0.24, 0.3, 0.3]);
+    physics.registerUsable(collider, this);
+    const x = CHAMBER_HALF - 0.03;
+    const face = rotationZ(Math.PI / 2); // cylinders facing out of the east wall
+    this.items.push({ mesh: 'box', model: mul(translation([x, PANEL_Y, PANEL_Z]), scaling([0.05, 1.1, 0.5])), color: STEEL, spec: 0.8 });
+    for (let row = 0; row < 7; row++) {
+      for (const dz of [-0.1, 0.1]) {
+        const lit = row === 6 && dz > 0; // the top floor, where we are
+        this.items.push({ mesh: 'cylinder', model: mul(translation([x - 0.03, PANEL_Y - 0.1 + row * 0.08, PANEL_Z + dz]), face, scaling([0.028, 0.02, 0.028])), color: lit ? [2.4, 1.2, 0.2] : [0.8, 0.8, 0.78], pattern: lit ? Pattern.emissive : undefined, spec: 0.8 });
+      }
+    }
+    // A keyhole nobody has the key for.
+    this.items.push({ mesh: 'box', model: mul(translation([x - 0.03, PANEL_Y + 0.46, PANEL_Z]), scaling([0.01, 0.05, 0.015])), color: DARK });
+  }
+
+  use() {
+    this.pressedAt = this.time;
+    this.onPress();
+  }
+
+  update(dt: number) {
+    this.time += dt;
+  }
+
+  draw(out: DrawItem[]) {
+    for (const item of this.items) out.push(item);
+    const depress = this.time - this.pressedAt < 0.25 ? 0.03 : 0;
+    const [bx, by, bz] = STOP_BUTTON;
+    out.push({ mesh: 'cylinder', model: mul(translation([bx + 0.02, by, bz]), rotationZ(Math.PI / 2), scaling([0.12, 0.06, 0.12])), color: [0.85, 0.75, 0.1], spec: 0.5 });
+    out.push({ mesh: 'cylinder', model: mul(translation([bx - 0.04 + depress, by, bz]), rotationZ(Math.PI / 2), scaling([0.085, 0.08, 0.085])), color: [0.8, 0.06, 0.04], spec: 0.8, highlight: this.highlight });
+  }
 }
 
 /**
