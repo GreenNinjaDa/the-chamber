@@ -1,4 +1,5 @@
 import { Sandbox } from './dev/sandbox';
+import { audioState, sfx, stopTunes, unlockAudio } from './engine/audio';
 import { Input } from './engine/input';
 import { mul, multiply, scaling, translation, type Mat4, type Vec3 } from './engine/math';
 import { initPhysics, Physics } from './engine/physics';
@@ -12,6 +13,7 @@ import { Player } from './game/player';
 import { settings } from './game/settings';
 import { DartsLevel } from './levels/darts/dartsLevel';
 import { CakeLevel } from './levels/cake/cakeLevel';
+import { ClawLevel } from './levels/claw/clawLevel';
 import { GrenadeLevel } from './levels/grenade/grenadeLevel';
 import { LavaLevel } from './levels/lava/lavaLevel';
 import { TempleLevel } from './levels/temple/templeLevel';
@@ -20,10 +22,22 @@ import { SunburnLevel } from './levels/sunburn/sunburnLevel';
 import { MinesLevel } from './levels/mines/minesLevel';
 import { FroggerLevel } from './levels/frogger/froggerLevel';
 import { ChairsLevel } from './levels/chairs/chairsLevel';
+import { HexagoneLevel } from './levels/hexagone/hexagoneLevel';
+import { TetrisLevel } from './levels/tetris/tetrisLevel';
+import { DodgeballLevel } from './levels/dodgeball/dodgeballLevel';
+import { ButtonLevel } from './levels/button/buttonLevel';
+import { MicrowaveLevel } from './levels/microwave/microwaveLevel';
+import { QuizLevel } from './levels/quiz/quizLevel';
+import { DuckHuntLevel } from './levels/duckhunt/duckHuntLevel';
+import { PinataLevel } from './levels/pinata/pinataLevel';
+import { DominoesLevel } from './levels/dominoes/dominoesLevel';
+import { StealthLevel } from './levels/stealth/stealthLevel';
 import { RedLightLevel } from './levels/redLight/redLightLevel';
 import { LaserLevel } from './levels/lasers/laserLevel';
 import { GnomeLevel } from './levels/gnomes/gnomeLevel';
 import { SnakeLevel } from './levels/snake/snakeLevel';
+import { PacmanLevel } from './levels/pacman/pacmanLevel';
+import { BowlingLevel } from './levels/bowling/bowlingLevel';
 import { ElevatorLevel } from './levels/elevator/elevatorLevel';
 import type { Level, LevelContext, TrackedTarget, WorldLabel } from './levels/level';
 import { LobbyLevel } from './levels/lobby/lobbyLevel';
@@ -40,14 +54,27 @@ const LEVELS: ((ctx: LevelContext) => Level)[] = [
   (ctx) => new LavaLevel(ctx),
   (ctx) => new TempleLevel(ctx),
   (ctx) => new SimonLevel(ctx),
-  (ctx) => new SunburnLevel(ctx),
-  (ctx) => new MinesLevel(ctx),
   (ctx) => new RedLightLevel(ctx),
-  (ctx) => new LaserLevel(ctx),
-  (ctx) => new GnomeLevel(ctx),
-  (ctx) => new FroggerLevel(ctx),
-  (ctx) => new SnakeLevel(ctx),
+  (ctx) => new ButtonLevel(ctx),
+  (ctx) => new MinesLevel(ctx),
   (ctx) => new ChairsLevel(ctx),
+  (ctx) => new GnomeLevel(ctx),
+  (ctx) => new QuizLevel(ctx),
+  (ctx) => new DodgeballLevel(ctx),
+  (ctx) => new StealthLevel(ctx),
+  (ctx) => new SunburnLevel(ctx),
+  (ctx) => new FroggerLevel(ctx),
+  (ctx) => new DuckHuntLevel(ctx),
+  (ctx) => new ClawLevel(ctx),
+  (ctx) => new SnakeLevel(ctx),
+  (ctx) => new PinataLevel(ctx),
+  (ctx) => new MicrowaveLevel(ctx),
+  (ctx) => new HexagoneLevel(ctx),
+  (ctx) => new DominoesLevel(ctx),
+  (ctx) => new BowlingLevel(ctx),
+  (ctx) => new TetrisLevel(ctx),
+  (ctx) => new LaserLevel(ctx),
+  (ctx) => new PacmanLevel(ctx),
   (ctx) => new ElevatorLevel(ctx),
 ];
 const params = new URLSearchParams(location.search);
@@ -56,8 +83,10 @@ const sandbox = params.has('sandbox');
 let levelIndex = Math.min(LEVELS.length - 1, Math.max(0, (Number(params.get('level')) || 1) - 1));
 /** The lobby is the main menu: a chamber you walk around in, with a START portal. */
 let inLobby = !params.has('level');
-const makeLevel = (ctx: LevelContext) =>
-  sandbox ? new Sandbox(ctx) : inLobby ? new LobbyLevel(ctx, LEVELS.length) : LEVELS[levelIndex](ctx);
+const makeLevel = (ctx: LevelContext) => {
+  ctx.number = sandbox || inLobby ? 0 : levelIndex + 1;
+  return sandbox ? new Sandbox(ctx) : inLobby ? new LobbyLevel(ctx, LEVELS.length) : LEVELS[levelIndex](ctx);
+};
 
 /** Where each tracked target is on screen: a ring if visible, otherwise an edge arrow toward it. */
 function screenMarkers(targets: TrackedTarget[], view: Mat4, proj: Mat4, fov: number): ScreenMarker[] {
@@ -123,7 +152,7 @@ async function main() {
   // Chamber colliders are added after the level is created, since levels can tweak the chamber.
   const freshPhysics = () => new Physics();
 
-  const ctx: LevelContext = { player, camera, hud, input, physics: freshPhysics() };
+  const ctx: LevelContext = { number: 0, player, camera, hud, input, physics: freshPhysics() };
   player.attach(ctx.physics);
 
   let playing = false;
@@ -133,6 +162,7 @@ async function main() {
   hud.setLevel('');
 
   function startLevel() {
+    stopTunes();
     interaction.release();
     ctx.physics.dispose();
     ctx.physics = freshPhysics();
@@ -162,6 +192,7 @@ async function main() {
   });
   function pause() {
     if (!playing || pauseMenu.isOpen) return;
+    stopTunes();
     pausedAt = performance.now();
     pauseMenu.open(inLobby);
     hud.crosshair('hidden');
@@ -189,15 +220,18 @@ async function main() {
   // Clicking starts the game (and grabs the mouse); so does sitting on the title screen too long.
   // Without a click there's no mouse lock yet, so the first click in the chamber takes it.
   canvas.addEventListener('click', () => {
+    unlockAudio();
     input.lock();
     begin();
   });
+  window.addEventListener('keydown', unlockAudio);
 
   const draws: DrawItem[] = [];
   let last = performance.now();
   let time = 0;
 
   let nextOffered = false;
+  let mourned = false;
 
   function tick(dt: number) {
     time += dt;
@@ -236,6 +270,11 @@ async function main() {
         startLevel();
         if (finished) hud.show("THAT'S ALL, FOLKS", 'Every chamber so far. The rest are still being built. Probably.', 4);
       }
+      // The sad trombone, once per death (after the level's own crash and bang).
+      if (level.status === 'lost' && !mourned) {
+        mourned = true;
+        sfx.fail(0.7);
+      } else if (level.status !== 'lost') mourned = false;
       camera.look(dt, input);
       const frozen = level.freezeWorld?.() ?? false;
       if (!frozen) {
@@ -302,6 +341,7 @@ async function main() {
           draw(1 / 60);
         },
         get level() { return level; },
+        audio: audioState,
         get paused() { return pauseMenu.isOpen; },
         pause,
         resume,

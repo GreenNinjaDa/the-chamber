@@ -77,7 +77,7 @@ interface Dart {
 }
 
 export class DartsLevel implements Level {
-  readonly number = 1;
+  readonly number: number;
   readonly title = 'Darts';
   status: LevelStatus = 'playing';
 
@@ -110,6 +110,7 @@ export class DartsLevel implements Level {
   private bullseyeExit = -1;
 
   constructor(private ctx: LevelContext) {
+    this.number = ctx.number;
     ctx.hud.setLevel(`The Chamber · Level ${this.number}`);
     ctx.hud.show(`LEVEL ${this.number}`, "", 2.5); // no hint of the theme up front
     ctx.hud.hint('');

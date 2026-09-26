@@ -233,7 +233,7 @@ class Sweep {
 }
 
 export class LaserLevel implements Level {
-  readonly number = 6;
+  readonly number: number;
   readonly title = 'Laser Show';
   status: LevelStatus = 'playing';
   private arrival: PortalArrival;
@@ -266,6 +266,7 @@ export class LaserLevel implements Level {
   private pylonObstacle: Circle[] = [{ x: 0, z: 0, r: PYLON_RADIUS }];
 
   constructor(private ctx: LevelContext) {
+    this.number = ctx.number;
     const { physics, hud } = ctx;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);

@@ -1,3 +1,4 @@
+import { sfx } from '../../engine/audio';
 import {
   add, basis, cross, distXZ, dot, fromQuat, length, lerp, mul, normalize, rotateByQuat, rotationZ, scale, scaling,
   segment, sub, translation,
@@ -213,7 +214,7 @@ interface LiveGrenade {
 }
 
 export class GrenadeLevel implements Level {
-  readonly number = 2;
+  readonly number: number;
   readonly title = 'Grenade';
   readonly chamber: ChamberOptions = { hole: HOLE };
   status: LevelStatus = 'playing';
@@ -235,6 +236,7 @@ export class GrenadeLevel implements Level {
   private exitOpensAt = Infinity;
 
   constructor(private ctx: LevelContext) {
+    this.number = ctx.number;
     ctx.hud.setLevel(`The Chamber · Level ${this.number}`);
     ctx.hud.show(`LEVEL ${this.number}`, '', 2.5);
     ctx.hud.hint('');
@@ -307,6 +309,7 @@ export class GrenadeLevel implements Level {
     physics.remove(g.body);
     this.grenade = null;
     camera.addShake(spec === GRENADES[0] ? 1.2 : 1.6);
+    sfx.explosion(spec === GRENADES[0] ? 0.6 : 0.9);
 
     // Shove loose objects away from the blast, unless a wall hides them from it completely.
     for (const b of physics.bodies) {

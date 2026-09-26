@@ -263,7 +263,7 @@ const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const pick = <T>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
 
 export class ElevatorLevel implements Level {
-  readonly number = 15;
+  readonly number: number;
   readonly title = 'Going Down';
   status: LevelStatus = 'playing';
   private arrival: PortalArrival;
@@ -312,6 +312,7 @@ export class ElevatorLevel implements Level {
 
   constructor(private ctx: LevelContext) {
     const { physics, hud } = ctx;
+    this.number = ctx.number;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);
     hud.hint('');

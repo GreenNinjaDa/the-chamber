@@ -1,3 +1,4 @@
+import { sfx } from '../engine/audio';
 import { add, basis, clamp, cross, easeInOut, normalize, scale, sub, type Vec3 } from '../engine/math';
 import { Pattern, type DrawItem } from '../engine/renderer';
 import type { CameraShot, LevelContext } from '../levels/level';
@@ -86,9 +87,12 @@ export class PortalArrival {
   }
 
   update(dt: number) {
+    const before = this.t;
     this.t += dt;
+    if (before < OPEN_AT && this.t >= OPEN_AT) sfx.portalOpen();
     if (!this.spat && this.t >= SPIT_AT) {
       this.spat = true;
+      sfx.portal();
       // The body comes out below the portal, so start it a body-length along the spit direction.
       this.ctx.player.emerge(add(this.centre, scale(this.dir, 1.0)), this.facing, scale(this.dir, SPIT_SPEED), STUN);
       // They start as a speck inside the portal and grow to full size on the way out.
@@ -159,12 +163,15 @@ export class ExitPortal {
   }
 
   openNow() {
+    if (!this.isOpen) sfx.slide();
     this.isOpen = true;
   }
 
   /** Slides the panel back over it (unless the player is already on the way through). */
   closeNow() {
-    if (this.sucking < 0) this.isOpen = false;
+    if (this.sucking >= 0) return;
+    if (this.isOpen) sfx.slide();
+    this.isOpen = false;
   }
 
   /** Open from the start, with the panel already out of the way. */
@@ -187,6 +194,7 @@ export class ExitPortal {
     if (nearWall && inside) {
       if (this.refuse?.()) return;
       this.sucking = 0;
+      sfx.portal();
       player.shrinkInto(this.centre, PORTAL_SQUEEZE_TIME);
     }
   }

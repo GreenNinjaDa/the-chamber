@@ -120,7 +120,7 @@ function rockPieces(pos: Vec3, radius: number, top: number): DrawItem[] {
 }
 
 export class LavaLevel implements Level {
-  readonly number = 4;
+  readonly number: number;
   readonly title = 'Useless Box';
   readonly chamber = { litFromBelow: true };
   private env: Environment = { ...LAVA_LIGHT };
@@ -139,6 +139,7 @@ export class LavaLevel implements Level {
   private lastHit = -10;
 
   constructor(private ctx: LevelContext) {
+    this.number = ctx.number;
     const { physics, hud } = ctx;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);
