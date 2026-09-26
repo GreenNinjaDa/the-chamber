@@ -155,7 +155,11 @@ class Spinner {
   omega = 0;
   /** How far it has grown out to the walls (0-1). */
   ext = 0;
-  constructor(readonly dir: 1 | -1) {}
+  /** It comes out opposite the player, turned by up to this much either way (random). */
+  readonly offset: number;
+  constructor(readonly dir: 1 | -1, spread: number) {
+    this.offset = (Math.random() * 2 - 1) * spread;
+  }
 }
 
 interface HLine { v: number; u0: number; u1: number }
@@ -230,8 +234,8 @@ export class LaserLevel implements Level {
   private exit = new ExitPortal(0);
   private pylon: LaserPylon;
   private slicer = new BodySlicer();
-  private low = new Spinner(1);
-  private high = new Spinner(-1);
+  private low = new Spinner(1, 0.3);
+  private high = new Spinner(-1, 1);
   /** Seconds since the arrival finished (-1: still arriving). */
   private t = -1;
   private noticeShown = false;
@@ -341,9 +345,9 @@ export class LaserLevel implements Level {
   private updateSpinner(s: Spinner, dt: number, t: number, onAt: number, offAt: number, speed: (t: number) => number) {
     s.prev = s.angle;
     if (t < onAt) {
-      // Not out yet: point it away from the player, so it grows out on the far side.
+      // Not out yet: point it away from the player (give or take), so it grows out on the far side.
       const pos = this.ctx.player.pos;
-      s.angle = s.prev = Math.atan2(pos[2], pos[0]) + Math.PI;
+      s.angle = s.prev = Math.atan2(pos[2], pos[0]) + Math.PI + s.offset;
       s.ext = 0;
       return;
     }
