@@ -25,6 +25,8 @@ const TILE_T = 0.4;
 const ARM_TIME = 0.5;
 const GOO_TOP = 1.2;
 const WALL_H = 18;
+/** Thick enough to hide the edge tiles poking into them. */
+const WALL_T = 2.5;
 const ROUND_TIME = 60;
 const COUNTDOWN = 3;
 const DEATH_SCREEN_DELAY = 1.8;
@@ -145,12 +147,12 @@ export class HexagoneLevel implements Level {
   private boardColor = [...LED];
   private countColor = [...LED];
   private shown = '';
+  /** The count board flashes red for a moment when someone goes out. */
+  private countFlash = 0;
   private statics: DrawItem[] = [];
   /** How far the player walked in the first seconds of the round (for the death quip). */
   private travelled = 0;
   private lastPos: Vec3 = [0, 0, 0];
-  /** Dev: why each contestant fell. */
-  private fallLog: string[] = [];
   private sign = new PixelText({ centre: [0, 15.9, H - 0.02], right: [-1, 0, 0], up: [0, 1, 0], pixel: 0.16, color: [0.1, 0.1, 0.12], depth: 0.05 }, 'NO LOITERING');
   private env: Environment = {
     ...DEFAULT_ENV,
@@ -173,10 +175,10 @@ export class HexagoneLevel implements Level {
     const boxes: [Vec3, Vec3, number[], number][] = [
       [[0, -0.6, 0], [900, 1, 900], OUTSIDE, 8],
       [[0, -0.25, 0], [H * 2, 0.5, H * 2], WALL, 2],
-      [[0, WALL_H / 2 - 0.1, H + 0.5], [H * 2 + 2, WALL_H + 0.2, 1], WALL, 2],
-      [[0, WALL_H / 2 - 0.1, -H - 0.5], [H * 2 + 2, WALL_H + 0.2, 1], WALL, 2],
-      [[H + 0.5, WALL_H / 2 - 0.1, 0], [1, WALL_H + 0.2, H * 2], WALL, 2],
-      [[-H - 0.5, WALL_H / 2 - 0.1, 0], [1, WALL_H + 0.2, H * 2], WALL, 2],
+      [[0, WALL_H / 2 - 0.1, H + WALL_T / 2], [(H + WALL_T) * 2, WALL_H + 0.2, WALL_T], WALL, 2],
+      [[0, WALL_H / 2 - 0.1, -H - WALL_T / 2], [(H + WALL_T) * 2, WALL_H + 0.2, WALL_T], WALL, 2],
+      [[H + WALL_T / 2, WALL_H / 2 - 0.1, 0], [WALL_T, WALL_H + 0.2, H * 2], WALL, 2],
+      [[-H - WALL_T / 2, WALL_H / 2 - 0.1, 0], [WALL_T, WALL_H + 0.2, H * 2], WALL, 2],
     ];
     for (const [pos, size, color, panel] of boxes) {
       physics.addStaticBox(pos, size);
@@ -257,12 +259,19 @@ export class HexagoneLevel implements Level {
     this.updatePlayer();
     for (const r of this.runners) this.updateRunner(r, dt);
     this.updateEffects(dt);
-    this.updateBoards();
+    this.updateBoards(dt);
   }
 
   private setPhase(p: Phase) {
     this.phase = p;
     this.phaseT = 0;
+  }
+
+  /** Contestants still in the game. */
+  private stillIn() {
+    let n = 0;
+    for (const r of this.runners) if (r.out === 'no') n++;
+    return n;
   }
 
   private get playerAlive() {
@@ -296,7 +305,7 @@ export class HexagoneLevel implements Level {
       this.splash(splash, 1.3);
       player.kill([0, 0.5, 0], { violence: 0 });
       camera.addShake(0.4);
-      const others = this.runners.filter((r) => r.out === 'no').length;
+      const others = this.stillIn();
       const old = this.runners.find((r) => r.p.look.old);
       let small = pick([
         'You were eliminated. By gravity.',
@@ -315,7 +324,7 @@ export class HexagoneLevel implements Level {
   private checkWin() {
     const { player } = this.ctx;
     if (!this.playerAlive || player.inPortal) return;
-    const left = this.runners.filter((r) => r.out === 'no').length;
+    const left = this.stillIn();
     const timeUp = this.roundT >= ROUND_TIME;
     if (left > 0 && !timeUp) return;
     // Still on (or over) a floor: falling into the goo when the clock stops doesn't count.
@@ -380,16 +389,19 @@ export class HexagoneLevel implements Level {
     if (r.air === 'ground') {
       const floor = this.floors[r.layer];
       if (!floor.support(c.pos[0], c.pos[2], FOOT)) {
-        if (import.meta.env.DEV) {
-          const t = floor.tileAt(c.pos[0], c.pos[2]);
-          this.fallLog.push(`${r.p.look.number} L${r.layer} t${this.roundT.toFixed(1)} ${t ? t.state + ' ' + t.t.toFixed(2) : 'none'} v${Math.hypot(c.vel[0], c.vel[2]).toFixed(1)} idle${r.idleT.toFixed(1)} gap${r.gapRoll}`);
-        }
         this.startFall(r);
       } else {
         if (this.phase === 'round') floor.touch(c.pos[0], c.pos[2], FOOT);
         if (this.phase === 'round') this.think(r, dt);
         else if (this.phase === 'won') this.celebrate(r);
-        else c.vel = [0, 0, 0];
+        else {
+          c.vel = [0, 0, 0];
+          // Bouncing on the spot while the clock counts down, like at the start of any race.
+          if (this.phase === 'ready' && !r.p.look.old && Math.random() < dt * 0.8) {
+            this.jump(r);
+            r.vy = rand(3, 4.5);
+          }
+        }
       }
     }
     if (r.air !== 'ground') this.fly(r, dt);
@@ -450,7 +462,8 @@ export class HexagoneLevel implements Level {
     r.y += r.vy * dt;
     if (r.air === 'fall') {
       const k = Math.exp(-dt * 2.5);
-      c.vel = [c.vel[0] * k, 0, c.vel[2] * k];
+      c.vel[0] *= k;
+      c.vel[2] *= k;
     }
     if (r.vy < 0) {
       for (let i = 0; i < TOPS.length; i++) {
@@ -468,7 +481,6 @@ export class HexagoneLevel implements Level {
           r.gapRoll = null;
           return;
         }
-        if (import.meta.env.DEV && r.air === 'jump' && i === r.layer) this.fallLog.push(`${r.p.look.number} L${i} t${this.roundT.toFixed(1)} missed landing`);
       }
     }
     if (r.y < GOO_TOP) this.eliminate(r);
@@ -483,7 +495,7 @@ export class HexagoneLevel implements Level {
     c.action = 'cheer';
     c.actionT = 0;
     r.label.text = '';
-    if (import.meta.env.DEV) this.fallLog.push(`OUT ${r.p.look.number} t${this.roundT.toFixed(1)}`);
+    this.countFlash = 1;
     this.splash([c.pos[0], GOO_TOP, c.pos[2]], 1);
     this.outLabels.push({ pos: [c.pos[0], GOO_TOP + 1.4, c.pos[2]], text: 'OUT!', size: 0.9, color: '#ff4d4d', ttl: 2.5 });
     // The show-offs stop to cheer. Standing still. On a floor that falls away.
@@ -551,7 +563,9 @@ export class HexagoneLevel implements Level {
     if (here && here.state === 'armed' && here.t > ARM_TIME * 0.8 && p.jump > 0 && !floor.fresh(ahead)) {
       return this.jumpAt(r, dx, dz, speed);
     }
-    c.vel = [dx * speed, 0, dz * speed];
+    c.vel[0] = dx * speed;
+    c.vel[1] = 0;
+    c.vel[2] = dz * speed;
   }
 
   /** Somewhere fresh to land a jump of `reach` metres that way (with a little slack either side). */
@@ -657,7 +671,7 @@ export class HexagoneLevel implements Level {
     this.outLabels = this.outLabels.filter((l) => l.ttl > 0);
   }
 
-  private updateBoards() {
+  private updateBoards(dt: number) {
     let text: string;
     let color = LED;
     if (this.phase === 'arrive') text = '1:00';
@@ -683,7 +697,10 @@ export class HexagoneLevel implements Level {
       this.shown = text;
       this.board.setText(text);
     }
-    const left = this.runners.filter((r) => r.out === 'no').length + (this.death ? 0 : 1);
+    this.countFlash = Math.max(0, this.countFlash - dt);
+    const flash = this.countFlash > 0 && Math.floor(this.countFlash * 8) % 2 === 0 ? LED_RED : LED;
+    for (let i = 0; i < 3; i++) this.countColor[i] = flash[i];
+    const left = this.stillIn() + (this.death ? 0 : 1);
     this.countBoard.setText(`${left} LEFT`);
   }
 
