@@ -85,7 +85,7 @@ export class LobbyLevel implements Level {
     // Something to fling around while you make up your mind.
     for (let i = 0; i < 4; i++) {
       const def = junk(i % 2 ? 'small crate' : 'crate');
-      spawnJunk(physics, def, [4 + i * 1.3, def.size[1] / 2 + 0.01, -3 + (i % 2) * 1.5]);
+      spawnJunk(physics, def, [4 + i * 1.3, def.size[1] / 2 + 0.01, 5.5 + (i % 2) * 1.5]);
     }
     spawnJunk(physics, junk('beach ball'), [3, 0.4, 3]);
     spawnJunk(physics, junk('rubber duck'), [1.5, 0.3, 3.5]);
