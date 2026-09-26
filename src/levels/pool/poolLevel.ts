@@ -27,7 +27,7 @@ import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type Level
 /** The pool: interior x within ±X_HALF, z within ±Z_HALF. The deck round it is the old floor (y = 0). */
 const X_HALF = 9;
 const Z_HALF = 8;
-const WATER_Y = -1.4;
+const WATER_Y = -1.7;
 const POOL_FLOOR = -4.2;
 const SPAWN: Vec3 = [0, 0, 1];
 /** Swimming: feet this far under the surface, speed (share of walking), sluggishness in the water. */
@@ -284,8 +284,9 @@ export class PoolLevel implements Level {
   private arrival: PortalArrival;
   private exit = new ExitPortal(0, 0);
   private stage: Stage = 'arrive';
-  /** Seconds since the arrival finished. */
+  /** Seconds since the intro started (the Sim up on their feet after the arrival). */
   private t = 0;
+  private upT = 0;
   private time = 0;
   private beats = new Set<string>();
   private death: Death | null = null;
@@ -395,7 +396,7 @@ export class PoolLevel implements Level {
       body = spawnJunk(physics, def, pos, { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) });
       const capacity = CAPACITY[kind] ?? def.mass * 2;
       if (def.shape === 'ball') w.add(body, { capacity, points: [[0, 0, 0]], half: def.size[0] });
-      else w.add(body, { capacity, righting: kind.includes('crate') ? 60 : 0, anyFace: true });
+      else w.add(body, { capacity, righting: kind.includes('crate') ? 90 : 0, anyFace: true });
     }
     this.floaters.push({ name: kind, body });
     return body;
@@ -424,7 +425,11 @@ export class PoolLevel implements Level {
       }
     }
     this.arrival.update(dt);
-    if (this.stage === 'arrive' && this.arrival.done) this.stage = 'intro';
+    // The show starts once the Sim is back on their feet.
+    if (this.stage === 'arrive' && this.arrival.done) {
+      this.upT += dt;
+      if (!player.gettingUp || this.upT > 1.5) this.stage = 'intro';
+    }
     if (this.stage !== 'arrive') this.t += dt;
 
     if (this.stage !== 'arrive') this.updateScript(dt);
@@ -676,13 +681,25 @@ export class PoolLevel implements Level {
     ];
     for (let i = 0; i < 8; i++) dirs.push([Math.cos((i / 8) * Math.PI * 2), 0, Math.sin((i / 8) * Math.PI * 2)]);
     for (const d of dirs) {
-      for (const reach of [0.45, 0.75, 1.05]) {
+      for (const reach of [0.45, 0.75, 1.05, 1.3]) {
         const origin: Vec3 = [p[0] + d[0] * reach, WATER_Y + 1.8, p[2] + d[2] * reach];
         const hit = physics.raycast(origin, [0, -1, 0], 2.6, player.collider ?? undefined);
         if (!hit) continue;
         const body = this.water.bodyFor(hit.collider);
         if (!body || hit.normal[1] < 0.55) continue;
         if (hit.point[1] > WATER_Y + CLAMBER_MAX || hit.point[1] < WATER_Y - 0.4) continue;
+        // Climb onto the middle of it (or as far in as half a metre), not its very edge.
+        const c = body.rb.translation();
+        const toward: Vec3 = [c.x - hit.point[0], 0, c.z - hit.point[2]];
+        const len = Math.hypot(toward[0], toward[2]);
+        if (len > 0.05) {
+          const k = Math.min(len, 0.5) / len;
+          const inner: Vec3 = [hit.point[0] + toward[0] * k, WATER_Y + 1.8, hit.point[2] + toward[2] * k];
+          const top = physics.raycast(inner, [0, -1, 0], 2.6, player.collider ?? undefined);
+          if (top && this.water.bodyFor(top.collider) === body && top.normal[1] > 0.55 && top.point[1] < WATER_Y + CLAMBER_MAX + 0.1) {
+            return { body, point: top.point };
+          }
+        }
         return { body, point: hit.point };
       }
     }
@@ -981,7 +998,7 @@ export class PoolLevel implements Level {
         if (this.once('doorThere', cursor.arrived)) {
           this.taskT = 0;
           SOUND.hmm();
-          this.say('DELETE DOOR?', add(DOOR_TIP, [-0.6, 1.4, 0]), 0.42, '#ff6b5a', 2.4, [0, 0.1, 0]);
+          this.say('DELETE DOOR?', add(DOOR_TIP, [-0.6, 1.2, 0]), 0.55, '#ff6b5a', 2.4, [0, 0.1, 0]);
           this.speak('Nib! Nib!', 1.8);
         }
         if (!this.beats.has('doorThere')) break;
@@ -1318,7 +1335,7 @@ export class PoolLevel implements Level {
   trackedTargets(): TrackedTarget[] {
     // The ladder is somewhere to go. For a moment.
     const l = this.ladder;
-    if (l && !l.gone && l.placed >= 0 && this.carrying !== 'ladder' && !this.death) {
+    if (l && !l.gone && l.placed >= 0 && this.carrying !== 'ladder' && !this.death && this.stage === 'pool') {
       LADDER_TARGET.pos = add(l.pos, [0, 0.3, 0]);
       return [LADDER_TARGET];
     }

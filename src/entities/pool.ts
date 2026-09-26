@@ -149,7 +149,7 @@ export class Water {
    * cleared (0). It pushes at the body's middle, shifted only `lever` of the way toward `point`,
    * so standing near an edge tips it a little rather than flipping it.
    */
-  setLoad(body: Body, point: Vec3, kg: number, lever = 0.15) {
+  setLoad(body: Body, point: Vec3, kg: number, lever = 0.05) {
     if (kg <= 0) {
       this.loads.delete(body);
       return;
