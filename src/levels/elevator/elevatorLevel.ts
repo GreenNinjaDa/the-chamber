@@ -2,6 +2,7 @@ import {
   add, clamp, dot, length, lerp, mul, normalize, rotationY, scale, scaling, segment, sub, toQuat, transformPoint, translation,
   type Vec3,
 } from '../../engine/math';
+import { note, noise, sfx, tone, Tune } from '../../engine/audio';
 import { GRAVITY, type Body } from '../../engine/physics';
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
 import {
@@ -160,6 +161,70 @@ const STOP_FALLING = [
 const STOP_LANDED = ["Stopped. You're welcome.", 'Emergency over. Mostly.'];
 const STOP_COLOR = '#ffd9d0';
 
+// --- Sound (every cue is also on screen) ---------------------------------------------------------
+
+/** Smooth elevator muzak: an original little bossa loop in F. */
+const MUZAK: [string | null, number][] = [
+  ['A4', 1], ['C5', 0.5], ['F5', 1], ['E5', 0.5], ['D5', 1], ['C5', 1], [null, 0.5], ['A4', 0.5],
+  ['Bb4', 1], ['D5', 1], ['C5', 1.5], [null, 0.5],
+  ['G4', 1], ['Bb4', 0.5], ['E5', 1], ['D5', 0.5], ['C5', 1], ['Bb4', 1], ['A4', 1.5], [null, 0.5],
+  ['F4', 0.5], ['A4', 0.5], ['C5', 1], ['Bb4', 0.5], ['G4', 1], ['F4', 2], [null, 1],
+];
+
+const SOUND = {
+  hum() {
+    tone(55, 2.4, { wave: 'sine', vol: 0.06, attack: 0.6 });
+    tone(110, 2.4, { wave: 'sine', vol: 0.02, attack: 0.6 });
+  },
+  creak() {
+    tone(260, 0.9, { to: 170, wave: 'sawtooth', vol: 0.035, attack: 0.25 });
+    noise(0.9, { freq: 900, to: 500, type: 'bandpass', q: 6, vol: 0.08 });
+  },
+  ping() {
+    tone(2600, 0.7, { to: 1900, wave: 'sine', vol: 0.12 });
+    tone(3900, 0.3, { wave: 'sine', vol: 0.04 });
+  },
+  groan() {
+    tone(80, 1.3, { to: 52, wave: 'sawtooth', vol: 0.08, attack: 0.3 });
+    noise(1.2, { freq: 300, to: 140, vol: 0.12 });
+  },
+  twang() {
+    tone(160, 1.5, { to: 42, wave: 'sawtooth', vol: 0.22 });
+    tone(320, 0.8, { to: 90, wave: 'square', vol: 0.06 });
+    noise(0.5, { freq: 3000, to: 300, vol: 0.3 });
+  },
+  screech() {
+    noise(2.2, { freq: 4200, to: 3000, type: 'bandpass', q: 10, vol: 0.12 });
+    tone(2900, 2, { to: 2500, wave: 'sawtooth', vol: 0.015, attack: 0.1 });
+  },
+  /** The wind and rattle of falling, louder as it goes (0-1). */
+  rush(k: number) {
+    noise(0.7, { freq: 180 + k * 250, to: 120, vol: 0.05 + 0.12 * k });
+  },
+  beep() {
+    tone(1046, 0.16, { wave: 'square', vol: 0.06 });
+  },
+  crash() {
+    sfx.explosion(0.8);
+    noise(1.6, { freq: 700, to: 90, vol: 0.45, at: 0.05 });
+  },
+  clink() {
+    tone(900, 0.1, { wave: 'triangle', vol: 0.08 });
+    tone(1350, 0.14, { wave: 'triangle', vol: 0.05, at: 0.02 });
+  },
+  whoosh() {
+    noise(0.3, { freq: 500, to: 1600, type: 'bandpass', q: 1, vol: 0.12 });
+  },
+  grind() {
+    noise(2.3, { freq: 500, to: 260, type: 'bandpass', q: 3, vol: 0.2 });
+    tone(55, 2.1, { wave: 'sawtooth', vol: 0.05, attack: 0.3 });
+  },
+  /** The muzak's last, sad note. */
+  lastNote() {
+    tone(note('C4'), 1.4, { to: note('A3'), wave: 'triangle', vol: 0.07, attack: 0.05 });
+  },
+};
+
 const TIPS: [string, string][] = [
   ['Hint', "Grab a handrail (hold E or left mouse) and be holding on when it hits the bottom. Don't be under anything heavy."],
   ['Controls', 'WASD move (A/D slides along a rail) · Space push off · Hold E or left mouse to grab a handrail'],
@@ -304,6 +369,7 @@ export class ElevatorLevel implements Level {
   /** The car's fixed fittings (crosshead, grate, lights, rails, signs), and its strip lights' glow. */
   private fittings: DrawItem[] = [];
   private glow = [...STRIP_LIGHT];
+  private muzak = new Tune(MUZAK, 104, { wave: 'triangle', vol: 0.05, bass: true });
   private panel: CarPanel;
   private stopQuips: string[] = [];
   /** The weightless player's position and velocity after the last update (to spot bumping into things). */
@@ -429,15 +495,18 @@ export class ElevatorLevel implements Level {
     if (this.once('ding', true)) {
       this.say('DING!', [CHAMBER_HALF - 0.6, 8.3, DOOR_Z], 0.9, '#ffd166', 1.6);
       this.say('DING!', [-CHAMBER_HALF + 0.6, 8.3, 0], 0.9, '#ffd166', 1.6);
+      sfx.ding();
       for (const d of this.indicators) {
         d.brightness = 1;
         d.arrowSpeed = 3;
         d.setMessage('GOING DOWN');
       }
     }
+    if (t > 1.2 && !this.death) this.muzak.start();
     if (this.once('clunk', t > 0.5)) {
       this.say('*clunk*', [0, 9, 0], 0.4, '#cfcfcf', 1.2);
       this.ctx.camera.addShake(0.15);
+      sfx.thud(0.3);
     }
     this.speed = RIDE_SPEED * clamp((t - 0.5) / RIDE_ACCEL_TIME, 0, 1);
     this.depth += this.speed * dt;
@@ -445,15 +514,21 @@ export class ElevatorLevel implements Level {
     if (this.once(`hum${Math.floor((t - 1) / 3.5)}`, t > 1 && t < RIDE_TIME - GROAN_BEFORE - 1)) {
       this.say('~ hmmmmmmmm ~', [rand(-3, 3), WALL_HEIGHT - 0.8, rand(-3, 3)], 0.3, 'rgba(230,230,230,0.55)', 2.6, [0, 0.15, 0]);
     }
-    if (this.once('creak', t > CREAK_AT)) this.say('*creak*', this.inView(7, 2.5), 0.45, '#cfcfcf', 1.5);
+    if (this.once(`humming${Math.floor(t / 2)}`, t > 0.5 && t < RIDE_TIME)) SOUND.hum();
+    if (this.once('creak', t > CREAK_AT)) {
+      this.say('*creak*', this.inView(7, 2.5), 0.45, '#cfcfcf', 1.5);
+      SOUND.creak();
+    }
     if (this.once('ping', t > RIDE_TIME - PING_BEFORE)) {
       this.pinged = 0;
       this.say('*PING*', this.inView(6, 2.2), 0.6, '#ffffff', 1.4, [0, 1, 0]);
       this.ctx.camera.addShake(0.25);
+      SOUND.ping();
     }
     if (this.once('groan', t > RIDE_TIME - GROAN_BEFORE)) {
       this.say('*groooan*', this.inView(7, 1.8), 0.5, '#cfcfcf', 1.3);
       this.ctx.camera.addShake(0.3);
+      SOUND.groan();
     }
     if (t > RIDE_TIME) this.snap();
   }
@@ -466,6 +541,10 @@ export class ElevatorLevel implements Level {
     this.flickerT = 0;
     this.say('TWANG!', this.inView(8, 1.5), 1.6, '#ffe066', 1.8, [0, 1.2, 0]);
     camera.addShake(1);
+    SOUND.twang();
+    // The muzak stops dead.
+    this.muzak.stop();
+    sfx.scratch();
     for (const d of this.indicators) {
       d.setMessage('UH OH');
       d.arrowSpeed = 0;
@@ -501,8 +580,17 @@ export class ElevatorLevel implements Level {
     const left = FALL_TIME - this.stageT;
     // Rattling, worse and worse.
     this.ctx.camera.addShake(0.06 + 0.22 * (this.stageT / FALL_TIME) ** 2);
-    if (this.once('screech', this.stageT > 1.2)) this.say('SKREEEEEEEEE', [0, 11.5, -CHAMBER_HALF + 0.5], 0.7, '#ffb347', 2.2, [0, 0.6, 0]);
-    if (this.once('screech2', this.stageT > 5.5)) this.say('EEEEEEEEEEE', [0, 11.5, CHAMBER_HALF - 0.5], 0.7, '#ffb347', 2, [0, 0.6, 0]);
+    if (this.once('screech', this.stageT > 1.2)) {
+      this.say('SKREEEEEEEEE', [0, 11.5, -CHAMBER_HALF + 0.5], 0.7, '#ffb347', 2.2, [0, 0.6, 0]);
+      SOUND.screech();
+    }
+    if (this.once('screech2', this.stageT > 5.5)) {
+      this.say('EEEEEEEEEEE', [0, 11.5, CHAMBER_HALF - 0.5], 0.7, '#ffb347', 2, [0, 0.6, 0]);
+      SOUND.screech();
+    }
+    if (this.once(`rush${Math.floor(this.stageT * 2)}`, this.stageT > 0.8)) SOUND.rush(this.stageT / FALL_TIME);
+    // A beep for every second of the countdown.
+    if (left < BRACE_TIME && this.once(`beep${Math.ceil(left)}`, true)) SOUND.beep();
     this.alarm = left < BRACE_TIME ? 0.5 + 0.5 * Math.cos(this.stageT * Math.PI * 3) : 0;
     // Sparks where the safety brakes (uselessly) grab the guide rails.
     this.spawnSparks(dt);
@@ -519,6 +607,7 @@ export class ElevatorLevel implements Level {
     this.flickerT = 0;
     camera.addShake(1.8);
     this.say('KA-RUNCH!', this.inView(8, 0.5), 1.4, '#ffffff', 1.6);
+    SOUND.crash();
     physics.world.gravity = { x: 0, y: -GRAVITY * SLAM_GRAVITY, z: 0 };
     for (const c of this.cargo) {
       const rb = c.body.rb;
@@ -566,11 +655,20 @@ export class ElevatorLevel implements Level {
     if (this.stageT > SLAM_TIME && this.once('gravity', true)) physics.setGravityDirection([0, -1, 0]);
     if (this.stageT < CRUSH_WINDOW && !this.death) this.checkCrush();
     if (this.once('b7', this.stageT > 0.9)) for (const d of this.indicators) d.setFloor(floorLabel(IMPACT_FLOOR));
+    // The muzak's last word.
+    if (!this.death && this.once('lastNote', this.stageT > 1.3)) {
+      this.say('♪...', [-CHAMBER_HALF + 0.5, 8.6, -4], 0.5, '#bdf3ff', 2.5, [0.3, -0.4, 0]);
+      SOUND.lastNote();
+    }
     if (this.death || this.stageT < DOORS_AT) return;
-    if (this.once('grind', true)) this.say('*grrrrrind*', [CHAMBER_HALF - 0.8, 4.8, DOOR_Z], 0.6, '#cfcfcf', 2);
+    if (this.once('grind', true)) {
+      this.say('*grrrrrind*', [CHAMBER_HALF - 0.8, 4.8, DOOR_Z], 0.6, '#cfcfcf', 2);
+      SOUND.grind();
+    }
     this.doorOpen = clamp((this.stageT - DOORS_AT) / DOORS_TIME, 0, 1) ** 1.3;
     if (this.once('open', this.doorOpen > 0.55)) {
       this.exit.openNow();
+      sfx.ding();
       this.say('DING!', [CHAMBER_HALF - 0.6, 8.6, DOOR_Z], 0.9, '#ffd166', 2);
       for (const d of this.indicators) d.setMessage('DING');
       if (player.mode === 'control') hud.show('DING.', 'Ground floor. Mind the gap.\n(The display says B7. The display is a pessimist.)', 4.5);
@@ -701,6 +799,7 @@ export class ElevatorLevel implements Level {
     this.grip = { rail: best.rail, s: clamp(best.s, 0.35, best.rail.length - 0.35), t: 0, byMouse: !input.isDown('KeyE') };
     player.vel = [0, 0, 0];
     this.say(pick(['*grab*', '*clang*', '*grip*']), add(railPoint(best.rail, best.s), [0, 0.5, 0]), 0.3, '#ffffff', 0.8, [0, 0.5, 0]);
+    SOUND.clink();
   }
 
   // --- Weightless ------------------------------------------------------------------------------
@@ -778,6 +877,7 @@ export class ElevatorLevel implements Level {
     const into = dot(look, normal);
     const dir = into < 0.15 ? normalize(add(look, scale(normal, 0.15 - into * 2))) : look;
     player.vel = scale(dir, PUSH_SPEED);
+    SOUND.whoosh();
     player.onGround = false;
     if (body) body.rb.applyImpulse(vec(scale(dir, -PUSH_SPEED * PLAYER_MASS * PUSH_BACK)), true);
   }
@@ -800,6 +900,7 @@ export class ElevatorLevel implements Level {
         const t = c.body.rb.translation();
         this.puff([t.x, Math.max(0.1, t.y - 0.4), t.z], Math.round(clamp(c.mass / 12, 2, 14)), 0.9);
         if (c.mass >= CRUSH_MASS) this.ctx.camera.addShake(0.35);
+        sfx.thud(Math.min(0.6, 0.15 + c.mass / 400));
       }
       c.prevVy = v.y;
     }

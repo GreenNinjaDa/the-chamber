@@ -1,3 +1,4 @@
+import { sfx } from '../engine/audio';
 import { add, clamp, cross, easeInOut, mul, rotationZ, scale, scaling, segment, translation, type Vec3 } from '../engine/math';
 import type { Physics, Usable } from '../engine/physics';
 import { Pattern, type DrawItem } from '../engine/renderer';
@@ -163,6 +164,7 @@ export class CarPanel implements Usable {
   }
 
   use() {
+    sfx.button();
     this.pressedAt = this.time;
     this.onPress();
   }
