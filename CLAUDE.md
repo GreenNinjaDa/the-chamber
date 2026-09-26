@@ -68,15 +68,17 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   (a hit to the head or chest knocks you into the lava), and the 3rd rock from the end sinks 1.8 m and back over
   10 s, carrying you. Lava death is a plain collapse.
 - **Level 5 — Raiders of the Lost Chamber** (`src/levels/temple/`, work in progress): its own map, no test chamber. A
-  dark stone tunnel lit by a torch in the player's hand. A boulder drops from a ceiling shaft between the
-  player and the exit portal and chases them (rubber-banded: sprinting stays ahead, walking gets caught) over four
-  spiked pits (the wide one has a vine: jump into it and it swings you across). At the dead end the wall sinks to
-  reveal a second boulder and gravity slowly rolls over about the tunnel's axis: a quarter turn drops the player
-  onto the side wall (a 1.5 s pause standing there), then another onto the ceiling. The map never moves; gravity
-  (the physics world's and the player's own) turns, and the camera turns with the player. The new boulder chases them back; the first
-  rolls ahead and drops down its shaft, now a pit, crossed on a second vine to reach the portal. Boulders kill on
-  contact. The map is built in "track" space on one fixed body (fixed, not kinematic: Rapier's character controller
-  won't climb slopes on kinematic colliders).
+  dark stone tunnel lit by a torch in the player's hand. A boulder drops from a deep ceiling shaft between the player
+  and the exit portal and chases them (rubber-banded: sprinting stays ahead, walking gets caught) over spiked floor
+  pits; the 8 m one (too far to sprint-jump) needs a vine. A wide pressure plate at the end stops the boulder, the
+  end wall sinks to reveal a second boulder, and gravity slowly rolls over about the tunnel's axis: a quarter turn
+  drops the player onto the side wall (a 1.5 s pause standing there), another onto the ceiling. The map never moves;
+  gravity (the physics world's and the player's own) turns, and the camera turns with the player. The way back has
+  the ceiling's own pits; the new boulder chases, the first rolls ahead and drops into its shaft (12 m deep, so both
+  boulders fit with room to spare), crossed on a second vine to the portal. Vines are physical ropes: hold E or left
+  mouse near one to hang on at that length (`player.hanging` for the pose); let go to fly on; each snaps after one
+  use. Boulders kill on contact with a small push. The map is one fixed body (not kinematic: Rapier's character
+  controller won't climb slopes on kinematic colliders).
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber). `Environment.pointLight` adds one

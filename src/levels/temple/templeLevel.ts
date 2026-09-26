@@ -1,65 +1,70 @@
 import {
-  add, clamp, dot, easeInOut, length, mul, normalize, rotationX, rotationZ, scale, scaling, segment, sub, toQuat, transformDir, transformPoint, translation,
-  type Mat4, type Vec3,
+  add, clamp, dot, easeInOut, length, mul, normalize, rotationX, rotationZ, scale, scaling, segment, sub, transformDir, transformPoint,
+  translation, type Mat4, type Vec3,
 } from '../../engine/math';
 import { GROUPS_BOULDER, GROUPS_BOULDER_BRIDGE, RAPIER, type Body } from '../../engine/physics';
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
 import { drawPortal, PORTAL_SQUEEZE_TIME, PortalArrival } from '../../entities/portal';
+import { PressurePlate } from '../../entities/pressurePlate';
 import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus } from '../level';
 
 /*
- * The boulder temple (an Indiana Jones parody). Its own map: a dark, sloping stone tunnel lit only
- * by the torch in your hand. The exit portal is right there... until a boulder drops out of the
- * ceiling in front of it and chases you down the tunnel, over spiked pits (one needs a vine).
- * At the dead end the wall sinks into the floor to reveal a second boulder, and gravity slowly
- * rolls over: a quarter turn drops you onto the side wall for a moment, another onto the ceiling,
- * and the new boulder chases you home. The first one rolls ahead of you and drops down its own shaft,
- * now a pit, which you cross on a second vine to reach the portal. Boulders kill on contact.
+ * The boulder temple (an Indiana Jones parody). Its own map: a dark stone tunnel lit only by the
+ * torch in your hand. The exit portal is right there... until a boulder drops out of a deep shaft
+ * in the ceiling in front of it and chases you down the tunnel, over spiked pits (the widest needs
+ * a vine). At the end a pressure plate stops the boulder, the end wall sinks into the floor to
+ * reveal a second boulder, and gravity slowly rolls over: a quarter turn drops you onto the side
+ * wall for a moment, another onto the ceiling. Now the ceiling's pits are in your way, the new
+ * boulder chases you home, and the first one rolls ahead of you and drops back down its shaft
+ * (now a pit), which you cross on a second vine to reach the portal. Boulders kill on contact.
  *
- * The map is built in "track" space (floor y = 0, ceiling y = H, running along +z) on one fixed
- * body. It never moves: the flip turns gravity (the physics world's and the player's own) about
- * the tunnel's axis, so the player really does fall onto the wall and then the ceiling.
+ * Vines are physical ropes: hold E or left mouse near one to grab it wherever you reach, swing,
+ * and let go to fly on. Each snaps after one use, so there's no going back.
+ *
+ * The map never moves: the roll turns gravity (the physics world's and the player's own) about
+ * the tunnel's axis (+z), so the player really falls onto the wall and then the ceiling.
  */
 
-// --- Track layout (track space) -----------------------------------------------------------------
+// --- Layout (world space: floor y = 0, ceiling y = H, running along +z) ------------------------------
 const H = 5; // tunnel height
 const W = 4.6; // tunnel width (a 4 m boulder leaves no room to dodge past)
 const WALL_T = 1;
-const SLOPE = 0; // drop per metre toward +z (flat: gravity has to be square to the walls and ceiling too)
-const Z_START = -20;
+const Z_START = -24;
 const Z_ALCOVE_END = 87;
 const END_Z = 80; // the dead-end wall that sinks away
-const PORTAL_Z = -18;
+const PLATE_Z = 76;
+const PLATE_R = 2;
+const PORTAL_Z = -21;
 const PORTAL_R = 2;
 const SPAWN_Z = -2;
-/** The shaft the first boulder drops from, in the ceiling above the cave (a pit after the flip). */
-const SHAFT: [number, number] = [-11, -5];
-const SHAFT_DEPTH = 6;
-const LAND_Z = -8;
-/** Spiked pits in the floor; the wide one needs the vine. */
-const PITS: [number, number][] = [[14, 16.5], [30, 32.5], [46.5, 51.5], [64, 66.5]];
+/** The shaft the first boulder drops from: long, wide and deep, so both boulders fit in the bottom when it's a pit. */
+const SHAFT: [number, number] = [-14, -5];
+const SHAFT_W = 7;
+const SHAFT_DEPTH = 12;
+const LAND_Z = (SHAFT[0] + SHAFT[1]) / 2;
+/** Spiked pits in the floor (the way out) and the ceiling (the way back). The 8 m ones need a vine. */
+const FLOOR_PITS: [number, number][] = [[14, 16.5], [30, 32.5], [46, 54], [64, 66.5]];
+const CEILING_PITS: [number, number][] = [[8, 10.5], [24, 26.5], [40, 42.5], [58, 60.5]];
 const PIT_DEPTH = 6;
 const BOULDER_R = 2;
 const BOULDER2_Z = 83.5;
 
-// Vines: pivot (track space), rope length, and which way along the track they swing you.
+/** Vines: where they hang from, which way they hang (gravity when they're used), and rope length. */
 const VINE_LEN = 2.6;
-const VINE1 = { pivot: [0, H, 49] as Vec3, dir: 1 };
-const VINE2 = { pivot: [0, 0, LAND_Z] as Vec3, dir: -1 };
-/** Hands to feet while hanging. */
-const HANG = 2.0;
-const SWING_TIME = 0.9;
-const SWING_TO = (45 * Math.PI) / 180;
-const RELEASE_FORWARD = 7;
-const RELEASE_UP = 3.5;
+/** Hands above the feet while holding on, and how close the hands must be to grab the rope. */
+const GRAB_HEIGHT = 2.0;
+const GRAB_REACH = 1.0;
+const VINE_FALL_TIME = 1.2;
 
 // Chase: boulder speed (m/s) by the gap to the player. Walking (5) gets you caught, sprinting (8.5) doesn't.
 const CHASE_SLOW = 6.2;
 const CHASE = 7.2;
 const CHASE_CATCHUP = 9.5;
 const ROLL_DELAY = 0.7;
-/** After the flip the first boulder rolls away toward the start faster than anyone can run. */
+/** After the roll the first boulder rolls away toward the start faster than anyone can run. */
 const FLEE = 10.5;
+/** Once the plate is pressed, the chasing boulder stops at least this far back. */
+const STOP_SHORT = 8;
 
 const END_WAIT = 1;
 const WALL_SINK = 1;
@@ -91,6 +96,17 @@ interface Piece {
 
 interface Vine {
   pivot: Vec3;
+  /** The way it hangs (down, for whoever will use it). */
+  hang: Vec3;
+  used: boolean;
+  /** Seconds since it snapped (it falls away into the pit). */
+  fallT: number;
+}
+
+interface Spikes {
+  z: [number, number];
+  y: number;
+  /** +1: pointing up (a floor pit), -1: pointing down (a ceiling pit). */
   dir: number;
 }
 
@@ -105,7 +121,7 @@ const DEATHS = {
   pit: {
     big: 'SKEWERED',
     small: 'Mind the gap. The gap did not mind you.',
-    hint: 'Jump the pits (Space). For the widest one, jump into the vine: it swings you across.',
+    hint: 'Jump the pits (Space). The widest ones are too far: jump at the vine, hold E or left mouse to grab it, and let go at the top of the swing.',
   },
 };
 
@@ -119,94 +135,59 @@ export class TempleLevel implements Level {
   private stage: Stage = 'start';
   private stageT = 0;
   private pieces: Piece[] = [];
+  private spikes: Spikes[] = [];
   private levelBody: RAPIER.RigidBody;
-  private base: Mat4 = rotationX(Math.atan(SLOPE));
-  private flip: Mat4 = rotationX(0);
-  private level: Mat4 = this.base;
-  private inverse: Mat4 = this.base;
   private flipped = false;
   private endWall: RAPIER.Collider;
   private wallDrop = 0;
+  private plate: PressurePlate;
   private boulders: Body[] = [];
-  /** Boulders parked (kinematic) at a track-space position until they're let go. */
+  /** Boulders parked (kinematic) at a position until they're let go. */
   private parked: (Vec3 | null)[] = [];
   private chasing: Body | null = null;
   private fleeing: Body | null = null;
   private fleeDelay = 0;
   private chaseDelay = 0;
-  private swing: { vine: Vine; t: number; from: number } | null = null;
-  private vineCooldown = 0;
+  private vines: Vine[];
+  /** The rope the player is holding, and how far along it their hands are. */
+  private rope: { vine: Vine; length: number } | null = null;
   private exiting = -1;
   private death: { t: number; kind: keyof typeof DEATHS } | null = null;
   private env: Environment = { ...CAVE_ENV, pointLight: { pos: [0, 0, 0], color: [0, 0, 0], range: 16 } };
 
   constructor(private ctx: LevelContext) {
-    const { physics, hud, camera } = ctx;
+    const { physics, hud, camera, player } = ctx;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);
     hud.hint('');
     camera.confine = false;
 
     this.levelBody = physics.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
-    this.setLevelPose();
     this.build();
     this.endWall = this.solid([0, H / 2, END_Z + 0.5], [W, H, 1], STONE_WALL, false);
+    this.plate = new PressurePlate(physics, [0, 0, PLATE_Z], [], player, (down) => {
+      if (down && this.stage === 'chase') this.setStage('endWait');
+    }, PLATE_R);
 
-    // Boulder 1 waits up the shaft; boulder 2 behind the dead-end wall.
-    this.boulders = [this.makeBoulder([0, H + 2.5, LAND_Z]), this.makeBoulder([0, BOULDER_R, BOULDER2_Z])];
-    this.parked = [[0, H + 2.5, LAND_Z], [0, BOULDER_R, BOULDER2_Z]];
+    // Vine 1 hangs from the ceiling over the widest floor pit; vine 2 hangs from the floor over the
+    // shaft, for when gravity points at the ceiling. Both a little past the pit's middle.
+    this.vines = [
+      { pivot: [0, H, FLOOR_PITS[2][0] + 4.5], hang: [0, -1, 0], used: false, fallT: 0 },
+      { pivot: [0, 0, LAND_Z - 0.5], hang: [0, 1, 0], used: false, fallT: 0 },
+    ];
+
+    // Boulder 1 waits at the top of the shaft; boulder 2 behind the dead-end wall.
+    this.parked = [[0, H + SHAFT_DEPTH - BOULDER_R - 0.3, LAND_Z], [0, BOULDER_R, BOULDER2_Z]];
+    this.boulders = this.parked.map((p) => this.makeBoulder(p!));
     for (const b of this.boulders) b.rb.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
     this.placeParked();
 
-    this.arrival = new PortalArrival(ctx, this.toWorld([0, 0, SPAWN_Z]), { minElevationDeg: 80 });
-  }
-
-  // --- Level space ---------------------------------------------------------------------------------
-
-  private turning() {
-    return this.stage === 'turn1' || this.stage === 'turn2';
-  }
-
-  /** The whole roll, pause included: boulders stay frozen and nothing chases. */
-  private rolling() {
-    return this.turning() || this.stage === 'onWall';
-  }
-
-  private setLevelPose() {
-    this.level = mul(this.base, this.flip);
-    this.inverse = invertRigid(this.level);
-    const q = toQuat(this.level);
-    const p = { x: this.level[12], y: this.level[13], z: this.level[14] };
-    if (this.turning()) {
-      this.levelBody.setNextKinematicTranslation(p);
-      this.levelBody.setNextKinematicRotation(q);
-    } else {
-      this.levelBody.setTranslation(p, true);
-      this.levelBody.setRotation(q, true);
-    }
-  }
-
-  private toWorld(p: Vec3): Vec3 {
-    return transformPoint(this.level, p);
-  }
-
-  private toTrack(p: Vec3): Vec3 {
-    return transformPoint(this.inverse, p);
-  }
-
-  private dirToTrack(d: Vec3): Vec3 {
-    const m = this.inverse;
-    return [m[0] * d[0] + m[4] * d[1] + m[8] * d[2], m[1] * d[0] + m[5] * d[1] + m[9] * d[2], m[2] * d[0] + m[6] * d[1] + m[10] * d[2]];
-  }
-
-  private dirToWorld(d: Vec3): Vec3 {
-    const m = this.level;
-    return [m[0] * d[0] + m[4] * d[1] + m[8] * d[2], m[1] * d[0] + m[5] * d[1] + m[9] * d[2], m[2] * d[0] + m[6] * d[1] + m[10] * d[2]];
+    this.arrival = new PortalArrival(ctx, [0, 0, SPAWN_Z], { minElevationDeg: 80 });
   }
 
   // --- Building ------------------------------------------------------------------------------------
 
-  /** A solid block of temple (track space), attached to the level body. */
+  /** A solid block of temple. */
   private solid(pos: Vec3, size: Vec3, color: number[], draw = true): RAPIER.Collider {
     const desc = RAPIER.ColliderDesc.cuboid(size[0] / 2, size[1] / 2, size[2] / 2).setTranslation(pos[0], pos[1], pos[2]);
     const c = this.ctx.physics.world.createCollider(desc, this.levelBody);
@@ -214,38 +195,71 @@ export class TempleLevel implements Level {
     return c;
   }
 
-  private build() {
-    const wallX = W / 2 + WALL_T / 2;
-    const yLow = -PIT_DEPTH - 1, yHigh = H + SHAFT_DEPTH + 1;
-    const len = Z_ALCOVE_END - Z_START;
-    const midZ = (Z_START + Z_ALCOVE_END) / 2;
-    // Side walls, tall enough to line the pits and the shaft.
-    for (const x of [-wallX, wallX]) this.solid([x, (yLow + yHigh) / 2, midZ], [WALL_T, yHigh - yLow, len + 2], STONE_WALL);
-    // End caps.
-    this.solid([0, (yLow + yHigh) / 2, Z_START - 0.5], [W, yHigh - yLow, 1], STONE_WALL);
-    this.solid([0, (yLow + yHigh) / 2, Z_ALCOVE_END + 0.5], [W, yHigh - yLow, 1], STONE_WALL);
+  /** A block between two z values and two y values, across x from -hx to hx. */
+  private slab(z0: number, z1: number, y0: number, y1: number, hx: number, color: number[]) {
+    if (z1 - z0 < 1e-3 || y1 - y0 < 1e-3) return;
+    this.solid([0, (y0 + y1) / 2, (z0 + z1) / 2], [hx * 2, y1 - y0, z1 - z0], color);
+  }
 
-    // Floor: solid blocks between the pits, each pit with a spiked floor far below.
+  /** An invisible floor over a pit that only boulders touch, with its top at \`y\` (facing \`dir\`). */
+  private bridge(z0: number, z1: number, y: number, dir: number) {
+    const desc = RAPIER.ColliderDesc.cuboid(W / 2, 0.15, (z1 - z0) / 2)
+      .setTranslation(0, y - dir * 0.15, (z0 + z1) / 2)
+      .setCollisionGroups(GROUPS_BOULDER_BRIDGE);
+    this.ctx.physics.world.createCollider(desc, this.levelBody);
+  }
+
+  private build() {
+    const yLow = -PIT_DEPTH - 1;
+    const yHigh = H + PIT_DEPTH + 1;
+    const [s0, s1] = SHAFT;
+    // Side walls, tall enough to line the pits. Around the shaft they stop at the ceiling and get
+    // thicker, out to the shaft's own (wider) walls.
+    for (const side of [-1, 1]) {
+      const wall = (z0: number, z1: number, x0: number, x1: number, y0: number, y1: number) =>
+        this.solid([side * (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2], [x1 - x0, y1 - y0, z1 - z0], STONE_WALL);
+      wall(Z_START - 1, s0, W / 2, W / 2 + WALL_T, yLow, yHigh);
+      wall(s1, Z_ALCOVE_END + 1, W / 2, W / 2 + WALL_T, yLow, yHigh);
+      wall(s0, s1, W / 2, SHAFT_W / 2 + WALL_T, yLow, H);
+      wall(s0 - 1, s1 + 1, SHAFT_W / 2, SHAFT_W / 2 + WALL_T, H, H + SHAFT_DEPTH + 1);
+    }
+    // End caps.
+    this.slab(Z_START - 1, Z_START, yLow, yHigh, W / 2, STONE_WALL);
+    this.slab(Z_ALCOVE_END, Z_ALCOVE_END + 1, yLow, yHigh, W / 2, STONE_WALL);
+    // The shaft's ends and lid.
+    this.slab(s0 - 1, s0, H, H + SHAFT_DEPTH + 1, SHAFT_W / 2, STONE_WALL);
+    this.slab(s1, s1 + 1, H, H + SHAFT_DEPTH + 1, SHAFT_W / 2, STONE_WALL);
+    this.slab(s0, s1, H + SHAFT_DEPTH, H + SHAFT_DEPTH + 1, SHAFT_W / 2, STONE_CEIL);
+
+    // Floor: solid blocks between the pits, each pit with a spiked bottom and a bridge for boulders.
     let z = Z_START;
-    for (const [a, b] of [...PITS, [Z_ALCOVE_END, Z_ALCOVE_END]] as [number, number][]) {
-      if (a > z) this.solid([0, -PIT_DEPTH / 2, (z + a) / 2], [W, PIT_DEPTH, a - z], STONE_FLOOR);
-      if (b > a) {
-        this.solid([0, -PIT_DEPTH - 0.5, (a + b) / 2], [W, 1, b - a], STONE_FLOOR);
-        // Boulders roll over the pits on an invisible bridge only they can touch.
-        const bridge = RAPIER.ColliderDesc.cuboid(W / 2, 0.15, (b - a) / 2).setTranslation(0, -0.15, (a + b) / 2).setCollisionGroups(GROUPS_BOULDER_BRIDGE);
-        this.ctx.physics.world.createCollider(bridge, this.levelBody);
+    for (const [a, b] of FLOOR_PITS) {
+      this.slab(z, a, -PIT_DEPTH, 0, W / 2, STONE_FLOOR);
+      this.slab(a, b, -PIT_DEPTH - 1, -PIT_DEPTH, W / 2, STONE_FLOOR);
+      this.bridge(a, b, 0, 1);
+      this.spikes.push({ z: [a, b], y: -PIT_DEPTH, dir: 1 });
+      z = b;
+    }
+    this.slab(z, Z_ALCOVE_END, -PIT_DEPTH, 0, W / 2, STONE_FLOOR);
+
+    // Ceiling: the same, with its own pits (the way back), and a gap for the shaft (no bridge:
+    // both boulders end up down there).
+    z = Z_START;
+    const gaps = [...CEILING_PITS, SHAFT].sort((p, q) => p[0] - q[0]);
+    for (const [a, b] of gaps) {
+      this.slab(z, a, H, H + PIT_DEPTH, W / 2, STONE_CEIL);
+      if (a !== s0) {
+        this.slab(a, b, H + PIT_DEPTH, H + PIT_DEPTH + 1, W / 2, STONE_CEIL);
+        this.bridge(a, b, H, -1);
+        this.spikes.push({ z: [a, b], y: H + PIT_DEPTH, dir: -1 });
       }
       z = b;
     }
-
-    // Ceiling: solid except the shaft, which has a lid at the top.
-    this.solid([0, H + SHAFT_DEPTH / 2, (Z_START + SHAFT[0]) / 2], [W, SHAFT_DEPTH, SHAFT[0] - Z_START], STONE_CEIL);
-    this.solid([0, H + SHAFT_DEPTH / 2, (SHAFT[1] + Z_ALCOVE_END) / 2], [W, SHAFT_DEPTH, Z_ALCOVE_END - SHAFT[1]], STONE_CEIL);
-    this.solid([0, H + SHAFT_DEPTH + 0.5, (SHAFT[0] + SHAFT[1]) / 2], [W, 1, SHAFT[1] - SHAFT[0]], STONE_CEIL);
+    this.slab(z, Z_ALCOVE_END, H, H + PIT_DEPTH, W / 2, STONE_CEIL);
   }
 
-  private makeBoulder(track: Vec3): Body {
-    const body = this.ctx.physics.addBall(this.toWorld(track), BOULDER_R, {
+  private makeBoulder(pos: Vec3): Body {
+    const body = this.ctx.physics.addBall(pos, BOULDER_R, {
       mass: 3000,
       friction: 1,
       restitution: 0.05,
@@ -260,9 +274,7 @@ export class TempleLevel implements Level {
   private placeParked() {
     this.boulders.forEach((b, i) => {
       const p = this.parked[i];
-      if (!p) return;
-      const w = this.toWorld(p);
-      b.rb.setNextKinematicTranslation({ x: w[0], y: w[1], z: w[2] });
+      if (p) b.rb.setNextKinematicTranslation({ x: p[0], y: p[1], z: p[2] });
     });
   }
 
@@ -274,11 +286,20 @@ export class TempleLevel implements Level {
     rb.setAngvel({ x: 0, y: 0, z: 0 }, true);
   }
 
+  private boulderPos(i: number): Vec3 {
+    const t = this.boulders[i].rb.translation();
+    return [t.x, t.y, t.z];
+  }
+
   // --- Update --------------------------------------------------------------------------------------
 
-  private boulderTrack(i: number): Vec3 {
-    const t = this.boulders[i].rb.translation();
-    return this.toTrack([t.x, t.y, t.z]);
+  private turning() {
+    return this.stage === 'turn1' || this.stage === 'turn2';
+  }
+
+  /** The whole roll, pause included: boulders stay frozen and nothing chases. */
+  private rolling() {
+    return this.turning() || this.stage === 'onWall';
   }
 
   private setStage(stage: Stage) {
@@ -290,21 +311,21 @@ export class TempleLevel implements Level {
     const { player, camera } = this.ctx;
     this.t += dt;
     this.stageT += dt;
-    this.vineCooldown = Math.max(0, this.vineCooldown - dt);
     this.arrival.update(dt);
-    const me = this.toTrack(player.pos);
+    this.plate.update(dt);
+    const me = player.pos;
 
     switch (this.stage) {
       case 'start':
         // The boulder drops the moment you head for the portal (or a second after you land).
         if (this.arrival.done && (me[2] < SPAWN_Z - 1.2 || this.stageT > 1)) {
-          this.release(0, scale(this.dirToWorld([0, -1, 0]), 12));
+          this.release(0, [0, -12, 0]);
           camera.addShake(0.3);
           this.setStage('drop');
         }
         break;
       case 'drop':
-        if (this.boulderTrack(0)[1] < BOULDER_R + 0.3) {
+        if (this.boulderPos(0)[1] < BOULDER_R + 0.3) {
           camera.addShake(0.8);
           this.chasing = this.boulders[0];
           this.chaseDelay = ROLL_DELAY;
@@ -312,8 +333,7 @@ export class TempleLevel implements Level {
         }
         break;
       case 'chase':
-        if (me[2] > END_Z - 7) this.setStage('endWait');
-        break;
+        break; // until the pressure plate at the end
       case 'endWait':
         if (this.stageT >= END_WAIT) this.setStage('wallDown');
         break;
@@ -331,7 +351,7 @@ export class TempleLevel implements Level {
         this.setGravity((Math.PI / 2) * ((this.stage === 'turn2' ? 1 : 0) + k));
         if (this.stageT >= QUARTER_TURN) {
           if (this.stage === 'turn1') this.setStage('onWall');
-          else this.endFlip();
+          else this.endRoll();
         }
         break;
       }
@@ -344,8 +364,8 @@ export class TempleLevel implements Level {
 
     this.driveChase(dt, me);
     this.driveFlee(dt);
-    this.updateVines(dt, me);
-    this.checkDeaths(me);
+    this.updateRope(dt);
+    this.checkDeaths();
     this.checkExit(dt);
     this.updateTorch();
 
@@ -358,7 +378,7 @@ export class TempleLevel implements Level {
         this.ctx.hud.show(d.big, `${d.small}\nPress R to try again.`);
         this.ctx.hud.tips([
           ['Hint', d.hint],
-          ['Controls', 'WASD move · Shift sprint · Space jump (jump into a vine to grab it)'],
+          ['Controls', 'WASD move · Shift sprint · Space jump · Hold E or left mouse to hang on to a vine'],
         ]);
       }
     }
@@ -372,21 +392,19 @@ export class TempleLevel implements Level {
       this.chaseDelay -= dt;
       return;
     }
-    const i = this.boulders.indexOf(b);
-    const along = this.flipped ? -1 : 1; // which way down the track it chases
-    const gap = (me[2] - this.boulderTrack(i)[2]) * along - BOULDER_R;
+    const along = this.flipped ? -1 : 1; // which way down the tunnel it chases
+    const gap = (me[2] - b.rb.translation().z) * along - BOULDER_R;
     let target = gap > 14 ? CHASE_CATCHUP : gap < 4 ? CHASE_SLOW : CHASE;
     if (this.stage === 'endWait' || this.stage === 'wallDown') {
-      // Don't arrive before the temple flips (that's the rescue).
+      // The plate stops it well short (after the roll it has to get away from you, not onto you).
       const left = (this.stage === 'endWait' ? END_WAIT - this.stageT + WALL_SINK : WALL_SINK - this.stageT) + 0.3;
-      // (and stop well short: after the roll it has to get away from the player, not onto them).
-      target = Math.min(target, Math.max(0, (gap - 8) / left));
+      target = Math.min(target, Math.max(0, (gap - STOP_SHORT) / left));
     }
-    if (this.death) target = CHASE;
+    if (this.death) target = 0; // it stops, rather than bulldozing the body
     this.rollAlong(b, along, target, dt);
   }
 
-  /** The first boulder, after the flip: rolls off ahead of you toward the start (and its pit). */
+  /** The first boulder, after the roll: off ahead of you toward the start (and its pit). */
   private driveFlee(dt: number) {
     const b = this.fleeing;
     if (!b || this.rolling()) return;
@@ -397,20 +415,17 @@ export class TempleLevel implements Level {
     this.rollAlong(b, -1, FLEE, dt);
   }
 
-  /** Eases a boulder's speed along the track (+1: toward the end, -1: toward the start) to `target`. */
+  /** Eases a boulder's speed along the tunnel (+1: toward the end, -1: toward the start) to \`target\`. */
   private rollAlong(b: Body, along: number, target: number, dt: number) {
-    const dir = this.dirToWorld([0, 0, along]);
     const v = b.rb.linvel();
-    const vel: Vec3 = [v.x, v.y, v.z];
-    const cur = dot(vel, dir);
-    const next = add(vel, scale(dir, (target - cur) * Math.min(1, dt * 3)));
-    b.rb.setLinvel({ x: next[0], y: next[1], z: next[2] }, true);
+    const next = v.z + (target * along - v.z) * Math.min(1, dt * 3);
+    b.rb.setLinvel({ x: v.x, y: v.y, z: next }, true);
   }
 
   /** A quarter turn of gravity. The boulders freeze where they are until it's all over. */
   private startTurn(stage: 'turn1' | 'turn2') {
     if (stage === 'turn1') {
-      this.parked = this.boulders.map((_, i) => this.boulderTrack(i));
+      this.parked = this.boulders.map((_, i) => this.boulderPos(i));
       for (const b of this.boulders) b.rb.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
       this.chasing = null;
     }
@@ -418,96 +433,97 @@ export class TempleLevel implements Level {
     this.setStage(stage);
   }
 
-  /** Gravity rolled by `angle` about the tunnel's axis (0: normal, π/2: onto a side wall, π: onto the ceiling). */
+  /** Gravity rolled by \`angle\` about the tunnel's axis (0: normal, π/2: onto a side wall, π: onto the ceiling). */
   private setGravity(angle: number) {
     const g = rotationZ(angle);
     this.ctx.player.setGravity(g);
     this.ctx.physics.setGravityDirection(transformDir(g, [0, -1, 0]));
   }
 
-  private endFlip() {
-    const { camera } = this.ctx;
+  private endRoll() {
     this.flipped = true;
     this.setGravity(Math.PI);
     this.setStage('chaseBack');
     // Both boulders fall to the new floor; the first rolls off ahead, the second chases you home.
-    this.release(0, scale(this.dirToWorld([0, 0, -1]), FLEE));
+    this.release(0, [0, 0, -FLEE]);
     this.release(1);
     this.chasing = this.boulders[1];
     this.chaseDelay = ROLL_DELAY + 0.5;
     this.fleeing = this.boulders[0];
     this.fleeDelay = 0;
-    camera.addShake(0.6);
+    this.ctx.camera.addShake(0.6);
   }
 
   // --- Vines ---------------------------------------------------------------------------------------
 
+  /** The vine for this half of the run. */
   private activeVine(): Vine {
-    return this.flipped ? VINE2 : VINE1;
+    return this.vines[this.flipped ? 1 : 0];
   }
 
-  /** A vine's swing plane: its pivot, which way is down (gravity), and the direction it carries you. */
-  private vineFrame(vine: Vine): { pivot: Vec3; ahead: Vec3; down: Vec3 } {
-    const up = this.ctx.player.up;
-    const d = this.dirToWorld([0, 0, vine.dir]);
-    const ahead = normalize(sub(d, scale(up, dot(d, up))));
-    return { pivot: this.toWorld(vine.pivot), ahead, down: scale(up, -1) };
-  }
-
-  private updateVines(dt: number, me: Vec3) {
-    const { player } = this.ctx;
-    const vine = this.activeVine();
-    const { pivot, ahead, down } = this.vineFrame(vine);
-    if (this.swing) {
-      const s = this.swing;
-      s.t += dt;
-      const k = clamp(s.t / SWING_TIME, 0, 1);
-      const angle = s.from + (SWING_TO - s.from) * easeInOut(k);
-      const hand = add(pivot, add(scale(ahead, Math.sin(angle) * VINE_LEN), scale(down, Math.cos(angle) * VINE_LEN)));
-      player.pos = add(hand, scale(down, HANG));
-      if (k >= 1) {
-        this.swing = null;
-        this.vineCooldown = 1;
-        player.resume(add(scale(ahead, RELEASE_FORWARD), scale(down, -RELEASE_UP)));
+  /**
+   * A vine is a rope: hold E or left mouse with your hands near it and you're tied to the pivot at
+   * that length. Gravity and your own momentum do the swinging; let go and you fly on. It snaps
+   * once you let go.
+   */
+  private updateRope(dt: number) {
+    const { player, input } = this.ctx;
+    for (const v of this.vines) if (v.used) v.fallT += dt;
+    const holding = input.isDown('KeyE') || input.mouseDown;
+    const hands = add(player.pos, scale(player.up, GRAB_HEIGHT));
+    const rope = this.rope;
+    if (rope) {
+      if (!holding || player.mode !== 'control' || this.death) {
+        this.rope = null;
+        rope.vine.used = true;
+        player.hanging = false;
+        return;
+      }
+      // Keep the hands on a sphere around the pivot; drop any velocity pulling away from it.
+      const d = sub(hands, rope.vine.pivot);
+      const dist = length(d);
+      if (dist > rope.length) {
+        const n = scale(d, 1 / dist);
+        player.pos = sub(player.pos, scale(n, dist - rope.length));
+        const outward = dot(player.vel, n);
+        if (outward > 0) player.vel = sub(player.vel, scale(n, outward));
+        player.syncCollider();
       }
       return;
     }
-    if (player.mode !== 'control' || player.onGround || this.vineCooldown > 0 || this.rolling()) return;
-    // Jumped into the vine? Grab it if your hands pass close to the rope while heading the right way.
-    const hands = add(player.pos, scale(down, -HANG));
-    const bottom = add(pivot, scale(down, VINE_LEN));
-    if (distToSegment(hands, pivot, bottom) > 1.3 || dot(player.vel, ahead) < 0.5) return;
-    const rel = sub(hands, pivot);
-    const from = clamp(Math.atan2(dot(rel, ahead), dot(rel, down)), -1, 0.2);
-    player.mode = 'swinging';
-    player.facing = Math.atan2(-ahead[0], -ahead[2]);
-    this.swing = { vine, t: 0, from };
-    void me;
+    const vine = this.activeVine();
+    if (!holding || vine.used || player.mode !== 'control' || this.rolling()) return;
+    const bottom = add(vine.pivot, scale(vine.hang, VINE_LEN));
+    if (distToSegment(hands, vine.pivot, bottom) > GRAB_REACH) return;
+    this.rope = { vine, length: clamp(length(sub(hands, vine.pivot)), 0.8, VINE_LEN) };
+    player.hanging = true;
   }
 
   // --- Deaths and the exit -----------------------------------------------------------------------
 
-  private checkDeaths(me: Vec3) {
+  private checkDeaths() {
     const { player, camera } = this.ctx;
-    if (this.death || player.mode === 'ragdoll' || player.mode === 'hidden' || player.inPortal || this.turning()) return;
-    // Boulders: any contact is fatal.
+    if (this.death || player.mode !== 'control' || player.inPortal || this.turning()) return;
+    // Boulders: any contact is fatal. A small shove; limbs might come off, it doesn't explode.
     for (const b of this.boulders) {
       const c = b.rb.translation();
       const centre: Vec3 = [c.x, c.y, c.z];
       for (const h of [0.3, 1.0, 1.7]) {
-        if (length(sub(add(player.pos, scale(player.up, h)), centre)) > BOULDER_R + 0.3) continue;
-        const v = b.rb.linvel();
-        if (player.mode !== 'control') player.resume();
-        player.kill([v.x * 1.2, v.y * 1.2 + 4, v.z * 1.2], { violence: 45, origin: centre });
-        camera.addShake(1);
+        const p = add(player.pos, scale(player.up, h));
+        if (length(sub(p, centre)) > BOULDER_R + 0.3) continue;
+        const away = normalize(sub(p, centre));
+        player.hanging = false;
+        player.kill(add(scale(away, 3), scale(player.up, 1.5)), { violence: 19, origin: centre });
+        camera.addShake(0.7);
         this.die('boulder');
         return;
       }
     }
     // Pits: down past the floor means onto the spikes.
-    const below = this.stage === 'onWall' ? false : this.flipped ? me[1] > H + 1.2 : me[1] < -1.2;
-    if (below && player.mode === 'control') {
-      player.kill([0, -2, 0], { violence: 20 });
+    const below = this.stage === 'onWall' ? false : this.flipped ? player.pos[1] > H + 1.2 : player.pos[1] < -1.2;
+    if (below) {
+      player.hanging = false;
+      player.kill(scale(player.up, -2), { violence: 10 });
       this.die('pit');
     }
   }
@@ -515,10 +531,11 @@ export class TempleLevel implements Level {
   private die(kind: keyof typeof DEATHS) {
     this.ctx.hud.hide();
     this.death = { t: 0, kind };
+    this.rope = null;
   }
 
   private portalCentre(): Vec3 {
-    return this.toWorld([0, H / 2, PORTAL_Z]);
+    return [0, H / 2, PORTAL_Z];
   }
 
   private checkExit(dt: number) {
@@ -531,6 +548,7 @@ export class TempleLevel implements Level {
     if (player.mode !== 'control' || this.death) return;
     const centre = this.portalCentre();
     if (length(sub(add(player.pos, scale(player.up, 1.2)), centre)) < PORTAL_R + 0.2) {
+      player.hanging = false;
       player.shrinkInto(centre, PORTAL_SQUEEZE_TIME);
       this.exiting = 0;
     }
@@ -538,7 +556,7 @@ export class TempleLevel implements Level {
 
   // --- Torch ---------------------------------------------------------------------------------------
 
-  /** The torch in the right hand: the tip of it, where the flame is. */
+  /** The torch in the right hand. */
   private torchFrame(): Mat4 | null {
     const player = this.ctx.player;
     if (player.mode === 'hidden') return null;
@@ -554,7 +572,7 @@ export class TempleLevel implements Level {
     }
     const flame = transformPoint(f, [0, 0.62, 0]);
     const flicker = 0.85 + Math.sin(this.t * 17) * 0.08 + Math.sin(this.t * 29) * 0.07;
-    light.pos = [flame[0], flame[1] + 0.1, flame[2]];
+    light.pos = add(flame, scale(this.ctx.player.up, 0.1));
     light.color = [2.8 * flicker, 1.35 * flicker, 0.45 * flicker];
     light.range = 13;
   }
@@ -562,53 +580,59 @@ export class TempleLevel implements Level {
   // --- Drawing -------------------------------------------------------------------------------------
 
   draw(out: DrawItem[], time: number) {
-    const L = this.level;
     for (const p of this.pieces) {
-      out.push({ mesh: 'box', model: mul(L, translation(p.pos), scaling(p.size)), color: p.color, pattern: Pattern.panels, param: 1.5, spec: 0.05 });
+      out.push({ mesh: 'box', model: mul(translation(p.pos), scaling(p.size)), color: p.color, pattern: Pattern.panels, param: 1.5, spec: 0.05 });
     }
     // The sinking end wall.
     if (this.wallDrop < H) {
       out.push({
         mesh: 'box',
-        model: mul(L, translation([0, H / 2 - this.wallDrop, END_Z + 0.5]), scaling([W, H, 1])),
+        model: mul(translation([0, H / 2 - this.wallDrop, END_Z + 0.5]), scaling([W, H, 1])),
         color: STONE_WALL,
         pattern: Pattern.panels,
         param: 1.5,
         spec: 0.05,
       });
     }
-    // Spikes at the bottom of every pit.
-    for (const [a, b] of PITS) {
-      for (let z = a + 0.4; z < b; z += 0.8) {
+    // Spikes at the bottom of every pit (pointing down in the ceiling's).
+    for (const s of this.spikes) {
+      for (let z = s.z[0] + 0.4; z < s.z[1]; z += 0.8) {
         for (let x = -W / 2 + 0.4; x < W / 2; x += 0.75) {
-          out.push({ mesh: 'cone', model: mul(L, translation([x, -PIT_DEPTH + 0.35, z]), scaling([0.16, 0.7, 0.16])), color: [0.5, 0.48, 0.44], spec: 0.6 });
+          const model = mul(translation([x, s.y + s.dir * 0.35, z]), rotationX(s.dir > 0 ? 0 : Math.PI), scaling([0.16, 0.7, 0.16]));
+          out.push({ mesh: 'cone', model, color: [0.5, 0.48, 0.44], spec: 0.6 });
         }
       }
     }
 
-    // The exit portal, and the vine for this half of the run.
-    const n = this.dirToWorld([0, 0, 1]);
-    drawPortal(out, this.portalCentre(), n, PORTAL_R, true);
+    drawPortal(out, this.portalCentre(), [0, 0, 1], PORTAL_R, true);
     this.arrival.draw(out);
+    this.drawVine(out);
+    this.drawTorch(out, time);
+  }
+
+  private drawVine(out: DrawItem[]) {
     const vine = this.activeVine();
-    const { pivot, down } = this.vineFrame(vine);
+    if (vine.fallT > VINE_FALL_TIME) return;
     const player = this.ctx.player;
-    const end: Vec3 = this.swing ? add(player.pos, scale(down, -HANG)) : add(pivot, scale(down, VINE_LEN));
-    out.push({ mesh: 'cylinder', model: segment(pivot, end, 0.05), color: VINE_COLOR });
+    // Snapped vines fall away into the pit.
+    const drop = scale(vine.hang, 0.5 * 20 * vine.fallT * vine.fallT);
+    const top = add(vine.pivot, drop);
+    const end = this.rope ? add(player.pos, scale(player.up, GRAB_HEIGHT)) : add(add(vine.pivot, scale(vine.hang, VINE_LEN)), drop);
+    out.push({ mesh: 'cylinder', model: segment(top, end, 0.05), color: VINE_COLOR });
     for (let i = 1; i < 5; i++) {
-      const p = add(pivot, scale(sub(end, pivot), i / 5));
+      const p = add(top, scale(sub(end, top), i / 5));
       out.push({ mesh: 'sphere', model: mul(translation(p), scaling([0.14, 0.05, 0.1])), color: [0.18, 0.35, 0.08] });
     }
+  }
 
-    // The torch.
+  private drawTorch(out: DrawItem[], time: number) {
     const f = this.torchFrame();
-    if (f) {
-      out.push({ mesh: 'cylinder', model: mul(f, translation([0, 0.25, 0]), scaling([0.03, 0.62, 0.03])), color: [0.3, 0.18, 0.08] });
-      out.push({ mesh: 'cylinder', model: mul(f, translation([0, 0.53, 0]), scaling([0.05, 0.12, 0.05])), color: [0.12, 0.08, 0.05] });
-      const flicker = 1 + Math.sin(time * 23) * 0.15 + Math.sin(time * 41) * 0.1;
-      out.push({ mesh: 'cone', model: mul(f, translation([0, 0.68, 0]), scaling([0.07, 0.2 * flicker, 0.07])), color: [6, 2.6, 0.5], pattern: Pattern.emissive, shadow: false });
-      out.push({ mesh: 'sphere', model: mul(f, translation([0, 0.63, 0]), scaling([0.06, 0.08, 0.06])), color: [8, 4.5, 1.2], pattern: Pattern.emissive, shadow: false });
-    }
+    if (!f) return;
+    out.push({ mesh: 'cylinder', model: mul(f, translation([0, 0.25, 0]), scaling([0.03, 0.62, 0.03])), color: [0.3, 0.18, 0.08] });
+    out.push({ mesh: 'cylinder', model: mul(f, translation([0, 0.53, 0]), scaling([0.05, 0.12, 0.05])), color: [0.12, 0.08, 0.05] });
+    const flicker = 1 + Math.sin(time * 23) * 0.15 + Math.sin(time * 41) * 0.1;
+    out.push({ mesh: 'cone', model: mul(f, translation([0, 0.68, 0]), scaling([0.07, 0.2 * flicker, 0.07])), color: [6, 2.6, 0.5], pattern: Pattern.emissive, shadow: false });
+    out.push({ mesh: 'sphere', model: mul(f, translation([0, 0.63, 0]), scaling([0.06, 0.08, 0.06])), color: [8, 4.5, 1.2], pattern: Pattern.emissive, shadow: false });
   }
 
   environment() {
@@ -641,14 +665,4 @@ function distToSegment(p: Vec3, a: Vec3, b: Vec3): number {
   const ab = sub(b, a);
   const t = clamp(dot(sub(p, a), ab) / Math.max(dot(ab, ab), 1e-6), 0, 1);
   return length(sub(p, add(a, scale(ab, t))));
-}
-
-/** Inverse of a rotation + translation matrix. */
-function invertRigid(m: Mat4): Mat4 {
-  const r = new Float32Array(16);
-  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) r[i * 4 + j] = m[j * 4 + i];
-  const t = [m[12], m[13], m[14]];
-  for (let i = 0; i < 3; i++) r[12 + i] = -(r[i] * t[0] + r[4 + i] * t[1] + r[8 + i] * t[2]);
-  r[15] = 1;
-  return r;
 }

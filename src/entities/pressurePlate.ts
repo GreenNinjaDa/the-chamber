@@ -34,9 +34,11 @@ export class PressurePlate {
     private player: Player | null,
     /** Called with true when something presses it, false when the last thing leaves. */
     private onChange?: (pressed: boolean) => void,
+    /** Radius of the plate itself (m). */
+    private radius = RADIUS,
   ) {
-    physics.addStaticCylinder(add(pos, [0, 0.03, 0]), RADIUS + 0.2, 0.06);
-    this.plate = physics.addStaticCylinder(this.plateCentre(RAISED), RADIUS, 0.1);
+    physics.addStaticCylinder(add(pos, [0, 0.03, 0]), radius + 0.2, 0.06);
+    this.plate = physics.addStaticCylinder(this.plateCentre(RAISED), radius, 0.1);
     physics.addDrawable(this);
   }
 
@@ -50,7 +52,7 @@ export class PressurePlate {
     if (!p || p.mode === 'hidden' || p.inPortal) return false;
     const at = p.mode === 'control' || p.mode === 'ragdoll' ? p.pos : null;
     if (!at) return false;
-    return Math.hypot(at[0] - this.pos[0], at[2] - this.pos[2]) < RADIUS + 0.1 && at[1] - this.pos[1] < 0.45;
+    return Math.hypot(at[0] - this.pos[0], at[2] - this.pos[2]) < this.radius + 0.1 && Math.abs(at[1] - this.pos[1]) < 0.45;
   }
 
   /** Call every tick. */
@@ -78,11 +80,11 @@ export class PressurePlate {
 
   draw(out: DrawItem[]) {
     const p = this.pos;
-    out.push({ mesh: 'cylinder', model: mul(translation(add(p, [0, 0.03, 0])), scaling([RADIUS + 0.2, 0.06, RADIUS + 0.2])), color: RING, spec: 0.3 });
+    out.push({ mesh: 'cylinder', model: mul(translation(add(p, [0, 0.03, 0])), scaling([this.radius + 0.2, 0.06, this.radius + 0.2])), color: RING, spec: 0.3 });
     const top = RAISED + (SUNK - RAISED) * this.depth;
     out.push({
       mesh: 'cylinder',
-      model: mul(translation(add(p, [0, top - 0.05, 0])), scaling([RADIUS, 0.1, RADIUS])),
+      model: mul(translation(add(p, [0, top - 0.05, 0])), scaling([this.radius, 0.1, this.radius])),
       color: this.pressed ? PLATE_LIT : PLATE,
       spec: 0.5,
     });

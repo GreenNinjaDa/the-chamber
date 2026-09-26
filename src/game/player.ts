@@ -162,6 +162,8 @@ export class Player {
   gravity: Mat4 = identity();
   /** Which way is up for the player (world space). */
   up: Vec3 = [0, 1, 0];
+  /** Hanging on to something overhead (a vine): arms up. The level does the holding. */
+  hanging = false;
   /** Torso fatness for this life only (1 = normal); reset() puts it back. */
   girth = 1;
   /** Multiplies walking / sprinting speed and acceleration, for this life only. */
@@ -190,6 +192,7 @@ export class Player {
     this.speedScale = 1;
     this.gravity = identity();
     this.up = [0, 1, 0];
+    this.hanging = false;
   }
 
   /**
@@ -668,6 +671,7 @@ export class Player {
     const t = this.time;
     switch (this.mode) {
       case 'control': {
+        if (this.hanging) return hangingPose(t);
         if (!this.onGround) {
           return {
             lean: -0.1 + this.aimBend * 0.5, twist: this.aimTwist, headPitch: 0.1, shoulderL: -0.5, shoulderR: -0.5, armOut: 0.5, elbowL: 0.7, elbowR: 0.7,
@@ -704,11 +708,7 @@ export class Player {
           kneeL: -0.7 - Math.sin(t * 15) * 0.5, kneeR: -0.7 + Math.sin(t * 15) * 0.5,
         };
       case 'swinging':
-        // Both hands up on the vine, legs together and swaying a little.
-        return {
-          lean: 0, headPitch: 0.15, shoulderL: Math.PI - 0.1, shoulderR: Math.PI - 0.1, armOut: 0.05, elbowL: 0.1, elbowR: 0.1,
-          hipL: 0.35 + Math.sin(t * 4) * 0.15, hipR: 0.3 + Math.sin(t * 4 + 0.4) * 0.15, kneeL: -0.5, kneeR: -0.45,
-        };
+        return hangingPose(t);
       case 'flying':
         return {
           lean: 0, headPitch: 0.3, shoulderL: Math.PI, shoulderR: Math.PI, armOut: 0.05, elbowL: 0, elbowR: 0,
@@ -769,4 +769,12 @@ function toQuatRot(m: Mat4): { x: number; y: number; z: number; w: number } {
   }
   const s = Math.sqrt(1 + m[10] - m[0] - m[5]) * 2;
   return { w: (m[1] - m[4]) / s, x: (m[8] + m[2]) / s, y: (m[9] + m[6]) / s, z: 0.25 * s };
+}
+
+/** Both hands up on a vine (or anything overhead), legs together and swaying a little. */
+function hangingPose(t: number): Pose {
+  return {
+    lean: 0, headPitch: 0.15, shoulderL: Math.PI - 0.1, shoulderR: Math.PI - 0.1, armOut: 0.05, elbowL: 0.1, elbowR: 0.1,
+    hipL: 0.35 + Math.sin(t * 4) * 0.15, hipR: 0.3 + Math.sin(t * 4 + 0.4) * 0.15, kneeL: -0.5, kneeR: -0.45,
+  };
 }
