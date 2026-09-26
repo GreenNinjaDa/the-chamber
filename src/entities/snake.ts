@@ -444,25 +444,25 @@ export class Snake {
       const lx = e * 0.33 * size, lz = -0.3 * size, ly = h + eye / 2 - 0.04;
       this.put(out, 'box', EYE, 0.4, wx(lx, lz), ly, wz(lx, lz), yaw, eye, eye, eye);
       const px = lx + side, pz = lz - eye / 2 - 0.012;
-      this.put(out, 'box', PUPIL, 0.6, wx(px, pz), ly - 0.02, wz(px, pz), yaw, eye * 0.42, eye * 0.55, 0.03);
+      this.put(out, 'box', PUPIL, 0.6, wx(px, pz), ly - 0.03, wz(px, pz), yaw, eye * 0.5, eye * 0.62, 0.03);
     }
     // The forked tongue flicks out now and then.
     if (this.state !== 'moving' && this.state !== 'waiting') return;
     const cycle = (this.time % 1.3) / 0.38;
     if (cycle >= 1) return;
     const out1 = Math.sin(cycle * Math.PI);
-    const len = 0.45 * out1;
+    const len = 0.6 * out1;
     if (len < 0.04) return;
-    const ly = 0.42, front = -w / 2;
-    const stemZ = front - len / 2;
-    this.put(out, 'box', TONGUE, 0.5, wx(0, stemZ), ly, wz(0, stemZ), yaw, 0.09, 0.035, len);
+    const ly = 0.45, front = -w / 2;
+    const stemZ = front - len / 2 + 0.02;
+    this.put(out, 'box', TONGUE, 0.5, wx(0, stemZ), ly, wz(0, stemZ), yaw, 0.13, 0.05, len);
     const wiggle = Math.sin(this.time * 40) * 0.25;
     for (let side2 = -1; side2 <= 1; side2 += 2) {
-      const a = side2 * 0.5 + wiggle;
-      const pl = 0.2 * out1;
+      const a = side2 * 0.55 + wiggle;
+      const pl = 0.3 * out1;
       // Each prong starts at the stem's tip and angles outward (a yaw of `a` points it along (-sin a, -cos a)).
       const lx = (-Math.sin(a) * pl) / 2, lz = front - len - (Math.cos(a) * pl) / 2;
-      this.put(out, 'box', TONGUE, 0.5, wx(lx, lz), ly, wz(lx, lz), yaw + a, 0.06, 0.03, pl);
+      this.put(out, 'box', TONGUE, 0.5, wx(lx, lz), ly, wz(lx, lz), yaw + a, 0.09, 0.045, pl);
     }
   }
 }

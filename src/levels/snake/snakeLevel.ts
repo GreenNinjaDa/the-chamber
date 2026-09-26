@@ -1,8 +1,9 @@
 import type { Vec3 } from '../../engine/math';
 import { Pattern, type DrawItem } from '../../engine/renderer';
+import { APPLE_RADIUS, spawnApple, type Apple } from '../../entities/apple';
 import { PixelText } from '../../entities/pixelText';
 import { ExitPortal, PortalArrival } from '../../entities/portal';
-import { cellAt, cellCentre, Snake, SNAKE_BLOCK, SNAKE_GRID } from '../../entities/snake';
+import { cellAt, cellCentre, Snake, SNAKE_BLOCK, SNAKE_GRID, SNAKE_HEIGHT } from '../../entities/snake';
 import { CHAMBER_HALF } from '../../game/chamber';
 import { PLAYER_RADIUS, type Circle } from '../../game/player';
 import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus, type TrackedTarget, type WorldLabel } from '../level';
@@ -19,7 +20,7 @@ import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type Level
 
 /** Blocks the snake starts with, and one more every this many steps. */
 const START_LENGTH = 5;
-const GROW_EVERY = 6;
+const GROW_EVERY = 7;
 /** Seconds per step: from this at the start down to STEP_MIN over RAMP_TIME seconds. */
 const STEP_START = 0.32;
 const STEP_MIN = 0.2;
@@ -34,9 +35,9 @@ const GREEDY_RANGE = 4;
 const FORESIGHT_FAR = 0.85;
 const FORESIGHT_NEAR = 0.1;
 /** For this long after it comes out it always looks ahead (no early accidents). */
-const CAREFUL_FOR = 15;
+const CAREFUL_FOR = 20;
 /** A bite: the player is within this of the front of the head (m), or this close to its sides (overlapping). */
-const BITE_REACH = PLAYER_RADIUS;
+const BITE_REACH = PLAYER_RADIUS + 0.1;
 const SIDE_REACH = PLAYER_RADIUS - 0.05;
 /** Blocks gained from a player. */
 const PLAYER_MEAL = 3;
@@ -44,6 +45,11 @@ const PLAYER_MEAL = 3;
 const SWALLOW_TIME = 0.35;
 const GULP_PAUSE = 0.6;
 const DEATH_SCREEN_DELAY = 1.6;
+/** The apple: blocks it's worth, the gulp, how long until the next one, and its pop-in time. */
+const APPLE_MEAL = 3;
+const APPLE_GULP = 0.3;
+const APPLE_RESPAWN = 3;
+const APPLE_POP_TIME = 0.35;
 
 // --- Timeline (seconds after the arrival is done) -------------------------------------------------
 
@@ -52,6 +58,7 @@ const ROW_FLASH = 0.14;
 const LOGO_AT = 0.9;
 const DOOR_AT = 1.6;
 const GO_AT = 2.3;
+const APPLE_AT = 1.2;
 /** How long the head stays marked on screen after it comes out. */
 const MARK_HEAD_FOR = 4;
 
@@ -76,6 +83,7 @@ const EATEN_QUIPS = [
   'Part of a balanced breakfast.',
   'The snake would like to thank you for your contribution.',
   'Nutritious. Delicious. Deceased.',
+  'There was a perfectly good apple right there.',
 ];
 
 const WIN_QUIPS = [
@@ -116,6 +124,10 @@ export class SnakeLevel implements Level {
   private wanderI = 8;
   private wanderJ = 8;
   private wanderT = 0;
+  private apple: Apple | null = null;
+  /** Seconds until the next apple appears. */
+  private appleT = 0;
+  private applesEaten = 0;
 
   private plate: DrawItem;
   private rows: DrawItem[] = [];
@@ -234,6 +246,7 @@ export class SnakeLevel implements Level {
       s.interval = STEP_START - (STEP_START - STEP_MIN) * Math.min(1, this.huntT / RAMP_TIME);
       this.aim(dt);
     }
+    this.updateApple(dt);
     const wasAlive = s.alive;
     s.update(dt);
     if (wasAlive && !s.alive) this.ctx.camera.addShake(0.35);
@@ -275,20 +288,82 @@ export class SnakeLevel implements Level {
     return dx * dx + dz * dz < SIDE_REACH * SIDE_REACH;
   }
 
-  /** Points the snake at the player (a little ahead of them), or somewhere random once they're gone. */
+  /** The apple: pops into being, gets eaten, and comes back somewhere else. */
+  private updateApple(dt: number) {
+    const s = this.snake;
+    if (!this.apple) {
+      if (this.t < APPLE_AT || !s.alive) return;
+      this.appleT -= dt;
+      if (this.appleT <= 0) this.apple = spawnApple(this.ctx.physics, this.appleSpot());
+      return;
+    }
+    const apple = this.apple;
+    apple.pop = Math.min(1, apple.pop + dt / APPLE_POP_TIME);
+    if (s.state !== 'moving' || s.cj[0] < 0) return;
+    // Eaten if the head's box reaches it.
+    const p = apple.body.rb.translation();
+    const reach = SNAKE_BLOCK / 2 + APPLE_RADIUS;
+    if (Math.abs(p.x - s.headX()) < reach && Math.abs(p.z - s.headZ()) < reach && p.y < SNAKE_HEIGHT + APPLE_RADIUS * 2) {
+      this.ctx.physics.remove(apple.body);
+      this.apple = null;
+      this.appleT = APPLE_RESPAWN;
+      s.eat(APPLE_MEAL);
+      s.pauseFor = APPLE_GULP;
+      this.applesEaten++;
+    }
+  }
+
+  /** A free cell for a new apple: not against the walls, clear of the snake and the player. */
+  private appleSpot(): Vec3 {
+    const s = this.snake, p = this.ctx.player.pos;
+    let bi = 8, bj = 8, best = -Infinity;
+    for (let tries = 0; tries < 40; tries++) {
+      const i = 1 + Math.floor(Math.random() * (SNAKE_GRID - 2));
+      const j = 2 + Math.floor(Math.random() * (SNAKE_GRID - 3));
+      if (s.occupied(i, j)) continue;
+      const fromHead = Math.abs(i - s.ci[0]) + Math.abs(j - Math.max(0, s.cj[0]));
+      const fromPlayer = Math.hypot(cellCentre(i) - p[0], cellCentre(j) - p[2]);
+      const score = Math.min(fromHead, 8) + Math.min(fromPlayer, 6) + Math.random();
+      if (score > best) {
+        best = score;
+        bi = i;
+        bj = j;
+      }
+    }
+    return [cellCentre(bi), APPLE_RADIUS + 0.03, cellCentre(bj)];
+  }
+
+  /** Points the snake at the player (a little ahead of them) or the apple, whichever is nearer, or anywhere once they're gone. */
   private aim(dt: number) {
     const { player } = this.ctx;
     const s = this.snake;
-    if (player.mode === 'control' && !player.inPortal) {
+    const hi = s.ci[0], hj = Math.max(0, s.cj[0]);
+    const alive = player.mode === 'control' && !player.inPortal;
+    let far = Infinity;
+    if (alive) {
       const x = player.pos[0] + player.vel[0] * LEAD, z = player.pos[2] + player.vel[2] * LEAD;
       s.targetI = cellAt(x);
       s.targetJ = cellAt(z);
       s.lookX = player.pos[0];
       s.lookZ = player.pos[2];
+      far = Math.abs(s.targetI - hi) + Math.abs(s.targetJ - hj);
+    }
+    if (this.apple && this.apple.pop >= 1) {
+      const p = this.apple.body.rb.translation();
+      const ai = cellAt(p.x), aj = cellAt(p.z);
+      const d = Math.abs(ai - hi) + Math.abs(aj - hj);
+      if (d < far) {
+        s.targetI = ai;
+        s.targetJ = aj;
+        s.lookX = p.x;
+        s.lookZ = p.z;
+        far = d;
+      }
+    }
+    if (far < Infinity) {
       // Tunnel vision: with its dinner close, it stops looking where it's going.
       // (Except at first: it starts out on its best behaviour.)
-      const near = Math.abs(s.targetI - s.ci[0]) + Math.abs(s.targetJ - s.cj[0]) <= GREEDY_RANGE;
-      s.brain.foresight = this.huntT < CAREFUL_FOR ? 1 : near ? FORESIGHT_NEAR : FORESIGHT_FAR;
+      s.brain.foresight = this.huntT < CAREFUL_FOR ? 1 : far <= GREEDY_RANGE ? FORESIGHT_NEAR : FORESIGHT_FAR;
       return;
     }
     // Nobody left to chase: wander about, content.
