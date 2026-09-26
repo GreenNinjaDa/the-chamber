@@ -17,6 +17,7 @@ const UNSELECTED = [0.45, 0.46, 0.5];
 const MOUSE_MIN = 0.2;
 const MOUSE_MAX = 4;
 const WALL = CHAMBER_HALF - 0.08;
+const LEVELS_PER_ROW = 8;
 
 export class LobbyLevel implements Level {
   readonly number = 0;
@@ -43,14 +44,18 @@ export class LobbyLevel implements Level {
     this.afk = new AfkPranks(ctx);
     settings.startLevel = Math.min(levelCount, Math.max(1, settings.startLevel));
 
-    // Level select: a row of buttons along the north side.
+    // Level select: rows of buttons along the north side (up to LEVELS_PER_ROW in a row).
+    const rows = Math.ceil(levelCount / LEVELS_PER_ROW);
+    const firstRowZ = rows > 1 ? -9.6 : -8;
     for (let i = 0; i < levelCount; i++) {
-      const x = (i - (levelCount - 1) / 2) * 2.6;
-      const button = new Button(physics, [x, 0, -8], UNSELECTED, () => this.pickLevel(i + 1));
+      const row = Math.floor(i / LEVELS_PER_ROW), inRow = Math.min(LEVELS_PER_ROW, levelCount - row * LEVELS_PER_ROW);
+      const x = ((i % LEVELS_PER_ROW) - (inRow - 1) / 2) * 2.6;
+      const z = firstRowZ + row * 3;
+      const button = new Button(physics, [x, 0, z], UNSELECTED, () => this.pickLevel(i + 1));
       this.levelButtons.push(button);
-      this.fixedLabels.push({ pos: [x, 1.75, -8], text: `LEVEL ${i + 1}`, size: 0.3 });
+      this.fixedLabels.push({ pos: [x, 1.75, z], text: `LEVEL ${i + 1}`, size: 0.3 });
     }
-    this.fixedLabels.push({ pos: [0, 2.55, -8], text: 'PICK YOUR POISON', size: 0.42, color: '#ffd166' });
+    this.fixedLabels.push({ pos: [0, rows > 1 ? 3.1 : 2.55, firstRowZ], text: 'PICK YOUR POISON', size: 0.42, color: '#ffd166' });
     this.pickLevel(settings.startLevel);
 
     // Mouse speed: slower / faster buttons, and a lever to invert looking up and down.
