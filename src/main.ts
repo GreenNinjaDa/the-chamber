@@ -47,6 +47,7 @@ import { ElevatorLevel } from './levels/elevator/elevatorLevel';
 import { BirdsLevel } from './levels/birds/birdsLevel';
 import { PinballLevel } from './levels/pinball/pinballLevel';
 import { KatamariLevel } from './levels/katamari/katamariLevel';
+import { PoolLevel } from './levels/pool/poolLevel';
 import type { Level, LevelContext, TrackedTarget, WorldLabel } from './levels/level';
 import { LobbyLevel } from './levels/lobby/lobbyLevel';
 
@@ -92,6 +93,7 @@ const LEVELS: [string, (ctx: LevelContext) => Level][] = [
   ['birds', (ctx) => new BirdsLevel(ctx)],
   ['katamari', (ctx) => new KatamariLevel(ctx)],
   ['pinball', (ctx) => new PinballLevel(ctx)],
+  ['pool', (ctx) => new PoolLevel(ctx)],
 ];
 const params = new URLSearchParams(location.search);
 /** `?sandbox` opens the mechanics test room; `?level=N` skips the lobby and starts at level N. */

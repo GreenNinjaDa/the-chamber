@@ -216,6 +216,39 @@ fn lavaColor(wp: vec3f, t: f32, goo: f32, molten: f32) -> vec3f {
   return mix(crust, hot, heat);
 }
 
+// Pool water (PAT_LAVA param 3): a see-through surface with wind ripples, the sky reflected at
+// grazing angles, sun glints and a caustic shimmer. Alpha: the object's opacity, more at grazing angles.
+fn waterRipple(p: vec2f, t: f32) -> f32 {
+  return vnoise(p * 0.9 + vec2f(t * 0.3, t * 0.17)) * 0.6 + vnoise(p * 2.3 - vec2f(t * 0.45, -t * 0.28)) * 0.4;
+}
+
+fn waterColor(wp: vec3f, t: f32) -> vec4f {
+  let e = 0.06;
+  let h0 = waterRipple(wp.xz, t);
+  let hx = waterRipple(wp.xz + vec2f(e, 0.0), t);
+  let hz = waterRipple(wp.xz + vec2f(0.0, e), t);
+  let n = normalize(vec3f(-(hx - h0) / e * 0.22, 1.0, -(hz - h0) / e * 0.22));
+  let v = normalize(frame.camPos.xyz - wp);
+  let l = normalize(frame.sunDir.xyz);
+  let fres = 0.03 + 0.97 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
+  let body = vec3f(0.03, 0.36, 0.52) * (frame.sunColor.rgb * max(l.y, 0.0) * 0.5 + frame.skyColor.rgb * 1.2);
+  let refl = skyColor(reflect(-v, n));
+  let glint = pow(max(dot(n, normalize(l + v)), 0.0), 260.0) * 2.5;
+  let shimmer = pow(1.0 - abs(vnoise(wp.xz * 1.4 + vec2f(t * 0.35, -t * 0.25) + n.xz * 3.0) - 0.5) * 2.0, 12.0);
+  let col = mix(body, refl, fres * 0.8) + frame.sunColor.rgb * glint + vec3f(0.35, 0.6, 0.65) * shimmer * 0.35;
+  return vec4f(col, clamp(obj.color.a + fres * 0.6, 0.0, 1.0));
+}
+
+// Rippling light on a pool's floor and walls (panels with a negative size parameter).
+fn caustics(p: vec2f, t: f32) -> f32 {
+  let w = vnoise(p * 0.8 + vec2f(t * 0.25, -t * 0.2));
+  let a = vnoise(p * 1.9 + vec2f(w * 2.0 + t * 0.4, -t * 0.3));
+  let b = vnoise(p * 2.6 - vec2f(t * 0.35, w * 1.5 - t * 0.25));
+  let r = 1.0 - abs(a - 0.5) * 2.0;
+  let s = 1.0 - abs(b - 0.5) * 2.0;
+  return pow(r, 7.0) * 0.8 + pow(s, 9.0) * 0.6;
+}
+
 fn skyColor(dir: vec3f) -> vec3f {
   let l = normalize(frame.sunDir.xyz);
   let t = clamp(dir.y, 0.0, 1.0);
@@ -237,8 +270,12 @@ fn fs(in: VsOut) -> @location(0) vec4f {
     return vec4f(tonemap(portalColor(in.localPos, in.localNormal, frame.camPos.w)), 1.0);
   }
   if (pattern == PAT_LAVA) {
-    // Parameter: 0 lava, 1 green goo, 2 a thing turned molten (see lavaColor).
+    // Parameter: 0 lava, 1 green goo, 2 a thing turned molten (see lavaColor), 3 pool water.
     let kind = obj.params.y;
+    if (kind > 2.5) {
+      let w = waterColor(in.worldPos, frame.camPos.w);
+      return vec4f(tonemap(w.rgb), w.a);
+    }
     let goo = select(0.0, 1.0, abs(kind - 1.0) < 0.5);
     return vec4f(tonemap(lavaColor(in.worldPos, frame.camPos.w, goo, step(1.5, kind))), 1.0);
   }
@@ -260,7 +297,7 @@ fn fs(in: VsOut) -> @location(0) vec4f {
   let n = normalize(in.normal);
   var albedo = obj.color.rgb;
   if (pattern == PAT_PANELS) {
-    albedo = panelColor(albedo, in.worldPos, n, obj.params.y);
+    albedo = panelColor(albedo, in.worldPos, n, abs(obj.params.y));
   } else if (pattern == PAT_DARTBOARD) {
     albedo = dartboardColor(in.localPos, in.localNormal);
   } else if (pattern == PAT_ROCK) {
@@ -298,6 +335,11 @@ fn fs(in: VsOut) -> @location(0) vec4f {
   let h = normalize(l + v);
   let spec = pow(max(dot(n, h), 0.0), 48.0) * obj.params.z * step(0.0, dot(n, l));
   var col = albedo * (frame.sunColor.rgb * ndl * sh + hemi + pointLight) + frame.sunColor.rgb * spec * sh;
+  if (pattern == PAT_PANELS && obj.params.y < 0.0) {
+    // Underwater tiles: light rippling through the surface above.
+    let cp = in.worldPos.xz + vec2f(in.worldPos.y * 0.7, -in.worldPos.y * 0.5);
+    col += albedo * frame.sunColor.rgb * caustics(cp, frame.camPos.w) * (0.35 + 0.65 * sh) * 0.55;
+  }
   if (obj.params.w > 0.0) {
     // Pulsing glow on whatever the crosshair is targeting.
     let pulse = 0.65 + 0.35 * sin(frame.camPos.w * 6.0);

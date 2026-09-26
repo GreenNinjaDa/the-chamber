@@ -273,6 +273,11 @@ export class Player {
     return transformDir(this.gravity, v);
   }
 
+  /** Forgets a buffered jump press (e.g. a Space the level used for something else, like climbing). */
+  cancelJump() {
+    this.jumpBuffer = 0;
+  }
+
   /** Sucks the player into a portal centred at `pivot`: they shrink into it over `seconds`. */
   shrinkInto(pivot: Vec3, seconds: number) {
     this.inPortal = true;
