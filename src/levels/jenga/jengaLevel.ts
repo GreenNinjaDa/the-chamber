@@ -1,6 +1,6 @@
 import { noise, sfx, tone } from '../../engine/audio';
 import {
-  add, clamp, easeInOut, fromQuat, lerp, mul, normalize, quatSlerp, rotationX, rotationY, rotationZ, scale, scaling, segment, sub,
+  add, clamp, cross, easeInOut, fromQuat, lerp, mul, normalize, quatSlerp, rotationX, rotationY, rotationZ, scale, scaling, segment, sub,
   toQuat, transformPoint, translation,
   type Mat4, type Vec3,
 } from '../../engine/math';
@@ -161,7 +161,8 @@ export class JengaLevel implements Level {
   /** Timmy's hand: where it's reaching (smoothed), and a pointing finger for the finale. */
   private hand: Vec3 = [0, 30, 20];
   private finger = 0;
-  private timmyLabel: WorldLabel = { pos: [0, 0, 0], text: '', size: 3, color: '#ffd166' };
+  /** What Timmy says, pinned across the top of the screen (he is far too tall to read it off his head). */
+  private timmyLabel: WorldLabel = { pos: [0, 0, 0], text: '', size: 1, color: '#ffd166' };
   private timmyTimer = 0;
   private labelList: WorldLabel[];
   private wasGrounded = true;
@@ -180,7 +181,7 @@ export class JengaLevel implements Level {
 
   constructor(private ctx: LevelContext) {
     this.number = ctx.number;
-    const { hud, physics, player } = ctx;
+    const { hud, physics } = ctx;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);
     hud.hint('');
@@ -189,7 +190,6 @@ export class JengaLevel implements Level {
     this.tower.rise = -LAYERS * BLOCK_H + 0.03;
     this.tower.update(0);
     this.arrival = new PortalArrival(ctx, [BASE[0], 0, BASE[2]], { minElevationDeg: 82 });
-    void player;
 
     // The fence round the top while it rises.
     for (let i = 0; i < 4; i++) {
@@ -323,7 +323,7 @@ export class JengaLevel implements Level {
   }
 
   private say(text: string, seconds = 2.2) {
-    this.timmyLabel.text = text;
+    this.timmyLabel.text = `TIMMY: ${text}`;
     this.timmyTimer = seconds;
   }
 
@@ -389,7 +389,7 @@ export class JengaLevel implements Level {
       }
     }
 
-    // Once it's up, the Lean-o-meter pops up on the north wall.
+    // Once it’s up, the Lean-o-meters pop up on the north and south walls.
     if (t > RISE_DELAY + RISE_TIME + 0.4 && this.meterOn < 1) {
       if (this.meterOn === 0) {
         tone(660, 0.12, { wave: 'square', vol: 0.08 });
@@ -402,7 +402,6 @@ export class JengaLevel implements Level {
     if (t >= GIANT_AT && t - dt < GIANT_AT) this.say('JENGA!!', 2.5);
     this.timmyTimer -= dt;
     if (this.timmyTimer <= 0) this.timmyLabel.text = '';
-    this.timmyLabel.pos = add(this.giant.headCenter(), [0, 14, 0]);
 
     // Your weight on top.
     if (me && alive) {
@@ -733,7 +732,7 @@ export class JengaLevel implements Level {
   }
 
   private updateFinale(dt: number) {
-    const { player, camera } = this.ctx;
+    const { player } = this.ctx;
     const tower = this.tower;
     const f = (this.finaleT += dt);
     this.giant.headShake = f < 1.3 ? 1 - f / 1.3 : 0;
@@ -765,7 +764,6 @@ export class JengaLevel implements Level {
     if (!this.escaped && player.mode === 'control' && this.ledgeOut > 0.5 && player.pos[0] > CHAMBER_HALF - LEDGE_DEPTH - 0.4 && player.pos[1] > LEDGE_Y - 0.5) {
       this.escaped = true;
     }
-    void camera;
   }
 
   /** The finale's tower hits the wall and comes apart. */
@@ -1016,6 +1014,18 @@ export class JengaLevel implements Level {
   }
 
   labels(): WorldLabel[] {
+    if (this.timmyLabel.text) {
+      // Pinned near the top of the screen, just in front of the camera.
+      const { camera } = this.ctx;
+      const D = 6;
+      const p = camera.pos, tg = camera.target;
+      const f = normalize(sub(tg, p));
+      const r = normalize(cross(f, camera.up));
+      const u = cross(r, f);
+      const half = Math.tan(camera.fov / 2) * D;
+      this.timmyLabel.pos = add(add(p, scale(f, D)), scale(u, half * 0.72));
+      this.timmyLabel.size = 0.05 * 2 * half;
+    }
     return this.meterOn > 0.6 ? this.labelList : this.timmyOnly;
   }
 
