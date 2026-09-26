@@ -149,8 +149,8 @@ const JOKES: Record<Cause, string[]> = {
   flushed: ['Goodbye, little buddy. *flush*', 'Down the pipes to a better place.', 'You were supposed to jump. Tamagotchis can jump. Probably.'],
 };
 const HINTS: Record<Cause, string> = {
-  starved: 'Keep both rows of hearts up: eat the food it drops (E), go the other way in PLAY, don\'t step in anything, and sleep when the lights go out.',
-  sad: 'HAPPY drains all the time, faster when you\'re sick or awake in the dark. Dodge the arrows in PLAY, eat the candy, and when the lights go out stand still on the glowing bed.',
+  starved: 'Keep both rows of hearts on the screen up. HUNGRY only fills by eating: walk to the food Timmy drops (the purple marker) and press E. Burgers fill it; candy mostly cheers you up (and makes you fat).',
+  sad: 'HAPPY drains all the time, faster when you\'re sick or awake in the dark. Dodge the arrow in PLAY (it cheers you up), the flying NO!, and any jab you don\'t need; eat the candy; when the lights go out, stand still on the glowing bed.',
   squashed: 'In PLAY, the half of the floor that flashes is where the arrow lands (the screen points at it too). Be on the other half: the dashed line is the border.',
   flushed: 'When Timmy picks BATHROOM, a wave rises at one wall and sweeps the whole floor. Jump it as it reaches you.',
 };
