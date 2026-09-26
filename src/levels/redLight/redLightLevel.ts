@@ -39,11 +39,18 @@ const MOVE_SPEED = 0.3;
 const MOVE_VERTICAL = 1.2;
 const MOVE_TIME = 0.05;
 /**
+ * She has to see this many of your head, chest and pelvis (clear rays from her eyes) to count
+ * you as seen. Two lets you hide behind a fridge with your head poking over it (from 6 m up,
+ * most cover leaves the head showing), while anything lower than your chest won't do.
+ */
+const SEEN_PARTS = 2;
+/**
  * She only starts looking this long after her head has finished turning. Stopping from a sprint
  * (8.5 m/s) takes about 0.42 s, from a walk 0.35 s, so reacting as her head starts to turn is
- * enough. The first two red lights are more generous (extra seconds, per red light).
+ * enough: with her fastest turn a sprinter can take ~0.35 s to react (measured), a walker more.
+ * The first two red lights are more generous (extra seconds, per red light).
  */
-const GRACE = 0.4;
+const GRACE = 0.45;
 const EXTRA_GRACE = [0.5, 0.2];
 /** How long her head takes to whip round, per red light (the last value repeats). */
 const TURN_TIMES = [0.5, 0.45, 0.4, 0.35];
@@ -122,7 +129,7 @@ const SEEN_LINES = [
 ];
 const PARTIAL_LINES = [
   'She is seven metres tall. Your hiding spot was not.',
-  'Half hidden is fully seen. Your head was sticking out.',
+  'Half hidden is still half seen. It was the wrong half.',
 ];
 const CHEAT_LINE ='Yes, 001 moved too. He has... connections. You do not.';
 const TIMEUP_LINES = [
@@ -208,13 +215,14 @@ export class RedLightLevel implements Level {
   /** Player movement bookkeeping (actual displacement, not intended velocity). */
   private lastPos: Vec3 = [...SPAWN];
   private moveTime = 0;
+  private seenAt: Vec3 = [0, 0, 0];
   /** Player 001 moved during this red light (and got away with it). */
   private oldManMoved = false;
   private timeUpZaps = 0;
   private death: Death | null = null;
   private labelList: WorldLabel[] = [];
   private bubble: WorldLabel = { pos: [DOLL_POS[0], DOLL_HEAD_Y + 1.9, DOLL_POS[2]], text: '', size: 0.75, color: '#ffd23f' };
-  private clock: WorldLabel = { pos: [0, 7.3, -CHAMBER_HALF + 0.05], text: '01:00', size: 1.6, color: '#ff3b30' };
+  private clock: WorldLabel = { pos: [5, 7.4, -CHAMBER_HALF + 0.05], text: '01:00', size: 1.6, color: '#ff3b30' };
   private circles: Circle[] = [];
   /** The sun comes from behind the start line, so her face is lit when she turns round. */
   private env: Environment = { ...DEFAULT_ENV, sunDir: [-0.45, 1.0, 0.55], sunColor: [...DEFAULT_ENV.sunColor], skyColor: [...DEFAULT_ENV.skyColor] };
@@ -390,7 +398,6 @@ export class RedLightLevel implements Level {
         break;
       case 'green': {
         doll.eyeGlow = 0;
-        doll.headTilt *= Math.exp(-dt * 6);
         if (this.fakeAt >= 0 && this.fake < 0 && this.chantT >= this.fakeAt) this.fake = 0;
         if (this.fake >= 0 && this.fake < FAKE_OUT_TIME) {
           // Starts to turn... holds... no. Carry on.
@@ -404,18 +411,21 @@ export class RedLightLevel implements Level {
         }
         doll.headYaw = 0;
         this.chantT += dt;
+        let i = 0;
+        while (i + 1 < SYLLABLES.length - 1 && this.chantT >= this.chantAt[i + 1]) i++;
         if (this.announceT <= 0) {
-          let i = 0;
-          while (i + 1 < SYLLABLES.length - 1 && this.chantT >= this.chantAt[i + 1]) i++;
           this.bubble.text = CHANT_TEXT[i];
           this.bubble.color = '#ffd23f';
         }
+        // Her head rocks from side to side in time with the chant.
+        const tilt = i % 2 === 0 ? 0.08 : -0.08;
+        doll.headTilt += (tilt - doll.headTilt) * (1 - Math.exp(-dt * 14));
         if (this.chantT >= this.chantLen) this.startTurn();
         break;
       }
       case 'turn':
         doll.headYaw = this.turnFrom + (Math.PI - this.turnFrom) * whip(k);
-        doll.headTilt = 0.14 * k;
+        doll.headTilt += (0.14 - doll.headTilt) * (1 - Math.exp(-dt * 12));
         doll.eyeGlow = 0.3 + 0.4 * k;
         if (this.phaseT >= this.phaseLen) this.startRed();
         break;
@@ -507,17 +517,27 @@ export class RedLightLevel implements Level {
     if (this.crossed || this.phase !== 'red' || this.phaseT < this.grace) return;
     if (this.moveTime < MOVE_TIME) return;
     const seen = this.partsSeen();
-    if (seen === 0) return;
+    if (seen < SEEN_PARTS) return;
     // Half hidden (behind something too low for a 7 m doll) gets its own line.
     const line = seen < 3 ? pick(PARTIAL_LINES) : this.oldManMoved ? CHEAT_LINE : pick(SEEN_LINES);
-    this.zapPlayer('ELIMINATED', line, SEEN_HINT);
+    this.zapPlayer('ELIMINATED', line, SEEN_HINT, this.seenAt);
   }
 
-  /** How many of the player's head, chest and pelvis she has a clear line of sight to. */
+  /**
+   * How many of the player's head, chest and pelvis she has a clear line of sight to; `seenAt` is
+   * the one to aim for (the chest if she can see it).
+   */
   private partsSeen(): number {
     const body = this.ctx.player.body;
     if (!body) return 0;
-    return (this.canSee(body.position('head')) ? 1 : 0) + (this.canSee(body.position('chest')) ? 1 : 0) + (this.canSee(body.position('pelvis')) ? 1 : 0);
+    let seen = 0;
+    for (const part of ['pelvis', 'head', 'chest'] as const) {
+      const p = body.position(part);
+      if (!this.canSee(p)) continue;
+      seen++;
+      this.seenAt = p;
+    }
+    return seen;
   }
 
   private canSee(target: Vec3): boolean {
@@ -535,10 +555,10 @@ export class RedLightLevel implements Level {
     return !hit || hit.timeOfImpact > dist - 0.2;
   }
 
-  private zapPlayer(big: string, small: string, hint: string) {
+  private zapPlayer(big: string, small: string, hint: string, aim?: Vec3) {
     const { player, camera, hud } = this.ctx;
     const chest = player.body?.position('chest') ?? [player.pos[0], player.pos[1] + 1.3, player.pos[2]];
-    this.fire(chest);
+    this.fire(aim ?? chest);
     const away = normalize([chest[0] - DOLL_POS[0], 0, chest[2] - DOLL_POS[2]]);
     player.kill([away[0] * 13, 6, away[2] * 13], { violence: 22, origin: chest });
     camera.addShake(0.8);
