@@ -153,12 +153,14 @@ const TIPS: [string, string][] = [
 
 /** Clinging to a rail in front of you at about hip height, knees bent, braced. */
 function gripPose(t: number, bracing: number): Pose {
-  const crouch = 0.1 + 0.12 * bracing;
+  // Both ends keep the hands about 1 m up with the feet on the floor (so they meet the rail).
+  const crouch = 0.02 + 0.18 * bracing;
   const legs = crouchLegs(crouch);
   const sway = Math.sin(t * 1.7) * 0.04 * (1 - bracing);
+  const shoulder = 1.0 + 0.4 * bracing, elbow = 0.3 + 0.2 * bracing;
   return {
     crouch, lean: -0.3 - 0.15 * bracing, headPitch: 0.25 + 0.15 * bracing,
-    shoulderL: 1.0 + sway, shoulderR: 1.0 - sway, armOut: 0.2, elbowL: 0.3, elbowR: 0.3,
+    shoulderL: shoulder + sway, shoulderR: shoulder - sway, armOut: 0.2, elbowL: elbow, elbowR: elbow,
     hipL: legs.hip + 0.05, hipR: legs.hip - 0.05, kneeL: legs.knee, kneeR: legs.knee,
   };
 }
@@ -327,7 +329,6 @@ export class ElevatorLevel implements Level {
     ];
     for (let i = 0; i < 12; i++) this.landingLabels.push({ pos: [0, 0, 0], text: '', size: 1.3, color: '#d9d3bf' });
 
-    // Weightless crushing is checked against contacts, after each physics step.
     this.lastPos = [...ctx.player.pos];
   }
 
@@ -371,7 +372,7 @@ export class ElevatorLevel implements Level {
         this.updateFall(dt);
         break;
       case 'landed':
-        this.updateLanded(dt);
+        this.updateLanded();
         break;
     }
 
@@ -384,8 +385,10 @@ export class ElevatorLevel implements Level {
 
     this.exit.update(dt, player);
     if (this.exit.entered && this.status === 'playing') this.status = 'exited';
-    this.lastPos = [...player.pos];
-    this.lastVel = [...player.vel];
+    for (let i = 0; i < 3; i++) {
+      this.lastPos[i] = player.pos[i];
+      this.lastVel[i] = player.vel[i];
+    }
   }
 
   private updateRide(dt: number) {
@@ -526,7 +529,7 @@ export class ElevatorLevel implements Level {
     else this.die('SPLAT.', 'Terminal velocity, meet terminal floor.');
   }
 
-  private updateLanded(dt: number) {
+  private updateLanded() {
     const { physics, player, hud } = this.ctx;
     if (this.stageT > SLAM_TIME && this.once('gravity', true)) physics.setGravityDirection([0, -1, 0]);
     if (this.stageT < CRUSH_WINDOW && !this.death) this.checkCrush();
@@ -540,7 +543,6 @@ export class ElevatorLevel implements Level {
       for (const d of this.indicators) d.setMessage('DING');
       if (player.mode === 'control') hud.show('DING.', 'Ground floor. Mind the gap.\n(The display says B7. The display is a pessimist.)', 4.5);
     }
-    void dt;
   }
 
   /** Anything heavy still coming down, touching your body (not your hands or shins), crushes you. */
@@ -601,9 +603,11 @@ export class ElevatorLevel implements Level {
     const grip = this.grip;
     if (grip) {
       if (!alive || !holding || (grip.byMouse && !input.isDown('KeyE') && player.carrying) || input.wasPressed('Space')) {
-        const pushing = alive && input.wasPressed('Space') && this.stage === 'fall';
+        const weightless = this.stage === 'fall';
+        const pushing = alive && input.wasPressed('Space') && weightless;
         this.releaseGrip();
-        player.vel = [0, 0, 0];
+        // Weightless, you stay where you let go (or push off); otherwise you just stand there (or jump).
+        if (weightless) player.vel = [0, 0, 0];
         if (pushing) this.pushOff(this.lookDir(), grip.rail.normal, undefined);
         return;
       }
@@ -628,12 +632,13 @@ export class ElevatorLevel implements Level {
       // standingRoot's frame: local x -> (c, 0, -s), local z -> (s, 0, c).
       const offset: Vec3 = [hands[0] * c + hands[2] * s, hands[1], -hands[0] * s + hands[2] * c];
       const target = sub(railPoint(r, grip.s), offset);
-      target[1] = Math.max(0, target[1]);
+      // Feet on the floor (weightless, they may float a touch).
+      target[1] = this.stage === 'fall' ? Math.max(0, target[1]) : 0;
       const k = grip.t < 0.4 ? 1 - Math.exp(-dt * GRAB_PULL) : 1;
       player.pos = add(player.pos, scale(sub(target, player.pos), k));
       player.vel = [0, 0, 0];
       player.facing = facing;
-      player.onGround = player.pos[1] < 0.02;
+      player.onGround = this.stage !== 'fall';
       player.poseOverride = gripPose(this.t, bracing);
       player.syncCollider();
       return;
@@ -826,12 +831,19 @@ export class ElevatorLevel implements Level {
   private updateIndicators(dt: number) {
     const floor = this.stage === 'landed' ? null : floorAt(this.depth);
     const flicker = this.stage === 'fall' || this.stage === 'landed' ? this.light : 1;
+    // The message line has opinions about the ride.
+    const ride = this.stageT - DING_DELAY;
+    const msg = this.stage === 'ride'
+      ? ride > RIDE_TIME - GROAN_BEFORE ? 'UH...' : ride > RIDE_TIME - PING_BEFORE && ride < RIDE_TIME - PING_BEFORE + 1.6 ? 'PING?' : 'GOING DOWN'
+      : this.stage === 'landed' ? this.beats.has('open') ? 'DING' : this.stageT > 1.2 ? 'OW' : ''
+      : null;
     for (const d of this.indicators) {
       if (floor !== null && this.beats.has('ding')) d.setFloor(floorLabel(floor));
+      if (msg !== null && this.beats.has('ding')) d.setMessage(msg);
       if (this.stage === 'fall') {
         const left = FALL_TIME - this.stageT;
         if (this.stageT > 1.6 && left > BRACE_TIME) {
-          d.setMessage(Math.floor(this.stageT * 3) % 2 ? 'GOING DOWN' : '');
+          d.setMessage(Math.floor(this.stageT * 1.5) % 2 ? 'GOING DOWN' : 'EXPRESS');
           d.arrowSpeed = 22;
           d.alarm = true;
         } else if (left <= BRACE_TIME) {
