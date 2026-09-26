@@ -480,7 +480,9 @@ export class BowlingLevel implements Level {
       const g = Math.sign(px);
       const dropAt = Math.max(pz + 3, Math.min(ball.pos[2] - 4, 6));
       ball.lineX = g * (LANE_HALF + 0.4);
-      ball.vx = (ball.lineX - ball.pos[0]) / ((ball.pos[2] - dropAt) / ball.aim.speed);
+      // (At least 6 m to get across, however close to the hatch you're hiding.)
+      const run = Math.max(ball.pos[2] - dropAt, 6);
+      ball.vx = clamp((ball.lineX - ball.pos[0]) / (run / ball.aim.speed), -ball.aim.speed * 0.9, ball.aim.speed * 0.9);
       ball.vz = -ball.aim.speed;
       this.gutterBallThisFrame = true;
       this.pusher.yaw = Math.atan2(ball.vx, -ball.vz);
@@ -526,6 +528,8 @@ export class BowlingLevel implements Level {
         if (!blocked && p[2] > LOAD_Z) {
           b.vz = -Math.min(4, (p[2] - LOAD_Z) * 4 + 0.5);
           p[2] = Math.max(LOAD_Z, p[2] + b.vz * dt);
+          // Nobody hides in the ball tunnel.
+          this.checkBallHit(p, b.r, [0, 0, b.vz], 'cannon', 18);
         } else {
           b.vz = 0;
         }

@@ -353,6 +353,10 @@ export class Player {
       if (input.isDown('KeyD')) { mx += rx; mz += rz; }
       if (input.isDown('KeyA')) { mx -= rx; mz -= rz; }
     }
+    if (this.sitting) {
+      mx = mz = 0;
+      this.jumpBuffer = 0;
+    }
     const len = Math.hypot(mx, mz);
     if (len > 0) { mx /= len; mz /= len; }
     this.moveInput = len > 0;

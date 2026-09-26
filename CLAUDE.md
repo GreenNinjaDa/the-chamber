@@ -228,7 +228,13 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   view, kept under the floor overhead and above the one underfoot wherever there are tiles (after a fall it follows
   you down through your hole); dissolved, it looks down at the splash. `?hexTime=N` sets the round length, `?hexSolo`
   leaves the contestants out.
-- **Level 22 — Bowling** (`src/levels/bowling/`; map in `lane.ts`): its own map (`none`), with the chamber's footprint so
+- **Level 22 — Dominoes** (`src/levels/dominoes/`): a world-record attempt: 22 giant ivory dominoes (2.6 m, 60 kg physics
+  boxes with pips) in an S across the chamber, one missing, its gap marked by a chalk outline exactly your size. The
+  giant's finger flicks the first. Stand in the gap and the one before it knocks you flat, you carry the chain on,
+  and the last domino hits the button that opens the exit. Anywhere else in a falling domino's path: FLATTENED. Not
+  in the gap when the chain gets there: it stops, and the finger flicks you instead (FLICKED). If anything else
+  stalls the chain for 3.5 s, the giant nudges it on.
+- **Level 23 — Bowling** (`src/levels/bowling/`; map in `lane.ts`): its own map (`none`), with the chamber's footprint so
   the camera keeps its usual chamber confinement: a honey-wood lane
   (boards, arrows, dots, pin spots), sunken gutters (2.7 m wide, 0.7 m deep) along the east and west walls, a dark pit
   across the north end, a scoreboard on the north wall (and a small one over the hatch) with sarcastic verdicts
@@ -242,12 +248,12 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   and pushes everything into the pit (jump it; swept = "CLEARED"), then ten pins come down on strings onto their
   spots (standing on one = "PINNED"). After the giant, the last ball is fired 0.8 s after the exit (east wall, in
   the gutter halfway down the lane) opens, and more keep coming until you leave.
-- **Level 23 — Falling Blocks** (`src/levels/tetris/`): a glass-fronted well one cell deep and ten wide against the east wall,
+- **Level 24 — Falling Blocks** (`src/levels/tetris/`): a glass-fronted well one cell deep and ten wide against the east wall,
   seen side-on (the level's camera shot; A / D move along it). Tetrominoes fall a row at a time, steering toward
   wherever you stand (a column every other row) and committing 4 rows up (a ghost shows where they'll land); what
   lands is what you climb, up to the exit (open from the start, 5 m up the east wall). Full rows clear and drop
   everything above. Crushed = GAME OVER; the stack reaching the top of the well = TOPPED OUT.
-- **Level 24 — Laser Show** (`src/levels/lasers/`; Fall Guys' Jump Club meets the Resident Evil laser hallway): the
+- **Level 25 — Laser Show** (`src/levels/lasers/`; Fall Guys' Jump Club meets the Resident Evil laser hallway): the
   lights go down (dark red) and an emitter pylon (`entities/laser.ts`, `LaserPylon`) rises out of a floor hatch.
   A low beam (0.35 m) grows out opposite the player and sweeps round, speeding up from 5 s to 2.5 s a turn: jump it.
   Then a mast rises and a high beam (1.6 m) joins, turning the other way at a different speed: duck it (stand still and
@@ -258,7 +264,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   4.2 m/s. Any beam touching a body part (`BodySlicer`: the real part frames as slightly shrunk capsules/boxes, swept
   in 4 cm steps so fast beams can't skip a limb) slices you: `player.kill` with violence 30 (42 for the grid) at the
   cut. One red point light rides with the pylon, then with each wall. `?laserSkip=N` starts the show N s in.
-- **Level 25 — Pac-Man** (`src/levels/pacman/`): after the arrival the floor goes dark navy, the sun dims to a moon
+- **Level 26 — Pac-Man** (`src/levels/pacman/`): after the arrival the floor goes dark navy, the sun dims to a moon
   and a 13×13-cell maze (`maze.ts`: black blocks outlined in glowing arcade blue, 1.5 m tall so you can't jump
   onto them but the camera sees over; 2.25 m corridors; a ghost house with a pink door in the middle) rises out of
   the floor, shoving the player out of its way, while the camera shows the whole board from above (READY!). 81

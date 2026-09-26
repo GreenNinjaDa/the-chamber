@@ -65,6 +65,7 @@ export class DominoesLevel implements Level {
   private flicked = false;
   private carried = false;
   private stuckFor = 0;
+  private lastFall = FLICK_AT;
   private buttonPressed = false;
   private finger: Vec3 = [0, 30, 20];
   private fingerTarget: Vec3 | null = null;
@@ -185,12 +186,13 @@ export class DominoesLevel implements Level {
       const tilt = this.tilt(d);
       if (!this.fell[i] && tilt > 1.2) {
         this.fell[i] = true;
+        this.lastFall = t;
         const p = d.body.rb.translation();
         this.dust.push({ pos: add([p.x, 0, p.z], scale(d.dir, TALL * 0.6)), age: 0 });
         camera.addShake(Math.max(0, 0.35 - Math.hypot(p.x - player.pos[0], p.z - player.pos[2]) * 0.03));
       }
       // Falling onto the player (outside the gap): anything between its base and its landing spot.
-      if (alive && tilt > 0.7 && tilt < 1.35 && i !== this.gap - 1) {
+      if (alive && tilt > 0.22 && tilt < 1.35 && i !== this.gap - 1) {
         const rel = sub(player.pos, d.pos);
         const along = rel[0] * d.dir[0] + rel[2] * d.dir[2];
         const across = Math.abs(rel[0] * d.dir[2] - rel[2] * d.dir[0]);
@@ -227,6 +229,14 @@ export class DominoesLevel implements Level {
         player.kill([away[0] * 22, 12, away[2] * 22], { violence: 24 });
         camera.addShake(0.8);
         this.death = { t: 0, big: 'FLICKED', small: pick(['The chain broke. So did you.', 'You had one job: be the domino.', 'Nobody ruins Timmy’s world record.']) };
+      }
+    }
+    // A domino stopped by something (a player in the way, say): after a while, the giant nudges it on.
+    if (this.flicked && !this.buttonPressed && !this.fingerTarget && t - this.lastFall > 3.5) {
+      const k = this.fell.findIndex((f) => !f);
+      if (k >= 0 && k !== this.gap) {
+        this.lastFall = t;
+        this.push(this.dominoes[k], 1.3);
       }
     }
     // The last one falls on the button.

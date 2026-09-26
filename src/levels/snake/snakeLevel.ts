@@ -359,6 +359,7 @@ export class SnakeLevel implements Level {
       // Tunnel vision: with its dinner close, it stops looking where it's going.
       // (Except at first: it starts out on its best behaviour.)
       s.brain.foresight = this.huntT < CAREFUL_FOR ? 1 : far <= GREEDY_RANGE ? FORESIGHT_NEAR : FORESIGHT_FAR;
+      s.brain.blunder = this.huntT < CAREFUL_FOR ? 0 : 0.1;
       return;
     }
     // Nobody left to chase: wander about, content.

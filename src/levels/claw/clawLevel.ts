@@ -317,6 +317,7 @@ export class ClawLevel implements Level {
   private flap = {
     highlight: 0,
     use: () => {
+      if (this.death || this.status !== 'playing') return;
       const [big, small] = FLAP_QUIPS[this.flapUses++ % FLAP_QUIPS.length];
       this.ctx.hud.show(big, small, 3);
     },
