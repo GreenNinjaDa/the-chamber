@@ -455,6 +455,22 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   OVER, naming the ghost). All pellets eaten: the maze flashes, sinks, and the exit opens; the last 3 pellets get
   purple markers. Score and an unbeatable HIGH SCORE (3,333,360) on the north wall; no looking up while the maze
   is up (keeps the camera above the walls).
+- **Level 40 — QWOP Olympics** (`src/levels/qwop/`): after the arrival the chamber becomes a stadium
+  (`entities/stadium.ts`): bleachers of fans rise along the north wall, a six-lane track unrolls west to east (start
+  x = -10, finish x = 10 with a tape, 5 m boards), three other finalists lie DNF in their lanes, and the scoreboard
+  strikes out 100 METRES for 20 METRES, WE BELIEVE IN YOU. Then WASD stops working: you're put on the line (lane 4,
+  hip number) as a physics puppet (`player.startPuppet`), seen side-on from the south with a QWOP-style "N metres"
+  readout; ON YOUR MARKS, GET SET, the starter's pistol (keys before it: FALSE START). Q / W swing the thighs (left
+  forward and right back, and back again), O / P bend the knees (left / right, straightening the other); keys move
+  the joint targets at a rate and they hold when let go. A torque on the chest nudges it toward a slight forward lean
+  (at most 600 N·m): standing still is safe, bad legwork isn't. Head or chest on the ground: YOU FELL (the distance,
+  a personal best / worst this session; after 3 failures the tips let slip that Q goes with O and W with P). 90 s:
+  the crowd goes home. Pelvis past the line: NEW WORLD RECORD, the tape snaps, confetti, WASD comes back and the exit
+  (east wall, in the lane) opens. The crowd shouts about kneeling, the splits, going backwards or nowhere, and cheers
+  every 5 m. Test bots: holding QO then WP for 0.7-1.3 s each (±20% timing jitter) always finished, in 17-26 s;
+  0.55 s about half the time, 0.45 s never; the wrong pairing (QP / WO) and random mashing fall within 2-15 s, and
+  Q / W alone shuffles nowhere (backwards).
+  `?qwopQuick` skips the portal and the stadium's reveal.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -527,7 +543,10 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   in `CREW_COLORS`: set `vel` and it waddles; `lift` hops / sinks down a vent, `mouth` / `tongue` / `tongueTo` the
   impostor's flip-top bite, `glow` a red visor, `kill(from)` leaves the bottom half with a bone while the top flies off,
   `eject()` tumbles it up into space, `opacity` / `highlight`), `spaceship.ts` (`TaskStation` on a chamber wall with a
-  screen that lights while `lit`, `Vent` with a flap, `addMeetingTable` / `drawMeetingTable` with the EMERGENCY button). Put new
+  screen that lights while `lit`, `Vent` with a flap, `addMeetingTable` / `drawMeetingTable` with the EMERGENCY button),
+  `stadium.ts` (`Crowd`: bleachers along the north wall full of cheaply drawn fans that `rise` out of the floor, cheer /
+  gasp / stare by `mood` and `excitement`, `shout` world labels, and `leave`; `RunningTrack`: lanes along x on grass
+  that `unroll`; `Confetti`). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
@@ -586,6 +605,11 @@ Shared mechanics available to levels (via `ctx`):
   drift and the level steers) — this life only. `player.poseOverride` draws a level's own `Pose` while in control
   (clinging to something, floating); null for the normal animation.
 - `player.torchArm` raises the right arm up and ahead as if holding a torch (the level draws the torch).
+- `player.startPuppet(pose)` (mode `'puppet'`): QWOP-style, the level drives the joints (`player.puppetPose`, per-joint
+  `puppetJoints` multipliers, `puppetStrength`; this life only) and nothing else holds the body up. It's kept in the
+  vertical x-y plane (`PhysBody.setPlanar`: nothing moves along z and the pelvis only turns about z, so face along
+  ±x), `pos` follows the pelvis, and nothing knocks it. `kill()` ends it limp; `stopPuppet()` gives WASD back (they
+  scramble up from however they ended up). `PhysBody.driveJoints(pose, strengths)` is the joint-motor half of `drive()`.
 - `player.resume(velocity)` puts the player back in normal control after a scripted mode; `player.partFrames()`
   gives each body part's frame (e.g. to put a torch in the right hand, `foreArmR`).
 - Rapier's character controller can't jump up alongside kinematic colliders (the jump dies at once) or up an
@@ -599,7 +623,7 @@ Shared mechanics available to levels (via `ctx`):
   (so they roll over pits the player has to jump). Loose objects on `GROUPS_DEBRIS` behave normally but boulders
   pass through them.
 - In scripted modes (`held`, `flying`, `stuck`, `splat`, `swinging`) the physical body is switched off and the pose is drawn
-  directly; in `control` and `ragdoll` the body is drawn from physics.
+  directly; in `control`, `ragdoll` and `puppet` the body is drawn from physics.
 
 ## Testing without a visible browser
 
