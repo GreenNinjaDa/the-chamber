@@ -71,9 +71,10 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   dark stone tunnel lit by a torch in the player's hand. A boulder drops from a deep ceiling shaft between the player
   and the exit portal and chases them (rubber-banded: sprinting stays ahead, walking gets caught) over spiked floor
   pits (the 8 m one, too far to sprint-jump, needs a vine), past spikes (rows across the floor, spikes out of the
-  walls; not solid, touching one stuns for 0.5 s) and ~70 loose rocks (debris: boulders roll straight through them).
-  A pressure plate at the end (the boulder keeps coming) sinks the end wall to reveal a second boulder; then the
-  world freezes (`Level.freezeWorld`) while only the camera turns upside down (`camera.turnTarget`), and 0.5 s after
+  walls; not solid, touching one stuns for 0.5 s) and ~60 heavy loose rocks (400 kg: barely pushable, but they fall when
+  gravity flips; debris, so boulders roll straight through them).
+  A pressure plate at the end (the boulder keeps coming) sinks the end wall 1 s later to reveal a second boulder; the
+  world freezes as soon as the first boulder is within 1 m of the plate or 2 s have passed (`Level.freezeWorld`) while only the camera turns upside down (`camera.turnTarget`), and 0.5 s after
   it settles gravity snaps over: everything, the player included (stunned 0.1 s, then gets up), falls to the ceiling.
   The map never moves. The way back has the ceiling's own pits
   and spikes; the new boulder chases, the first rolls off from rest and drops into its shaft (12 m deep, so both
@@ -112,7 +113,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
 - `src/entities/` — things that can appear in more than one level (or the lobby / sandbox), each with its model:
   `junk.ts` (28 pieces of household junk; `spawnJunk(physics, junk('fridge'), pos)`), `grenade.ts` (pineapple
   model), `giant.ts`, `dart.ts`, `portal.ts` (entrance / exit portals), `props.ts` (Lever, Button), `cake.ts`, `companions.ts`,
-  `pressurePlate.ts`, `uselessBox.ts`, `rock.ts` (natural stone models of any size: `rockModel(radius, facets)`). Put new
+  `pressurePlate.ts`, `uselessBox.ts`, `rock.ts` (textured stone: `boulderModel`, odd-shaped `chunkModel`; `Pattern.rock`). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`

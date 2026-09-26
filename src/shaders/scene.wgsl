@@ -36,6 +36,7 @@ const PAT_SKIN = 5;
 const PAT_SKY = 6;
 const PAT_PORTAL = 7;
 const PAT_LAVA = 8;
+const PAT_ROCK = 9;
 
 struct VsOut {
   @builtin(position) pos: vec4f,
@@ -178,6 +179,25 @@ fn portalColor(lp: vec3f, ln: vec3f, t: f32) -> vec3f {
   return col;
 }
 
+// Rock: grainy mottling with darker cracks, in the object's own space (so it turns with it).
+// `grain` sets the feature size per unit of the mesh.
+fn rockNoise(p: vec3f) -> f32 {
+  return (vnoise(p.xy) + vnoise(p.yz + vec2f(3.1, 7.3)) + vnoise(p.zx + vec2f(5.7, 1.9))) / 3.0;
+}
+
+fn rockColor(base: vec3f, lp: vec3f, grain: f32) -> vec3f {
+  let p = lp * grain * 3.0;
+  let broad = rockNoise(p);
+  let fine = rockNoise(p * 4.3 + vec3f(11.0));
+  var col = base * (0.62 + 0.55 * broad + 0.25 * (fine - 0.5));
+  // Cracks: thin dark lines where a noise field crosses its middle.
+  let crack = rockNoise(p * 1.7 + vec3f(23.0));
+  col *= 0.55 + 0.45 * smoothstep(0.0, 0.05, abs(crack - 0.5));
+  // A few light flecks.
+  col += vec3f(0.08) * smoothstep(0.78, 0.9, fine);
+  return col;
+}
+
 // Molten rock in world space: dark crust drifting over glowing orange, slowly churning.
 fn lavaColor(wp: vec3f, t: f32) -> vec3f {
   let p = wp.xz * 0.32;
@@ -234,6 +254,8 @@ fn fs(in: VsOut) -> @location(0) vec4f {
     albedo = panelColor(albedo, in.worldPos, n, obj.params.y);
   } else if (pattern == PAT_DARTBOARD) {
     albedo = dartboardColor(in.localPos, in.localNormal);
+  } else if (pattern == PAT_ROCK) {
+    albedo = rockColor(albedo, in.localPos, obj.params.y);
   }
 
   let l = normalize(frame.sunDir.xyz);

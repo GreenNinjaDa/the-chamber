@@ -6,7 +6,7 @@ import { GROUPS_BOULDER, GROUPS_BOULDER_BRIDGE, GROUPS_DEBRIS, RAPIER, type Body
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
 import { drawPortal, PORTAL_SQUEEZE_TIME, PortalArrival } from '../../entities/portal';
 import { PressurePlate } from '../../entities/pressurePlate';
-import { rockModel } from '../../entities/rock';
+import { boulderModel, chunkModel, STONE_COLORS } from '../../entities/rock';
 import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus } from '../level';
 
 /*
@@ -66,8 +66,14 @@ const FLEE = 10.5;
 /** How quickly the first boulder gets going again after the roll (it starts from rest). */
 const FLEE_GAIN = 0.6;
 
-const END_WAIT = 1;
+/** After the plate: the end wall starts to sink this long after, taking WALL_SINK (frozen world or not). */
+const WALL_SINK_AT = 1;
 const WALL_SINK = 1;
+/** The frozen camera turn starts when the first boulder is this close to the plate (m, edge to edge), or after TURN_AFTER s. */
+const TURN_WHEN_BOULDER_WITHIN = 1;
+const TURN_AFTER = 2;
+/** The plate's radius (the standard pressure plate). */
+const PLATE_R = 0.95;
 /** The roll: with the world frozen, the camera turns a half turn about the tunnel's axis in this long... */
 const ROLL_TIME = 4;
 /** ...and holds there this long after it's caught up; then gravity snaps over and the player falls, limp for a moment. */
@@ -93,8 +99,12 @@ const WALL_SPIKES: [number, number, number][] = [
   [65, -1, H - 0.5], [47, 1, H - 0.5], [29, -1, H - 0.5], [13, 1, H - 0.5], [-1, -1, H - 0.5],
 ];
 
-/** Loose rocks all along the tunnel: they tumble when gravity turns; boulders roll straight through them. */
-const ROCKS = 70;
+/**
+ * Loose rocks all along the tunnel: heavy enough that you can barely shove them, but they fall when
+ * gravity turns. Boulders roll straight through them.
+ */
+const ROCKS = 60;
+const ROCK_MASS = 400;
 const DEATH_SCREEN_DELAY = 1.6;
 
 // --- Looks ---------------------------------------------------------------------------------------
@@ -141,7 +151,7 @@ interface Spike {
   radius: number;
 }
 
-type Stage = 'start' | 'drop' | 'chase' | 'endWait' | 'wallDown' | 'turn' | 'chaseBack';
+type Stage = 'start' | 'drop' | 'chase' | 'endWait' | 'turn' | 'chaseBack';
 
 const DEATHS = {
   boulder: {
@@ -175,6 +185,8 @@ export class TempleLevel implements Level {
   private holdT = 0;
   private endWall: RAPIER.Collider;
   private wallDrop = 0;
+  /** Seconds since the plate was pressed (-1: not yet). */
+  private sincePlate = -1;
   private plate: PressurePlate;
   private boulders: Body[] = [];
   /** Boulders parked (kinematic) at a position until they're let go. */
@@ -201,7 +213,10 @@ export class TempleLevel implements Level {
     this.build();
     this.endWall = this.solid([0, H / 2, END_Z + 0.5], [W, H, 1], STONE_WALL, false);
     this.plate = new PressurePlate(physics, [0, 0, PLATE_Z], [], player, (down) => {
-      if (down && this.stage === 'chase') this.setStage('endWait');
+      if (down && this.stage === 'chase') {
+        this.setStage('endWait');
+        this.sincePlate = 0;
+      }
     });
     this.placeSpikes();
     this.scatterRocks();
@@ -313,17 +328,17 @@ export class TempleLevel implements Level {
     for (let i = 0; i < ROCKS; i++) {
       const z = Z_START + 3 + Math.random() * (END_Z - Z_START - 5);
       const x = (Math.random() * 2 - 1) * (W / 2 - 0.5);
-      const size = 0.15 + Math.random() * 0.3;
-      const shade = 0.75 + Math.random() * 0.35;
-      const body = physics.addBall([x, size + 0.02, z], size, {
-        mass: Math.min(50, 1200 * size * size * size),
+      const s = 0.3 + Math.random() * 0.45;
+      const size: Vec3 = [s * (0.9 + Math.random() * 0.8), s * (0.5 + Math.random() * 0.4), s * (0.8 + Math.random() * 0.7)];
+      const color = STONE_COLORS[Math.floor(Math.random() * STONE_COLORS.length)];
+      const body = physics.addBox([x, size[1] / 2 + 0.02, z], size, {
+        mass: ROCK_MASS,
         grabbable: false,
-        friction: 0.9,
+        friction: 1,
         rotation: { x: 0, y: Math.sin(i), z: 0, w: Math.cos(i) },
-        model: rockModel(size, 5 + Math.floor(size * 12), STONE_WALL.map((c) => c * shade)),
+        model: chunkModel(size, color),
       });
       body.collider.setCollisionGroups(GROUPS_DEBRIS);
-      body.rb.setAngularDamping(3); // rough stones don't roll far
     }
   }
 
@@ -333,7 +348,7 @@ export class TempleLevel implements Level {
       friction: 1,
       restitution: 0.05,
       grabbable: false,
-      model: rockModel(BOULDER_R, 26, BOULDER_COLOR),
+      model: boulderModel(BOULDER_R, BOULDER_COLOR),
     });
     body.collider.setCollisionGroups(GROUPS_BOULDER);
     body.rb.setAngularDamping(0);
@@ -384,6 +399,17 @@ export class TempleLevel implements Level {
     this.plate.update(dt);
     const me = player.pos;
 
+    if (this.sincePlate >= 0) {
+      this.sincePlate += dt;
+      const k = clamp((this.sincePlate - WALL_SINK_AT) / WALL_SINK, 0, 1);
+      if (k > 0 && this.wallDrop < H + 0.1) {
+        // The end wall sinks into the floor with a rumble: a second boulder was behind it.
+        this.wallDrop = easeInOut(k) * (H + 0.1);
+        this.endWall.setTranslationWrtParent({ x: 0, y: H / 2 - this.wallDrop, z: END_Z + 0.5 });
+        camera.addShake(0.25);
+      }
+    }
+
     switch (this.stage) {
       case 'start':
         // The boulder drops the moment you head for the portal (or a second after you land).
@@ -403,16 +429,13 @@ export class TempleLevel implements Level {
         break;
       case 'chase':
         break; // until the pressure plate at the end
-      case 'endWait':
-        if (this.stageT >= END_WAIT) this.setStage('wallDown');
+      case 'endWait': {
+        // The world freezes for the turn once the first boulder is nearly on the plate (its edge
+        // within a metre of the plate's), or after a couple of seconds, whichever comes first.
+        const gap = Math.abs(PLATE_Z - this.boulderPos(0)[2]) - BOULDER_R - PLATE_R;
+        if (gap <= TURN_WHEN_BOULDER_WITHIN || this.stageT >= TURN_AFTER) this.startTurn();
         break;
-      case 'wallDown':
-        // The end wall sinks into the floor with a rumble: a second boulder was behind it.
-        this.wallDrop = easeInOut(clamp(this.stageT / WALL_SINK, 0, 1)) * (H + 0.1);
-        this.endWall.setTranslationWrtParent({ x: 0, y: H / 2 - this.wallDrop, z: END_Z + 0.5 });
-        camera.addShake(0.25);
-        if (this.stageT >= WALL_SINK) this.startTurn();
-        break;
+      }
       case 'turn': {
         // The world is frozen and only the camera turns (a little behind its target). Once it has
         // caught up and held for a moment, gravity snaps over and everything falls to the ceiling.

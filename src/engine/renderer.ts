@@ -19,6 +19,7 @@ export const Pattern = {
   sky: 6,
   portal: 7,
   lava: 8,
+  rock: 9,
 } as const;
 
 export interface DrawItem {
