@@ -237,6 +237,12 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   and pushes everything into the pit (jump it; swept = "CLEARED"), then ten pins come down on strings onto their
   spots (standing on one = "PINNED"). After the giant, the last ball is fired 0.8 s after the exit (east wall, in
   the gutter halfway down the lane) opens, and more keep coming until you leave.
+- **Quiz Show** (`src/levels/quiz/`): "Who Wants To Be A Test Subject?" Four coloured answer pads (A-D) on the floor,
+  laid out like the answers on the big screen on the north wall, with a timer bar. Seven questions: 2 + 2 first, five
+  from a pool of trick and callback questions (the cake, turret legs, the big red button, gnomes, "which answer is
+  wrong"), then "DO YOU WANT TO LEAVE?". When the bar runs out, every wrong pad (and the floor between them) is a
+  trapdoor. Standing on one pad for 3.5 s locks it in early ("FINAL ANSWER?"; not the pad you were already on). From
+  question 4 the pads sometimes swap places.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one

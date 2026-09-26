@@ -25,6 +25,7 @@ import { TetrisLevel } from './levels/tetris/tetrisLevel';
 import { DodgeballLevel } from './levels/dodgeball/dodgeballLevel';
 import { ButtonLevel } from './levels/button/buttonLevel';
 import { MicrowaveLevel } from './levels/microwave/microwaveLevel';
+import { QuizLevel } from './levels/quiz/quizLevel';
 import { RedLightLevel } from './levels/redLight/redLightLevel';
 import { LaserLevel } from './levels/lasers/laserLevel';
 import { GnomeLevel } from './levels/gnomes/gnomeLevel';
@@ -51,6 +52,7 @@ const LEVELS: ((ctx: LevelContext) => Level)[] = [
   (ctx) => new MinesLevel(ctx),
   (ctx) => new ChairsLevel(ctx),
   (ctx) => new GnomeLevel(ctx),
+  (ctx) => new QuizLevel(ctx),
   (ctx) => new DodgeballLevel(ctx),
   (ctx) => new SunburnLevel(ctx),
   (ctx) => new FroggerLevel(ctx),
