@@ -34,12 +34,12 @@ const Z_START = -24;
 const Z_ALCOVE_END = 169;
 const END_Z = 162; // the dead-end wall that sinks away
 /**
- * A stone pressure plate fills the last few metres before the dead end (all but a sliver of the
- * tunnel's width, so there's no way past it): stepping on it starts the ending.
+ * A stone pressure plate near the dead end, sticking up out of the floor: stepping on it starts
+ * the ending. PLATE_Z is its centre, PLATE_NEAR its edge nearest the spawn.
  */
-const END_ZONE = 3;
-const END_ZONE_Z = END_Z - END_ZONE;
-const PLATE_SIZE: [number, number] = [W - 0.6, END_ZONE];
+const PLATE_SIZE: [number, number] = [(W - 0.6) * 0.75, 2.25];
+const PLATE_Z = END_Z - 2.5;
+const PLATE_NEAR = PLATE_Z - PLATE_SIZE[1] / 2;
 const PORTAL_Z = -21;
 const PORTAL_R = 2;
 const SPAWN_Z = -2;
@@ -276,7 +276,7 @@ export class TempleLevel implements Level {
     this.levelBody = physics.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
     this.build();
     this.endWall = this.solid([0, H / 2, END_Z + 0.5], [W, H, 1], STONE_WALL, false);
-    this.plate = new PressurePlate(physics, [0, 0, END_ZONE_Z + END_ZONE / 2], [], player, (down) => {
+    this.plate = new PressurePlate(physics, [0, 0, PLATE_Z], [], player, (down) => {
       if (down && this.stage === 'chase' && player.mode === 'control') {
         this.setStage('endWait');
         this.sinceEnd = 0;
@@ -406,7 +406,7 @@ export class TempleLevel implements Level {
     };
     const jitter = () => (Math.random() - 0.5) * 0.3;
     // Kept clear of the arrival spot, the end zone and the portal, and off pit openings.
-    const clear = (z: number) => Math.abs(z - SPAWN_Z) > SPAWN_CLEAR && z < END_ZONE_Z - 1 && z < END_Z - 1;
+    const clear = (z: number) => Math.abs(z - SPAWN_Z) > SPAWN_CLEAR && z < PLATE_NEAR - 1 && z < END_Z - 1;
     const overGap = (z: number, gaps: [number, number][], margin = 0.3) => gaps.some(([a, b]) => z > a - margin && z < b + margin);
     const pick = (ok: (z: number) => boolean) => {
       for (let tries = 0; tries < 40; tries++) {
@@ -418,7 +418,7 @@ export class TempleLevel implements Level {
 
     // Rows, spread evenly along the run (nudged off any pit), each one a random pattern.
     const rows = (count: number, gaps: [number, number][], y: number, dir: number) => {
-      const from = SPAWN_Z + SPAWN_CLEAR + 1, to = END_ZONE_Z - 3;
+      const from = SPAWN_Z + SPAWN_CLEAR + 1, to = PLATE_NEAR - 3;
       for (let k = 0; k < count; k++) {
         const kinds = [ROWS.left, ROWS.right, ROWS.sides];
         const xs = Math.random() < FULL_ROW_CHANCE ? ROWS.full : kinds[Math.floor(Math.random() * kinds.length)];
@@ -464,8 +464,8 @@ export class TempleLevel implements Level {
       [...CEILING_PITS, SHAFT].some(([, b]) => z > b - 0.5 && z < b + ROCK_CLEAR) ||
       this.jumpRows.some((r) => (r.dir > 0 ? z > r.z - ROCK_CLEAR && z < r.z + 0.5 : z > r.z - 0.5 && z < r.z + ROCK_CLEAR));
     for (let i = 0; i < ROCKS; i++) {
-      let z = Z_START + 3 + Math.random() * (END_ZONE_Z - 1 - Z_START - 3);
-      for (let tries = 0; tries < 30 && beforeJump(z); tries++) z = Z_START + 3 + Math.random() * (END_ZONE_Z - 1 - Z_START - 3);
+      let z = Z_START + 3 + Math.random() * (PLATE_NEAR - 1 - Z_START - 3);
+      for (let tries = 0; tries < 30 && beforeJump(z); tries++) z = Z_START + 3 + Math.random() * (PLATE_NEAR - 1 - Z_START - 3);
       if (beforeJump(z)) continue;
       const x = (Math.random() * 2 - 1) * (W / 2 - 0.5);
       const s = 0.25 + Math.random() * 0.5; // overall size
@@ -602,9 +602,9 @@ export class TempleLevel implements Level {
       case 'chase':
         break; // until you step on the plate at the end
       case 'endWait': {
-        // The world freezes for the turn once the first boulder is nearly into the end zone (its
-        // edge within a metre of it), or after a couple of seconds, whichever comes first.
-        const gap = END_ZONE_Z - this.boulderPos(0)[2] - BOULDER_R;
+        // The world freezes for the turn once the first boulder is nearly at the plate (its edge
+        // within a metre of it), or after a couple of seconds, whichever comes first.
+        const gap = PLATE_NEAR - this.boulderPos(0)[2] - BOULDER_R;
         if (gap <= TURN_WHEN_BOULDER_WITHIN || this.stageT >= TURN_AFTER) this.startTurn();
         break;
       }

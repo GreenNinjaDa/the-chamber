@@ -19,6 +19,9 @@ const STONE_FRAME = [0.26, 0.23, 0.2];
 const RADIUS = 0.95;
 const RAISED = 0.13;
 const SUNK = 0.07;
+/** The stone slab is a solid block that sticks up this far until it's pressed down to this. */
+const STONE_RAISED = 0.28;
+const STONE_SUNK = 0.06;
 /** Stays down this long after losing contact, so a settling object doesn't make it flicker. */
 const RELEASE_DELAY = 0.3;
 
@@ -53,7 +56,7 @@ export class PressurePlate {
     if (this.stone) {
       const [w, d] = this.stone;
       physics.addStaticBox(add(pos, [0, 0.03, 0]), [w + 0.3, 0.06, d + 0.3]);
-      this.plate = physics.addStaticBox(this.plateCentre(RAISED), [w, 0.1, d]);
+      this.plate = physics.addStaticBox(this.plateCentre(STONE_RAISED), [w, STONE_RAISED, d]);
     } else {
       physics.addStaticCylinder(add(pos, [0, 0.03, 0]), this.radius + 0.2, 0.06);
       this.plate = physics.addStaticCylinder(this.plateCentre(RAISED), this.radius, 0.1);
@@ -61,8 +64,9 @@ export class PressurePlate {
     physics.addDrawable(this);
   }
 
+  /** Centre of the plate's collider with its top at `top` (the stone block reaches the floor). */
   private plateCentre(top: number): Vec3 {
-    return add(this.pos, [0, top - 0.05, 0]);
+    return add(this.pos, [0, this.stone ? top - STONE_RAISED / 2 : top - 0.05, 0]);
   }
 
   /** The player's movement capsule never makes contacts, so check where their feet (or body) are. */
@@ -92,7 +96,8 @@ export class PressurePlate {
     const down = this.sinceContact < RELEASE_DELAY;
     if (down !== this.pressed) {
       this.pressed = down;
-      this.plate.setTranslation(vec(this.plateCentre(down ? SUNK : RAISED)));
+      const [raised, sunk] = this.stone ? [STONE_RAISED, STONE_SUNK] : [RAISED, SUNK];
+      this.plate.setTranslation(vec(this.plateCentre(down ? sunk : raised)));
       if (down) this.everPressed = true;
       this.onChange?.(down);
     }
@@ -105,8 +110,9 @@ export class PressurePlate {
     const top = RAISED + (SUNK - RAISED) * this.depth;
     if (this.stone) {
       const [w, d] = this.stone;
+      const stoneTop = STONE_RAISED + (STONE_SUNK - STONE_RAISED) * this.depth;
       out.push({ mesh: 'bevelbox', model: mul(translation(add(p, [0, 0.03, 0])), scaling([w + 0.3, 0.06, d + 0.3])), color: STONE_FRAME, pattern: Pattern.rock, param: 1, spec: 0.05 });
-      out.push({ mesh: 'bevelbox', model: mul(translation(add(p, [0, top - 0.05, 0])), scaling([w, 0.1, d])), color: STONE, pattern: Pattern.rock, param: 1.5, spec: 0.05 });
+      out.push({ mesh: 'bevelbox', model: mul(translation(add(p, [0, stoneTop / 2, 0])), scaling([w, stoneTop, d])), color: STONE, pattern: Pattern.rock, param: 1.5, spec: 0.05 });
       return;
     }
     out.push({ mesh: 'cylinder', model: mul(translation(add(p, [0, 0.03, 0])), scaling([this.radius + 0.2, 0.06, this.radius + 0.2])), color: RING, spec: 0.3 });
