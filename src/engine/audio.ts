@@ -85,7 +85,7 @@ export function note(name: string): number {
   return 440 * Math.pow(2, (base + (Number(m[3]) - 4) * 12) / 12);
 }
 
-const tunes = new Set<Tune>();
+const tunes = new Set<{ stop(): void }>();
 
 /** Stops every tune (a level starting, or the pause menu). Levels start theirs again from update(). */
 export function stopTunes() {
@@ -102,7 +102,7 @@ export class Tune {
   private nextAt = 0;
   private index = 0;
 
-  constructor(private notes: [string | null, number][], private bpm: number, private opts: { wave?: Wave; vol?: number; bass?: boolean } = {}) {}
+  constructor(private notes: [string | null, number][], public bpm: number, private opts: { wave?: Wave; vol?: number; bass?: boolean } = {}) {}
 
   get playing() {
     return this.timer !== null;
@@ -139,6 +139,54 @@ export class Tune {
       this.nextAt += dur;
       this.index = (this.index + 1) % this.notes.length;
     }
+  }
+}
+
+/** A steady tone (a hum, a buzz) until `stop()`. `start()` is safe to call every frame. */
+export class Drone {
+  private osc: OscillatorNode | null = null;
+  private gain: GainNode | null = null;
+
+  constructor(private freq: number, private opts: { wave?: Wave; vol?: number; wobble?: number } = {}) {}
+
+  start() {
+    const c = ready();
+    if (!c || this.osc) return;
+    this.osc = c.createOscillator();
+    this.osc.type = this.opts.wave ?? 'sawtooth';
+    this.osc.frequency.value = this.freq;
+    this.gain = c.createGain();
+    this.gain.gain.setValueAtTime(0.0001, c.currentTime);
+    this.gain.gain.exponentialRampToValueAtTime(this.opts.vol ?? 0.05, c.currentTime + 0.3);
+    const filter = c.createBiquadFilter();
+    filter.frequency.value = this.freq * 6;
+    this.osc.connect(filter).connect(this.gain).connect(master!);
+    if (this.opts.wobble) {
+      // A slow wobble in pitch, like a motor.
+      const lfo = c.createOscillator(), depth = c.createGain();
+      lfo.frequency.value = this.opts.wobble;
+      depth.gain.value = this.freq * 0.03;
+      lfo.connect(depth).connect(this.osc.frequency);
+      lfo.start();
+      this.osc.addEventListener('ended', () => lfo.stop());
+    }
+    this.osc.start();
+    tunes.add(this);
+  }
+
+  /** Changes the pitch (glides there). */
+  setFreq(freq: number) {
+    if (freq === this.freq) return;
+    this.freq = freq;
+    if (this.osc && ctx) this.osc.frequency.setTargetAtTime(freq, ctx.currentTime, 0.1);
+  }
+
+  stop() {
+    tunes.delete(this);
+    if (!this.osc || !this.gain || !ctx) return;
+    this.gain.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.05);
+    this.osc.stop(ctx.currentTime + 0.3);
+    this.osc = this.gain = null;
   }
 }
 
@@ -213,8 +261,8 @@ export const sfx = {
     noise(0.35, { freq: 2500, to: 200, vol: 0.7 });
     tone(150, 0.2, { to: 40, wave: 'square', vol: 0.3 });
   },
-  laugh() {
-    for (let i = 0; i < 4; i++) tone(i % 2 ? 330 : 390, 0.12, { to: i % 2 ? 260 : 300, wave: 'sawtooth', vol: 0.12, at: i * 0.16 });
+  laugh(delay = 0) {
+    for (let i = 0; i < 4; i++) tone(i % 2 ? 330 : 390, 0.12, { to: i % 2 ? 260 : 300, wave: 'sawtooth', vol: 0.12, at: delay + i * 0.16 });
   },
 };
 

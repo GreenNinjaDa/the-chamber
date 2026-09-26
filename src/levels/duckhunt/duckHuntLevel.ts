@@ -1,3 +1,4 @@
+import { noise, sfx } from '../../engine/audio';
 import { add, clamp, mul, normalize, rotationX, rotationY, rotationZ, scaling, sub, translation, type Mat4, type Vec3 } from '../../engine/math';
 import type { RAPIER } from '../../engine/physics';
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
@@ -166,6 +167,7 @@ export class DuckHuntLevel implements Level {
     const { player } = this.ctx;
     this.flash = 0.09;
     camera.addShake(0.25);
+    sfx.shot();
     this.settle = 0;
     this.tracking = 0;
     this.shells--;
@@ -203,10 +205,12 @@ export class DuckHuntLevel implements Level {
   }
 
   private miss() {
+    sfx.laugh(0.35);
     this.dog = { mode: 'laugh', t: 0, x: Math.max(-8, Math.min(8, this.ctx.player.pos[0] + (Math.random() - 0.5) * 6)) };
   }
 
   private shred(b: Bush) {
+    noise(0.5, { freq: 3000, to: 800, type: 'bandpass', q: 1, vol: 0.35 });
     b.shredT = 0;
     if (b.collider) this.ctx.physics.world.removeCollider(b.collider, true);
     b.collider = null;

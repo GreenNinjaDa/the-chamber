@@ -1,3 +1,4 @@
+import { Drone, sfx } from '../../engine/audio';
 import { add, mul, normalize, rotationY, scale, scaling, segment, sub, translation, type Mat4, type Vec3 } from '../../engine/math';
 import type { Body } from '../../engine/physics';
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
@@ -72,6 +73,7 @@ export class MicrowaveLevel implements Level {
   private nextArc = 0;
   private death: Death | null = null;
   private done = false;
+  private hum = new Drone(60, { wave: 'sawtooth', vol: 0.07, wobble: 0.7 });
   private clock: WorldLabel = { pos: [0, 7.4, -CHAMBER_HALF + 0.35], text: '', size: 1.8, color: '#5dff8a' };
   private mode: WorldLabel = { pos: [0, 6.1, -CHAMBER_HALF + 0.35], text: '', size: 0.45, color: '#5dff8a' };
   private labelList: WorldLabel[];
@@ -150,8 +152,13 @@ export class MicrowaveLevel implements Level {
       this.clock.text = `0:${String(left).padStart(2, '0')}`;
       this.mode.text = t >= HIGH_AT ? 'POWER: HIGH (SORRY)' : 'POWER: LOW';
     }
+    if (cooking && this.status === 'playing') {
+      this.hum.start();
+      this.hum.setFreq(t >= HIGH_AT ? 72 : 60);
+    } else this.hum.stop();
     if (t >= COOK_TIME && !this.done) {
       this.done = true;
+      sfx.ding();
       this.clock.text = 'DING!';
       this.mode.text = 'ENJOY YOUR MEAL';
       this.exit.openNow();

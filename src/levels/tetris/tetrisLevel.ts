@@ -1,3 +1,4 @@
+import { note, tone, Tune } from '../../engine/audio';
 import { add, mul, scaling, translation, type Vec3 } from '../../engine/math';
 import type { RAPIER } from '../../engine/physics';
 import { Pattern, type DrawItem } from '../../engine/renderer';
@@ -26,6 +27,18 @@ const EXIT_COL = 8;
 const DEATH_SCREEN_DELAY = 1.8;
 /** Seconds per row, from the start to its fastest. */
 const STEP_START = 0.55;
+
+/** Korobeiniki, the folk tune everyone knows from somewhere. [note, beats]. */
+const KOROBEINIKI: [string | null, number][] = [
+  ['E5', 1], ['B4', 0.5], ['C5', 0.5], ['D5', 1], ['C5', 0.5], ['B4', 0.5],
+  ['A4', 1], ['A4', 0.5], ['C5', 0.5], ['E5', 1], ['D5', 0.5], ['C5', 0.5],
+  ['B4', 1.5], ['C5', 0.5], ['D5', 1], ['E5', 1],
+  ['C5', 1], ['A4', 1], ['A4', 2],
+  [null, 0.5], ['D5', 1], ['F5', 0.5], ['A5', 1], ['G5', 0.5], ['F5', 0.5],
+  ['E5', 1.5], ['C5', 0.5], ['E5', 1], ['D5', 0.5], ['C5', 0.5],
+  ['B4', 1], ['B4', 0.5], ['C5', 0.5], ['D5', 1], ['E5', 1],
+  ['C5', 1], ['A4', 1], ['A4', 1], [null, 1],
+];
 const STEP_FASTEST = 0.28;
 const STEP_RAMP = 70;
 /** Pieces stop steering this many rows above where they'll land. */
@@ -81,6 +94,7 @@ export class TetrisLevel implements Level {
   private next = Math.floor(Math.random() * 7);
   private stepT = 0;
   private time = 0;
+  private music = new Tune(KOROBEINIKI, 150, { wave: 'square', vol: 0.07, bass: true });
   private started = false;
   private lines = 0;
   private clearing: { rows: number[]; t: number } | null = null;
@@ -207,6 +221,10 @@ export class TetrisLevel implements Level {
     this.time += dt;
     if (!this.arrival.done) return;
     this.started = true;
+    if (this.status === 'playing' && !this.death) {
+      this.music.bpm = 150 + 60 * Math.min(1, this.time / STEP_RAMP);
+      this.music.start();
+    } else this.music.stop();
     // Side-on, like the real thing: the camera stands back from the well (see cameraShot), and
     // A / D always move along it.
     camera.yaw = -Math.PI / 2;
@@ -323,6 +341,7 @@ export class TetrisLevel implements Level {
     this.linesLabel.text = `LINES ${this.lines}`;
     this.flash.text = rows.length >= 4 ? 'TETRIS!' : rows.length > 1 ? `${rows.length} LINES!` : 'LINE!';
     this.flashUntil = this.time + 1.2;
+    rows.forEach((_, i) => tone(note(['C5', 'E5', 'G5', 'C6'][i % 4]), 0.15, { wave: 'square', vol: 0.12, at: i * 0.08 }));
   }
 
   private crush(big = 'GAME OVER', small?: string) {
