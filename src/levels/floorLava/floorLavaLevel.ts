@@ -53,8 +53,11 @@ const DUCK_DROP_AT = 0.9;
 const DUCK_DROP_HEIGHT = 18;
 const DUCK_GRAVITY = 22;
 const SAIL_SPEED = 2.0;
-/** Where the duck may land (the clear spots in the room); it picks the nearest one not too near you. */
-const DUCK_SPOTS: [number, number][] = [[-2.5, 7.4], [-6.3, -6.8], [2.8, -8.1], [7.0, 3.2]];
+/**
+ * Where the duck may land (clear spots in the room, all a good sail from the exit); it picks the
+ * nearest one that isn't too near you.
+ */
+const DUCK_SPOTS: [number, number][] = [[-2.5, 7.4], [-6.3, -6.8], [2.8, -8.1]];
 const DOCK: Vec3 = [CHAMBER_HALF - DUCK_HALF[0] - 0.06, 0, EXIT_Z];
 
 /** The rug in the middle of the room (it's floor, obviously). */
@@ -625,7 +628,8 @@ export class FloorLavaLevel implements Level {
       }
       const fall = t - DUCK_DROP_AT;
       const y = Math.max(0, DUCK_DROP_HEIGHT - 0.5 * DUCK_GRAVITY * fall * fall);
-      duck.moveTo([this.duckSpot[0], y, this.duckSpot[2]], duck.yaw, dt);
+      // (The first frame puts it up in the sky: no speed from wherever it was waiting.)
+      duck.moveTo([this.duckSpot[0], y, this.duckSpot[2]], duck.yaw, duck.pos[1] < -1 ? 0 : dt);
       // Anyone underneath is about to have a very bad day.
       const alive = player.mode === 'control' && !this.death;
       if (alive && y < player.pos[1] + 1.8 && y > player.pos[1] - 0.5 && duck.over(player.pos[0], player.pos[2], 0.2)) this.squash();
@@ -787,7 +791,7 @@ export class FloorLavaLevel implements Level {
 
   private causeOf(s: Surface): Cause {
     const step = this.step;
-    if (step?.kind === 'finale') return this.boarded ? 'overboard' : 'duck';
+    if (step?.kind === 'finale') return this.boarded && this.sailing ? 'overboard' : 'duck';
     if (s.kind === 'tide' || step?.kind === 'rising') return 'rising';
     if (s.kind === 'rug') return 'rug';
     if (s.kind === 'item' && step?.kind === 'rule') {

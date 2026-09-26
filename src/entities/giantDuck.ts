@@ -3,11 +3,12 @@ import { RAPIER, type Physics } from '../engine/physics';
 import { Pattern, type DrawItem } from '../engine/renderer';
 
 /*
- * A giant rubber duck (4 m long, 2.2 m tall) you can stand on: a kinematic body the level moves
- * by hand (drop it, float it, sail it), so it never tips over. Its body is a flat-bottomed
- * ellipsoid (a convex hull) whose back is 1.1 m up, low enough to jump onto from the floor; the
- * head is a ball on top at the front. Its local frame has the origin at the middle of its flat
- * bottom and the beak pointing along -z.
+ * A giant rubber duck (4 m long, 2.2 m tall) you can stand on, moved by hand by the level (drop it,
+ * float it, sail it), so it never tips over. It's a fixed body teleported every frame rather than a
+ * kinematic one: Rapier's character controller can't jump up alongside kinematic colliders. Riders
+ * are carried along with `pointVelocity` (player.platformVel). Its back is 1.1 m up, low enough to
+ * jump onto from the floor; the head is a ball on top at the front. Its local frame has the origin at
+ * the middle of its flat bottom and the beak pointing along -z.
  */
 
 /** The body: an ellipsoid with these radii, centred this high over the bottom (cut flat at 0). */
@@ -15,6 +16,11 @@ const BODY_R: Vec3 = [1.3, 0.65, 1.6];
 const BODY_Y = 0.45;
 /** Height of the top of its back over its bottom. */
 export const DUCK_BACK = BODY_Y + BODY_R[1];
+/**
+ * The body collider's side profile: (fraction of the body's radii, height), bottom to top. It never
+ * overhangs: jumping up an overhang counts as bumping your head, and you drop straight back down.
+ */
+const HULL_PROFILE: [number, number][] = [[0.9, 0], [0.9, 0.72], [0.74, 0.96], [0.45, 1.07], [0.001, DUCK_BACK]];
 const HEAD_R = 0.72;
 const HEAD: Vec3 = [0, 1.45, -1.2];
 /** Footprint half-sizes (x, z), for landing on things. */
@@ -45,21 +51,18 @@ export class GiantDuck {
     this.pos = [...pos];
     this.yaw = yaw;
     this.rb = physics.world.createRigidBody(
-      RAPIER.RigidBodyDesc.kinematicPositionBased()
+      RAPIER.RigidBodyDesc.fixed()
         .setTranslation(pos[0], pos[1], pos[2])
         .setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) }),
     );
-    // A flat-bottomed ellipsoid hull for the body...
+    // A hull for the body: the ellipsoid's outline from above, but with near-vertical flanks and a
+    // rounded top (an ellipsoid's bulging sides deflect a jumping player; a wall they can climb).
     const pts: number[] = [];
-    const rings = 7, segs = 18;
-    for (let i = 0; i <= rings; i++) {
-      const phi = -Math.PI / 2 + (Math.PI * i) / rings;
+    const segs = 20;
+    for (const [r, y] of HULL_PROFILE) {
       for (let j = 0; j < segs; j++) {
         const th = (Math.PI * 2 * j) / segs;
-        const x = BODY_R[0] * Math.cos(phi) * Math.cos(th);
-        const z = BODY_R[2] * Math.cos(phi) * Math.sin(th);
-        const y = Math.max(0, BODY_Y + BODY_R[1] * Math.sin(phi));
-        pts.push(x, y, z);
+        pts.push(BODY_R[0] * r * Math.cos(th), y, BODY_R[2] * r * Math.sin(th));
       }
     }
     const hull = RAPIER.ColliderDesc.convexHull(new Float32Array(pts));
@@ -79,16 +82,20 @@ export class GiantDuck {
     for (const c of this.colliders) c.setEnabled(solid);
   }
 
-  /** Moves it (kinematically) to `pos` facing `yaw`, and works out how fast it went, for riders. */
+  /** Moves it to `pos` facing `yaw`, and works out how fast it went, for riders (dt 0: a teleport). */
   moveTo(pos: Vec3, yaw: number, dt: number) {
-    if (dt > 0) {
+    if (dt <= 0) {
+      // Teleported: not moving.
+      this.vel = [0, 0, 0];
+      this.yawRate = 0;
+    } else {
       this.vel = [(pos[0] - this.pos[0]) / dt, (pos[1] - this.pos[1]) / dt, (pos[2] - this.pos[2]) / dt];
       this.yawRate = Math.atan2(Math.sin(yaw - this.yaw), Math.cos(yaw - this.yaw)) / dt;
     }
     this.pos = [...pos];
     this.yaw = yaw;
-    this.rb.setNextKinematicTranslation({ x: pos[0], y: pos[1], z: pos[2] });
-    this.rb.setNextKinematicRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) });
+    this.rb.setTranslation({ x: pos[0], y: pos[1], z: pos[2] }, false);
+    this.rb.setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) }, false);
   }
 
   /** The velocity of the duck's surface at world point `p` (its motion plus its turning). */
