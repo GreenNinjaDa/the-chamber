@@ -87,6 +87,9 @@ const SLIP = 0.75;
 const HANDS = 2.05;
 const REACH = 0.9;
 const HANG_OUT = 0.3;
+/** Grabbing on the run swings the claw (share of your speed); kicking your legs (WASD) swings it this hard (m/s²). */
+const GRAB_SWING = 0.15;
+const PUMP = 2.5;
 /** Feet below the hub when the claw grabs you (your head against the hub). */
 const GRIPPED = 2.3;
 const HEAD_TOP = 1.9;
@@ -810,6 +813,14 @@ export class ClawLevel implements Level {
         this.letGo(add(claw.velocity(), [0, -0.3, 0]));
         return;
       }
+      // Up top, kick your legs (WASD) to swing the claw about a bit. It doesn't get you anywhere.
+      const yaw = this.ctx.camera.yaw;
+      const fwd = (input.isDown('KeyW') ? 1 : 0) - (input.isDown('KeyS') ? 1 : 0);
+      const side = (input.isDown('KeyD') ? 1 : 0) - (input.isDown('KeyA') ? 1 : 0);
+      if ((fwd || side) && claw.y > CLAW_TOP - 3) {
+        const k = PUMP * dt;
+        claw.nudge([(-Math.sin(yaw) * fwd + Math.cos(yaw) * side) * k, 0, (-Math.cos(yaw) * fwd - Math.sin(yaw) * side) * k]);
+      }
       this.placeHanger(dt);
       return;
     }
@@ -819,6 +830,7 @@ export class ClawLevel implements Level {
     if (claw.distanceTo(hands) > REACH) return;
     const prong = claw.nearestProng(hands);
     this.hang = { prong, offset: sub(player.pos, this.hangSpot(prong)) };
+    claw.nudge(scale([player.vel[0], 0, player.vel[2]], GRAB_SWING));
     player.mode = 'swinging';
     player.vel = [0, 0, 0];
     this.fall = 'letgo';

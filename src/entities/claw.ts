@@ -115,6 +115,12 @@ export class Claw {
     return Math.abs(tx - this.x) < 0.04 && Math.abs(tz - this.z) < 0.04 && Math.abs(this.vx) + Math.abs(this.vz) < 0.15;
   }
 
+  /** Pushes the claw sideways on its cable (m/s added to its swing), e.g. someone grabbing it on the run. */
+  nudge(v: Vec3) {
+    this.svx += v[0];
+    this.svz += v[2];
+  }
+
   /** Stops the trolley where it is. */
   halt() {
     this.vx = this.vz = 0;
