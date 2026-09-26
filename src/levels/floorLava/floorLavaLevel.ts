@@ -1,3 +1,4 @@
+import { noise, note, tone } from '../../engine/audio';
 import { add, basis, clamp, mul, scale, scaling, translation, type Vec3 } from '../../engine/math';
 import { RAPIER, type Body, type RayHit } from '../../engine/physics';
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
@@ -298,6 +299,7 @@ export class FloorLavaLevel implements Level {
   private boarded = false;
   private death: Death | null = null;
   private burning = -1;
+  private shownHeader = '';
 
   // The finale.
   private duckSpot: Vec3 = [0, 0, 0];
@@ -442,6 +444,8 @@ export class FloorLavaLevel implements Level {
   // --- Screens ----------------------------------------------------------------------------------
 
   private show(header: string, line1: string, line2: string) {
+    if (header && header !== this.shownHeader) ['C5', 'E5', 'G5'].forEach((m, k) => tone(note(m), 0.14, { wave: 'triangle', vol: 0.14, at: k * 0.08 }));
+    this.shownHeader = header;
     const fit = (text: string, max: number) => Math.min(max, (SCREEN_W - 0.8) / (0.74 * Math.max(1, text.length)));
     for (const s of this.screens) {
       s.header.text = header;
@@ -460,6 +464,9 @@ export class FloorLavaLevel implements Level {
     this.countShown = n;
     for (const s of this.screens) s.count.text = n > 0 ? `${n}` : '';
     if (n > 0) this.ctx.hud.show(`${n}`, rule, 1.05);
+    // Beep, beep, beep... and the hiss as it turns.
+    if (n > 0) tone(n === 1 ? 990 : 660, 0.15, { wave: 'square', vol: 0.12 });
+    else noise(0.9, { freq: 900, to: 250, vol: 0.3 });
   }
 
   // --- The script -------------------------------------------------------------------------------
@@ -834,6 +841,7 @@ export class FloorLavaLevel implements Level {
     player.kill([(Math.random() - 0.5) * 2, 4.5, (Math.random() - 0.5) * 2], { violence: 3 });
     camera.addShake(0.35);
     this.burning = 0;
+    noise(1.2, { freq: 5000, to: 1500, type: 'highpass', vol: 0.3 });
     this.puff(add(player.pos, [0, 0.8, 0]), 14, 0.1);
     this.die(this.causeOf(s));
   }
