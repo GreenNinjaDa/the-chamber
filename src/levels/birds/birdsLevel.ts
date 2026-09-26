@@ -33,6 +33,9 @@ const SLING_BASE: Vec3 = [-17, -0.1, 0];
 /** The west wall: its middle (x) and top. Birds queue along its top. */
 const WALL_X = -CHAMBER_HALF - 0.5;
 const WALL_TOP = WALL_HEIGHT;
+/** The queue along the wall top starts at this z (just south of the slingshot), birds this far apart. */
+const QUEUE_START = 1.4;
+const QUEUE_GAP = 0.25;
 /** Script times, in seconds after the arrival: the slingshot rises, the birds perch on the wall, the penny drops. */
 const RISE_AT = 1.0;
 const RISE_TIME = 3.2;
@@ -508,7 +511,7 @@ export class BirdsLevel implements Level {
 
   private perchBirds() {
     // One bird per shot along the top of the west wall, nearest the slingshot first.
-    let z = 1.6;
+    let z = QUEUE_START;
     SHOTS.forEach((shot, i) => {
       if (i < this.skipTo) return;
       const r = BIRD_RADIUS[shot.bird];
@@ -518,7 +521,7 @@ export class BirdsLevel implements Level {
         bird: shot.bird, shot: i, pos: [...pos], goal: [...pos], hop: -1, hopFrom: [...pos],
         appear: PERCH_AT + (i - this.skipTo) * PERCH_GAP, shown: false, blink: rand(1, 4), yaw: Math.PI / 2,
       });
-      z += r + 0.35;
+      z += r + QUEUE_GAP;
     });
   }
 
@@ -699,7 +702,7 @@ export class BirdsLevel implements Level {
     this.aimError = [Math.cos(a) * e, 0, Math.sin(a) * e];
     sound.squawk(p.bird === 'terence' ? 0.45 : p.bird === 'blue' ? 1.4 : 1);
     // The rest shuffle up toward the slingshot.
-    let z = 1.6;
+    let z = QUEUE_START;
     for (const q of this.perched) {
       if (q === p || q.shot < this.shotIndex) continue;
       const r = BIRD_RADIUS[q.bird];
@@ -709,7 +712,7 @@ export class BirdsLevel implements Level {
         q.hopFrom = [...q.pos];
         q.hop = 0;
       }
-      z += r + 0.35;
+      z += r + QUEUE_GAP;
     }
   }
 

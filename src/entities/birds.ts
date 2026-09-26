@@ -13,7 +13,7 @@ import { Pattern, type DrawItem } from '../engine/renderer';
 export type BirdKind = 'red' | 'blue' | 'chuck' | 'bomb' | 'terence';
 
 /** Collision radius of each bird (m); the models are built around it. */
-export const BIRD_RADIUS: Record<BirdKind, number> = { red: 0.5, blue: 0.3, chuck: 0.5, bomb: 0.62, terence: 1.4 };
+export const BIRD_RADIUS: Record<BirdKind, number> = { red: 0.6, blue: 0.36, chuck: 0.6, bomb: 0.75, terence: 1.6 };
 export const BIRD_MASS: Record<BirdKind, number> = { red: 14, blue: 4, chuck: 12, bomb: 18, terence: 420 };
 
 const WHITE = [0.97, 0.97, 0.95];
