@@ -590,9 +590,11 @@ export class PacmanLevel implements Level {
       g.pos[0] = player.pos[0];
       g.pos[1] = player.pos[1] + 1.3;
       g.pos[2] = player.pos[2];
-      g.color[0] = 1.3 * d;
-      g.color[1] = 1.0 * d;
-      g.color[2] = 0.35 * d;
+      // Brighter and pulsing while the ghosts are scared: powered up.
+      const power = this.crew.frightLeft > 0 ? 1.7 + 0.5 * Math.sin(this.t * 10) : 1;
+      g.color[0] = 1.3 * d * power;
+      g.color[1] = 1.0 * d * power;
+      g.color[2] = 0.35 * d * power;
       e.pointLight = g;
     } else {
       e.pointLight = undefined;

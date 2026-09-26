@@ -229,7 +229,8 @@ export class Ghost {
     let mode: GhostLook = 'normal';
     if (eyes) mode = 'eyes';
     else if (this.scared) mode = crew.frightLeft < FLASH_TIME && Math.floor(crew.frightLeft * 5) % 2 === 0 ? 'flash' : 'scared';
-    const hover = this.state === 'house' ? 0.25 + 0.2 * Math.sin(time * 4 + this.phase) : 0.1 + 0.07 * Math.sin(time * 2.5 + this.phase);
+    let hover = this.state === 'house' ? 0.25 + 0.2 * Math.sin(time * 4 + this.phase) : 0.1 + 0.07 * Math.sin(time * 2.5 + this.phase);
+    if (mode === 'eyes') hover += 0.45; // bare eyes fly high enough to be seen over the walls
     // See-through with the camera in (or right up against) it.
     const d = Math.hypot(camPos[0] - this.pos[0], camPos[2] - this.pos[2]);
     const opacity = camPos[1] < GHOST_HEIGHT + 0.3 ? clamp((d - GHOST_RADIUS + 0.1) / 0.7, 0.35, 1) : 1;
