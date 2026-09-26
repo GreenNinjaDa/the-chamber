@@ -76,6 +76,12 @@ const CHASE_CATCHUP = 9.5;
 const ROLL_DELAY = 0.7;
 /** After the roll the first boulder rolls away toward the start faster than anyone can run. */
 const FLEE = 10.5;
+/**
+ * The second boulder starts slowly: at this share of its chase speed, easing up to full over
+ * SLOW_START_TIME, which costs it about a second of pace in all.
+ */
+const SLOW_START = 0.6;
+const SLOW_START_TIME = 5;
 /** How quickly the first boulder gets going again after the roll (it starts from rest). */
 const FLEE_GAIN = 0.6;
 
@@ -238,6 +244,8 @@ export class TempleLevel implements Level {
   private fleeing: Body | null = null;
   private fleeDelay = 0;
   private chaseDelay = 0;
+  /** How long the current chasing boulder has been rolling (after its delay). */
+  private chaseT = 0;
   private vines: Vine[];
   /** The rope the player is holding, and how far along it their hands are. */
   private rope: { vine: Vine; length: number } | null = null;
@@ -570,6 +578,7 @@ export class TempleLevel implements Level {
           camera.addShake(0.8);
           this.chasing = this.boulders[0];
           this.chaseDelay = ROLL_DELAY;
+          this.chaseT = 0;
           this.setStage('chase');
         }
         break;
@@ -638,6 +647,8 @@ export class TempleLevel implements Level {
     const along = this.flipped ? -1 : 1; // which way down the tunnel it chases
     const gap = (me[2] - b.rb.translation().z) * along - BOULDER_R;
     let target = gap > 14 ? CHASE_CATCHUP : gap < 4 ? CHASE_SLOW : CHASE;
+    this.chaseT += dt;
+    if (this.flipped) target *= SLOW_START + (1 - SLOW_START) * Math.min(1, this.chaseT / SLOW_START_TIME);
     if (this.death) target = 0; // it stops, rather than bulldozing the body
     this.rollAlong(b, along, target, dt);
   }
@@ -696,6 +707,7 @@ export class TempleLevel implements Level {
     this.release(1);
     this.chasing = this.boulders[1];
     this.chaseDelay = ROLL_DELAY + 0.5;
+    this.chaseT = 0;
     this.fleeing = this.boulders[0];
     this.fleeDelay = 0;
     this.ctx.camera.addShake(0.6);

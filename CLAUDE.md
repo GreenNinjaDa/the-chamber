@@ -79,7 +79,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   it settles gravity snaps over: everything, the player included (stunned 0.1 s, then immune to knocks for 1 s so landing head first doesn't
   stun them again), falls to the ceiling.
   The map never moves. The way back has the ceiling's own pits
-  and spikes; the new boulder chases, the first rolls off from rest and drops into its shaft (12 m deep, so both
+  and spikes; the new boulder chases (starting slowly: 60% of its speed, up to full over 5 s, about a second of pace
+  lost), the first rolls off from rest and drops into its shaft (12 m deep, so both
   boulders fit with room to spare), crossed on a second vine to the portal. Vines are physical ropes: hold E or left
   mouse near one to hang on at that length (`player.hanging` for the pose); let go to fly on; each snaps after one
   use. Boulders kill on contact with a small push. Boulders go 60% see-through with the camera inside them, and so
