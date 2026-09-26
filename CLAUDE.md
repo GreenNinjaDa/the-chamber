@@ -369,7 +369,26 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   scores the birds points (popups; "BIRDS: 12,450" and three stars on the north wall; a popped pig is 5,000).
   Survive all six (~60 s): the slingshot wilts, LEVEL FAILED (for the birds), the pig laughs, the exit opens.
   `?birdShot=N` starts with the Nth bird.
-- **Level 35 — Pinball** (`src/levels/pinball/`): you are the ball. The chamber is a pinball table (`entities/pinball.ts`):
+- **Level 35 — Katamari** (`src/levels/katamari/`): the chamber is littered with stuff: ~100 tiny things in heaps
+  (`entities/trinkets.ts`), most of the junk, three teddies, and the big pieces against the walls. After the arrival
+  a rainbow beam drops a tiny green prince and a 0.62 m sticky ball (`entities/katamari.ts`) into the NW corner, the
+  King (`entities/king.ts`, a giant crowned head) rises over the north wall, and the board under him says MAKE IT 5
+  METRES. USE ANYTHING. ANYTHING. (size readout, a bar with a red YOU tick at 3.4 m, a 90 s clock). His lines are
+  pinned across the top of the screen (world labels placed in front of the camera). The ball rolls up anything whose
+  biggest extent is at most half its diameter (d² grows by 0.8 × its two biggest extents multiplied, twice that for
+  things you carried or threw in: "OH, A VOLUNTEER."): the prince heads for the best thing nearby (bigger
+  preferred), stops now and then to admire his ball, and it speeds up as it grows (1.6 + 0.9 d m/s). Too-big things
+  bonk, and get shoved along rather than launched. At 3.4 m you count as stuff (1.7 m): the readout and bar go red, a
+  sting, a "!" over it for 1.4 s, then it hunts you (2.6 + 1.15 d, at most 7 m/s against a sprint's 8.5; it
+  swerves at 60% of its acceleration, so circling works; a red marker flags it within 9 m), detours for anything big
+  right in front of it, and every 6 s the King drops in something big it can eat (every third straight into its
+  path, the rest marked by a beam away from where you're running). Touch it and you're ROLLED UP: stuck on it,
+  flailing, while the camera watches from the side. 5 m: it floats up into the sky and becomes a star (the King
+  weeps), and the exit opens. Out of time: "UNACCEPTABLE.", beams from his eyes, ROYALLY ZAPPED. Test bots: only
+  fleeing runs out of time (the prince alone reaches 3.4 m at 70-85 s); feeding it gets there at 40-55 s, and then
+  running laps round the middle is never caught, while leading it through the deliveries wins at 60-85 s.
+  `?katTime=N` sets the clock, `?katSize=D` the starting diameter.
+- **Level 36 — Pinball** (`src/levels/pinball/`): you are the ball. The chamber is a pinball table (`entities/pinball.ts`):
   one fixed slab sloping 10° down to the south (surface 2 m up at the drain edge, z = 9.9, ~5.9 m at the north wall),
   a glossy navy playfield with a sunburst, stars and lamp inserts, cabinet side art and GI bulbs on the walls, a
   backglass on the north wall (orange dot-matrix display with score and messages, E X I T lamps, "SPACE CADAVER") and a
@@ -443,7 +462,13 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   `Flipper` (kinematic, swings about the table normal; `step(h)` from a physics substep hook, `relative` for hits),
   `PopBumper`, `Slingshot`, `DropTarget` (letter on its face, sinks when `drop()`ped), `spawnSteelBall`, `drawPlunger`,
   `drawStar` / `drawChevron` / `triangleModel` (any triangle from the 'wedge' mesh), `DotMatrix` (orange pixel-text
-  display), `pinSfx` (bumper chimes, flipper, knocker, jackpot, tilt...)). Put new
+  display), `pinSfx` (bumper chimes, flipper, knocker, jackpot, tilt...)),
+  `trinkets.ts` (`TRINKETS`: ~25 tiny household things as `JunkDef`s for `spawnJunk`: cans, mugs, books, shoes,
+  pencils, dice, donuts, a rubber chicken...), `katamari.ts` (`Katamari`: a sticky dynamic ball; `absorb(physics,
+  body)` takes a body out of the world and sticks it on the surface where it touched, turning with the ball;
+  `setRadius`; the prince who pushes it, drawn with `drawPrince`; `dimsOf(body)` gives any body's extents), `king.ts`
+  (`King`: a giant crowned head with a moustache that rises over a wall; `talk`, `tears`, `glow`, `lookAt`, `eye()`
+  for beams). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
