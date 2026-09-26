@@ -6,7 +6,7 @@ import {
 import { GRAVITY, RAPIER, type Body } from '../../engine/physics';
 import { Pattern, type DrawItem } from '../../engine/renderer';
 import { junk, spawnJunk } from '../../entities/junk';
-import { drawPoolLadder, spawnFloatingCouch, spawnPoolFloat, Water, type PoolFloatKind } from '../../entities/pool';
+import { drawLounger, drawParasol, drawPoolLadder, spawnFloatingCouch, spawnPoolFloat, Water, type PoolFloatKind } from '../../entities/pool';
 import { ExitPortal, PortalArrival } from '../../entities/portal';
 import { CursorHand, drawBubble, drawGrimReaper, drawPlumbob, NeedsPanel } from '../../entities/sims';
 import type { Pose } from '../../game/body';
@@ -441,6 +441,7 @@ export class PoolLevel implements Level {
 
     if (this.t > POP_AT && !this.death && this.status === 'playing') this.music.start();
     this.exit.update(dt, player);
+    if (this.exit.open && player.mode === 'control' && this.once('dagdag', Math.hypot(player.pos[0] - CHAMBER_HALF, player.pos[2]) < 3.2)) this.speak('Dag dag!', 1.5);
     if (this.exit.entered && this.status === 'playing') this.status = 'exited';
   }
 
@@ -501,6 +502,11 @@ export class PoolLevel implements Level {
     const cost = X_HALF * 2 * Z_HALF * 2 * POOL_PRICE;
     this.say(`-§${cost.toLocaleString('en-US')}`, add(this.cursor.tip, [0, 3.6, 0]), 0.9, '#ff5a4a', 2.2, [0, 1, 0]);
     this.ctx.camera.addShake(0.35);
+    // Buy mode throws in some poolside furniture.
+    for (const [kind, x, z] of FURNITURE) {
+      if (kind === 'lounger') this.ctx.physics.addStaticBox([x, 0.2, z], [2, 0.4, 0.7]);
+      else this.ctx.physics.addStaticCylinder([x, 1.15, z], 0.06, 2.3);
+    }
     // Anyone not standing over the pool gets helped in.
     const p = player.pos;
     if (player.mode === 'control' && !this.water.contains(p[0], p[2], -0.3)) {
@@ -671,7 +677,10 @@ export class PoolLevel implements Level {
     }
   }
 
-  /** Something floating with its top within reach, in front of the Sim (or around them). */
+  /**
+   * Something floating with its top within reach round the Sim: the highest such top (a crate
+   * stacked on the pallet beats the pallet), preferring what's in front of them.
+   */
   private findClamber(): { body: Body; point: Vec3 } | null {
     const { player, physics, camera } = this.ctx;
     const p = player.pos;
@@ -680,7 +689,8 @@ export class PoolLevel implements Level {
       [-Math.sin(player.facing), 0, -Math.cos(player.facing)],
     ];
     for (let i = 0; i < 8; i++) dirs.push([Math.cos((i / 8) * Math.PI * 2), 0, Math.sin((i / 8) * Math.PI * 2)]);
-    for (const d of dirs) {
+    let best: { body: Body; point: Vec3; score: number } | null = null;
+    dirs.forEach((d, di) => {
       for (const reach of [0.45, 0.75, 1.05, 1.3]) {
         const origin: Vec3 = [p[0] + d[0] * reach, WATER_Y + 1.8, p[2] + d[2] * reach];
         const hit = physics.raycast(origin, [0, -1, 0], 2.6, player.collider ?? undefined);
@@ -689,6 +699,7 @@ export class PoolLevel implements Level {
         if (!body || hit.normal[1] < 0.55) continue;
         if (hit.point[1] > WATER_Y + CLAMBER_MAX || hit.point[1] < WATER_Y - 0.4) continue;
         // Climb onto the middle of it (or as far in as half a metre), not its very edge.
+        let point = hit.point;
         const c = body.rb.translation();
         const toward: Vec3 = [c.x - hit.point[0], 0, c.z - hit.point[2]];
         const len = Math.hypot(toward[0], toward[2]);
@@ -696,14 +707,13 @@ export class PoolLevel implements Level {
           const k = Math.min(len, 0.5) / len;
           const inner: Vec3 = [hit.point[0] + toward[0] * k, WATER_Y + 1.8, hit.point[2] + toward[2] * k];
           const top = physics.raycast(inner, [0, -1, 0], 2.6, player.collider ?? undefined);
-          if (top && this.water.bodyFor(top.collider) === body && top.normal[1] > 0.55 && top.point[1] < WATER_Y + CLAMBER_MAX + 0.1) {
-            return { body, point: top.point };
-          }
+          if (top && this.water.bodyFor(top.collider) === body && top.normal[1] > 0.55 && top.point[1] < WATER_Y + CLAMBER_MAX + 0.1) point = top.point;
         }
-        return { body, point: hit.point };
+        const score = point[1] - reach * 0.1 + (di < 2 ? 0.15 : 0);
+        if (!best || score > best.score) best = { body, point, score };
       }
-    }
-    return null;
+    });
+    return best;
   }
 
   private updateClamber(dt: number) {
@@ -1161,6 +1171,7 @@ export class PoolLevel implements Level {
     if (this.dragTo && this.dragFade > 0) this.drawDrag(out);
     this.needs.draw(out);
     this.drawLadder(out);
+    this.drawFurniture(out);
     this.drawCursor(out);
     this.drawSim(out, time);
     if (this.reaper) drawGrimReaper(out, this.reaper.pos, this.reaper.yaw, this.time, clamp((this.reaper.t - 1.8) / 0.5, 0, 1));
@@ -1243,6 +1254,19 @@ export class PoolLevel implements Level {
     else if (l.placed >= 0) m = mul(translation(l.pos), rotationY(l.yaw));
     else return;
     drawPoolLadder(out, m);
+  }
+
+  /** Loungers and parasols, popping in one after another once the pool's built. */
+  private drawFurniture(out: DrawItem[]) {
+    if (!this.built) return;
+    FURNITURE.forEach(([kind, x, z, yaw], i) => {
+      const k = clamp((this.t - RELEASE_AT - 0.3 - i * 0.12) / 0.3, 0, 1);
+      if (k <= 0) return;
+      const s = k < 1 ? k * (1 + Math.sin(k * Math.PI) * 0.3) : 1;
+      const m = mul(translation([x, 0, z]), rotationY(yaw), scaling([s, s, s]));
+      if (kind === 'lounger') drawLounger(out, m);
+      else drawParasol(out, m);
+    });
   }
 
   private drawCursor(out: DrawItem[]) {
@@ -1475,6 +1499,15 @@ const LADDER_SPOTS: [number, number, number][] = [
 const DOOR_TIP: Vec3 = [CHAMBER_HALF - 0.9, 2.2, 0];
 
 const LADDER_TARGET: TrackedTarget = { pos: [0, 0, 0], radius: 0.8, color: 'purple' };
+
+/** Poolside furniture that turns up with the pool: kind, x, z, yaw. Nothing on the east deck (the exit). */
+const FURNITURE: ['lounger' | 'parasol', number, number, number][] = [
+  ['lounger', -6.4, -10.2, 0],
+  ['lounger', -3.1, -10.2, 0],
+  ['parasol', -8.9, -10.5, 0],
+  ['lounger', 4.6, 10.3, Math.PI],
+  ['parasol', 7.6, 10.6, 0],
+];
 
 const FOOT_RAYS: [number, number][] = [[0, 0], [0.22, 0], [-0.22, 0], [0, 0.22], [0, -0.22]];
 

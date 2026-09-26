@@ -316,6 +316,37 @@ export function spawnFloatingCouch(physics: Physics, water: Water, pos: Vec3, ya
   return body;
 }
 
+// --- Poolside furniture ------------------------------------------------------------------------------
+
+const PLASTIC = [0.95, 0.95, 0.93];
+
+/**
+ * A white plastic sun lounger with a striped towel, in its own frame: feet at the origin, 2 m long
+ * along x (the backrest up at +x), 0.7 m wide. Its bed is 0.38 m up.
+ */
+export function drawLounger(out: DrawItem[], m: Mat4) {
+  const put = (p: Vec3, s: Vec3, color: number[], rot?: Mat4) =>
+    out.push({ mesh: 'box', model: rot ? mul(m, translation(p), rot, scaling(s)) : mul(m, translation(p), scaling(s)), color, spec: 0.4 });
+  for (const x of [-0.85, 0.55]) for (const z of [-0.3, 0.3]) put([x, 0.17, z], [0.06, 0.34, 0.06], PLASTIC);
+  for (let i = 0; i < 9; i++) put([-0.95 + i * 0.16, 0.37, 0], [0.12, 0.04, 0.66], PLASTIC);
+  // The backrest, tilted up.
+  const back = mul(translation([0.62, 0.37, 0]), rotationZ(0.75));
+  for (let i = 0; i < 4; i++) out.push({ mesh: 'box', model: mul(m, back, translation([0.1 + i * 0.16, 0, 0]), scaling([0.12, 0.04, 0.66])), color: PLASTIC, spec: 0.4 });
+  // A towel, in stripes.
+  for (let i = 0; i < 5; i++) put([-0.7 + i * 0.22, 0.4, 0], [0.22, 0.02, 0.56], i % 2 ? [0.95, 0.95, 0.95] : [0.15, 0.45, 0.85]);
+}
+
+/** A striped beach parasol, in its own frame: its foot at the origin, 2.5 m tall, a 1.5 m canopy. */
+export function drawParasol(out: DrawItem[], m: Mat4) {
+  out.push({ mesh: 'cylinder', model: mul(m, translation([0, 0.04, 0]), scaling([0.28, 0.08, 0.28])), color: [0.3, 0.3, 0.32], spec: 0.5 });
+  out.push({ mesh: 'cylinder', model: mul(m, translation([0, 1.25, 0]), scaling([0.035, 2.5, 0.035])), color: [0.85, 0.85, 0.82], spec: 0.6 });
+  // The canopy: red, with a white band round it (a smaller cone poking out of the middle).
+  out.push({ mesh: 'cone', model: mul(m, translation([0, 2.3, 0]), scaling([1.5, 0.5, 1.5])), color: [0.92, 0.2, 0.18], spec: 0.2 });
+  out.push({ mesh: 'cone', model: mul(m, translation([0, 2.4, 0]), scaling([1.02, 0.34, 1.02])), color: [0.96, 0.95, 0.9], spec: 0.2 });
+  out.push({ mesh: 'cone', model: mul(m, translation([0, 2.5, 0]), scaling([0.55, 0.19, 0.55])), color: [0.92, 0.2, 0.18], spec: 0.2 });
+  out.push({ mesh: 'sphere', model: mul(m, translation([0, 2.6, 0]), scaling([0.06, 0.06, 0.06])), color: [0.92, 0.2, 0.18], spec: 0.5 });
+}
+
 // --- The ladder ------------------------------------------------------------------------------------
 
 const CHROME = [0.82, 0.84, 0.88];

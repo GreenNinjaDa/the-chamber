@@ -323,6 +323,24 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   OVER, naming the ghost). All pellets eaten: the maze flashes, sinks, and the exit opens; the last 3 pellets get
   purple markers. Score and an unbeatable HIGH SCORE (3,333,360) on the north wall; no looking up while the maze
   is up (keeps the camera above the walls).
+- **Level 30 — The Pool** (`src/levels/pool/`; The Sims' pool-ladder prank): its own room (`none`: the walls, and a
+  deck round an 18 x 16 pool, 4.2 m deep, the water 1.7 m under the deck). Once the Sim is up after the arrival a
+  green plumbob pops over their head ("Sul sul!"), a needs panel lights up on the north wall (ENERGY, FUN "Very high",
+  HYGIENE, SOCIAL "The cursor is your friend", BLADDER "Don't. Just don't."), and the camera swings up into a
+  build-mode view while a giant white cursor glove (`entities/sims.ts`) clicks and drags a blue rectangle (size and
+  §price) over the floor. On release the middle of the floor sinks into a tiled pool (lane lines, caustics,
+  see-through water) with everything on it (crates, a small crate, a pallet, an air mattress, a ring, noodles, a
+  beach ball, a duck; loungers and parasols pop up on the deck); anyone on the deck is picked up by the scruff and
+  dropped in. Swimming (`player.gravityScale` 0 and a float spring, 42% speed, a paddle / treading pose): Space hops,
+  or hauls you up onto anything floating whose top is within 0.9 m of the water (`player.mode = 'swinging'` for
+  0.5 s), onto the highest one in reach. The cursor places a ladder (purple marker) a swim away and deletes it
+  when you get within 3.8 m (or after 9 s): "+§50", "Nooboo!", a thought bubble of a crossed-out ladder. Then it
+  drops in a fridge (sinks) and a couch (floats, with a seat and back to stand on), and circles overhead. ENERGY
+  drains only in the water (55 s; the plumbob goes yellow then red, strokes slow, the head dips): at 0 the Sim
+  drowns (sinks slowly, bubbles), the Grim Reaper floats down with his scythe and clipboard ("*scribble
+  scribble*", "Drowned. Classic.") and it's SIM DIED. Way out: a crate (or the couch) pushed against the side and
+  jumped from (a pallet or the air mattress alone is too low; a crate on the pallet works in two jumps). Out on
+  the deck, the cursor flies to the exit, "DELETE DOOR?", hesitates... "...nah." and the exit opens.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -369,7 +387,13 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   beanbag, piano bench: `spawnFurniture`, sofas and armchairs with seat / back / arm colliders so you stand on the
   cushions; `drawRug`, `drawPainting`), `giantDuck.ts` (a 4 m rubber duck you can stand on: a fixed body the level
   moves with `moveTo`, which carries a rider along), `elevator.ts` (the chamber as an elevator car: doors, handrails,
-  LED floor indicator `FloorIndicator`, button panel `CarPanel`, crosshead and grate, the scrolling shaft). Put new
+  LED floor indicator `FloorIndicator`, button panel `CarPanel`, crosshead and grate, the scrolling shaft),
+  `pool.ts` (`Water`: a rectangle of water that floats loose objects from sample points: buoyancy `capacity` in kg,
+  drag, bobbing damped near critical, optional `righting`; `setLoad` for someone standing on a float, `splashes` to
+  show; pool toys `spawnPoolFloat` (ring, noodle, air mattress, pallet), `spawnFloatingCouch`, `drawPoolLadder`,
+  `drawLounger`, `drawParasol`), `sims.ts` (The Sims: `drawPlumbob` in a mood colour, `CursorHand` (the giant
+  build-mode glove: `flyTo`, `follow`, `pinch`), `drawBubble` (camera-facing speech / thought bubble; the text is
+  a world label), `NeedsPanel`, `drawGrimReaper`). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
@@ -430,7 +454,10 @@ Shared mechanics available to levels (via `ctx`):
 - Rapier's character controller can't jump up alongside kinematic colliders (the jump dies at once) or up an
   overhang (counts as bumping your head): for something moving that the player should climb onto, use a fixed body
   and teleport it every frame, and move whoever stands on it yourself (`GiantDuck.moveTo`).
-- `Pattern.lava` with `param` 2 draws a thing turned molten (hotter than a pool, and varying with height too).
+- `Pattern.lava` with `param` 2 draws a thing turned molten (hotter than a pool, and varying with height too);
+  `param` 3 is see-through pool water (give it an `opacity`; it gets more opaque at grazing angles). A negative
+  `Pattern.panels` param draws underwater tiles of that size with rippling caustics.
+- `player.cancelJump()` forgets a buffered Space press the level used for something else.
 - Boulders use `GROUPS_BOULDER`, and invisible `GROUPS_BOULDER_BRIDGE` colliders are floors only boulders touch
   (so they roll over pits the player has to jump). Loose objects on `GROUPS_DEBRIS` behave normally but boulders
   pass through them.
