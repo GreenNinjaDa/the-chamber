@@ -164,9 +164,8 @@ export class Ghost {
       case 'eyes': {
         const speed = this.state === 'eyes' ? EYES_SPEED : this.scared ? SCARED_SPEED : crew.speedOf(this);
         let dist = speed * dt;
-        const cell = CELL;
         while (dist > 0) {
-          const left = cell - this.prog;
+          const left = CELL - this.prog;
           if (dist < left) {
             this.prog += dist;
             break;
