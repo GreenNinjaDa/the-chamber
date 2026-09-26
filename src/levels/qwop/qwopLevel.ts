@@ -140,6 +140,8 @@ export class QwopLevel implements Level {
   private death: { t: number; big: string; small: string; tips: [string, string][] } | null = null;
   /** Furthest the pelvis has got (m past the start), for milestones and the death screen. */
   private best = 0;
+  /** The distance the readout sticks at once it's over. */
+  private shownDist: number | null = null;
   private milestone = 0;
   private tapeBroken = -1;
   private bang = -1;
@@ -160,11 +162,14 @@ export class QwopLevel implements Level {
   private chimed = false;
   private boardOn = 0;
   private signs: PixelText[] = [];
-  private noteLabel: WorldLabel = { pos: [0, 5.05, BOARD_Z + 0.2], text: '', size: 0.34, color: '#ffe9a8' };
+  private noteLabel: WorldLabel = { pos: [0, 5.2, BOARD_Z + 0.2], text: '', size: 0.5, color: '#ffe9a8' };
   private noteT = 0;
   private metresLabel: WorldLabel = { pos: [0, 0, 0], text: '', size: 0.34, color: '#ffffff' };
   private dnfLabels: WorldLabel[] = DNF.map((d) => ({ pos: [d.at[0] + (d.how === 'bug' ? -0.6 : 0.6), 1.1, d.at[2]], text: 'DNF', size: 0.3, color: '#ff8a80' }));
   private labelList: WorldLabel[] = [];
+  private shotPos: Vec3 = [0, 1.45, LANE_Z + 4.4];
+  private shotTarget: Vec3 = [0, 0.98, LANE_Z];
+  private shot: CameraShot = { pos: this.shotPos, target: this.shotTarget, sharpness: 5 };
   /** The feel of it (see TUNING); play-test bots can change it. */
   readonly tune = { ...TUNING };
   private staticItems: DrawItem[] = [];
@@ -322,7 +327,7 @@ export class QwopLevel implements Level {
     const { player } = this.ctx;
     this.enter('marks');
     this.rowNew.reveal = this.rowBelieve.reveal = this.rowOld.reveal = this.boardOn = 1;
-    this.crowd.rise = this.track.unroll = 1;
+    this.crowd.rise = this.track.unroll = this.strike = 1;
     for (const s of this.signs) s.reveal = 1;
     player.pos = [START_X, 0, LANE_Z];
     player.facing = -Math.PI / 2;
@@ -469,7 +474,7 @@ export class QwopLevel implements Level {
     chest.applyTorqueImpulse({ x: 0, y: 0, z: -tau * h }, true);
   }
 
-  /** True if the part is resting on (or hitting) anything that isn't the body itself. */
+  /** True if the part is resting on (or hitting) the ground (anything but the body, from above). */
   private touchingGround(body: PhysBody, part: PartName) {
     const collider = body.colliders[PART_NAMES.indexOf(part)];
     const world = this.ctx.physics.world;
@@ -477,6 +482,7 @@ export class QwopLevel implements Level {
     world.contactPairsWith(collider, (other) => {
       if (touching || body.owns(other)) return;
       world.contactPair(collider, other, (m) => {
+        if (Math.abs(m.normal().y) < 0.6) return; // leaning on a wall doesn't count
         for (let i = 0; i < m.numContacts(); i++) if (m.contactDist(i) < 0.02) touching = true;
       });
     });
@@ -493,6 +499,7 @@ export class QwopLevel implements Level {
   private finish() {
     const { hud } = this.ctx;
     this.enter('finished');
+    this.shownDist = FINISH_X - START_X;
     this.tapeBroken = 0;
     const time = this.runTime.toFixed(1);
     this.rowStatus.setText(`${time} S`);
@@ -514,6 +521,7 @@ export class QwopLevel implements Level {
   private fall(dist: number) {
     const { player, camera } = this.ctx;
     this.enter('fell');
+    this.shownDist = dist;
     player.kill([0, 0, 0]);
     camera.addShake(0.25);
     sfx.thud(0.5);
@@ -532,6 +540,7 @@ export class QwopLevel implements Level {
 
   private timeout(dist: number) {
     this.enter('timeout');
+    this.shownDist = dist;
     this.rowStatus.setText('CLOSED');
     this.rowBelieve.setText('WE STOPPED BELIEVING');
     this.crowd.mood = 'stare';
@@ -586,10 +595,11 @@ export class QwopLevel implements Level {
     if (this.noteLabel.text) list.push(this.noteLabel);
     if (this.phase !== 'arrive' && this.phase !== 'build') for (const l of this.dnfLabels) list.push(l);
     // QWOP's distance readout, pinned near the top of the side-on view.
-    const running = this.phase === 'run' || this.phase === 'fell' || this.phase === 'timeout' || this.phase === 'marks' || this.phase === 'set';
+    const running = this.phase === 'run' || this.phase === 'fell' || this.phase === 'timeout' || this.phase === 'marks' || this.phase === 'set' ||
+      (this.phase === 'finished' && player.mode === 'puppet');
     if (running && player.body) {
       const fwd = normalize(sub(camera.target, camera.pos));
-      const d = player.body.position('pelvis')[0] - START_X;
+      const d = this.shownDist ?? player.body.position('pelvis')[0] - START_X;
       this.metresLabel.pos = [camera.pos[0] + fwd[0] * 5 - 4.2, camera.pos[1] + fwd[1] * 5 + 2.45, camera.pos[2] + fwd[2] * 5];
       this.metresLabel.text = `${(Math.abs(d) < 0.05 ? 0 : d).toFixed(1)} metres`;
       list.push(this.metresLabel);
@@ -621,6 +631,7 @@ export class QwopLevel implements Level {
       out.push({ mesh: 'box', model: mul(translation([-3.9 + w / 2, 8.95, BOARD_Z + 0.08]), scaling([w, 0.16, 0.05])), color: LED_RED, pattern: Pattern.emissive, shadow: false });
     }
     this.drawTape(out);
+    this.drawHipNumber(out);
     this.drawStarter(out, time);
     this.drawDnf(out);
     this.confetti.draw(out);
@@ -643,6 +654,19 @@ export class QwopLevel implements Level {
       const cy = TAPE_Y - Math.sin(droop) * half / 2;
       out.push({ mesh: 'box', model: mul(translation([FINISH_X + 0.1, cy, cz]), rotationX(a), scaling([0.03, 0.06, half])), color, shadow: false });
     }
+  }
+
+  /** A lane-4 sticker on the runner's hip, facing the camera like the real ones. */
+  private drawHipNumber(out: DrawItem[]) {
+    const { player } = this.ctx;
+    if (this.phase === 'build' || player.mode === 'hidden' || player.portalScale < 1) return;
+    const pelvis = player.partFrames().pelvis;
+    const box = (c: Vec3, s: Vec3, color: number[]) => out.push({ mesh: 'box', model: mul(pelvis, translation(c), scaling(s)), color, shadow: false });
+    box([0.182, 0, 0], [0.012, 0.15, 0.17], [0.97, 0.97, 0.95]);
+    const ink = [0.05, 0.05, 0.06];
+    box([0.19, 0, -0.025], [0.006, 0.1, 0.018], ink);
+    box([0.19, -0.012, 0], [0.006, 0.017, 0.07], ink);
+    box([0.19, 0.022, 0.028], [0.006, 0.055, 0.016], ink);
   }
 
   private drawStarter(out: DrawItem[], time: number) {
@@ -723,21 +747,25 @@ export class QwopLevel implements Level {
     switch (this.phase) {
       case 'build':
         // Taking in the stadium.
-        return { pos: [0, 4.2, 10.5], target: [0, 3, -8], sharpness: 2.5 };
+        return { pos: [0, 6.2, 11.6], target: [0, 2.6, -7], sharpness: 2.5 };
       case 'marks':
       case 'set':
       case 'run':
       case 'fell':
-      case 'timeout': {
-        // Side on, like the original, following the runner.
-        const x = this.camX + 0.7;
-        return { pos: [x, 1.55, LANE_Z + 5], target: [x, 1.0, LANE_Z], sharpness: this.phase === 'marks' && this.t < 0.1 ? 60 : 5 };
-      }
+      case 'timeout':
+        return this.sideShot(this.phase === 'marks' && this.t < 0.1 ? 60 : 5);
       case 'finished':
-        if (this.ctx.player.mode === 'puppet') return { pos: [this.camX + 0.7, 1.55, LANE_Z + 5], target: [this.camX + 0.7, 1.0, LANE_Z], sharpness: 5 };
-        return null;
+        return this.ctx.player.mode === 'puppet' ? this.sideShot(5) : null;
       default:
         return null;
     }
+  }
+
+  /** Side on, like the original, following the runner. */
+  private sideShot(sharpness: number): CameraShot {
+    const x = this.camX + 0.7;
+    this.shotPos[0] = this.shotTarget[0] = x;
+    this.shot.sharpness = sharpness;
+    return this.shot;
   }
 }

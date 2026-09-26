@@ -218,7 +218,7 @@ export interface TrackOptions {
   finishX: number;
 }
 
-const TARTAN = [0.55, 0.12, 0.08];
+const TARTAN = [0.42, 0.075, 0.045];
 const GRASS = [0.17, 0.36, 0.12];
 const LINE = [0.95, 0.95, 0.95];
 
