@@ -112,7 +112,6 @@ const SPOTS: Vec3[] = [[10.6, 0, 10.2], [9.2, 0, 11], [8.3, 0, 9.6], [10.6, 0, -
 const COVER: [string, number, number, number][] = [
   ['fridge', -5.5, -6.3, 0.1],
   ['vending machine', -3.2, 3.8, -0.05],
-  ['washing machine', -7, 5.6, 0.3],
   ['piano', -0.8, -1.9, Math.PI / 2 + 0.05],
   ['bookcase', 1.8, 7.2, Math.PI / 2],
   ['fridge', 2.6, -7.2, -0.1],
@@ -282,7 +281,7 @@ export class RedLightLevel implements Level {
   private startGreen() {
     const n = this.cycle++;
     const len = n === 0 ? FIRST_GREEN : n === 1 ? 3.4 : n === 2 ? 3.0
-      : rand(Math.max(1.3, 2.2 - 0.2 * (n - 3)), Math.max(1.8, 3.6 - 0.25 * (n - 3)));
+      : rand(Math.max(1.5, 2.3 - 0.2 * (n - 3)), Math.max(1.9, 3.6 - 0.25 * (n - 3)));
     this.setPhase('green', len);
     this.chantT = 0;
     this.chantLen = len;

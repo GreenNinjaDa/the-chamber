@@ -93,7 +93,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   moving (actual displacement over 0.3 m/s, or jumping) from 0.45 s after the turn (+0.5 s / +0.2 s in the first two
   red lights; stopping from a sprint takes ~0.42 s) while she has clear rays from her eyes to two of your head, chest
   and pelvis (`SEEN_PARTS`) gets you lasered (two red beams) and flung, violence 22. Moving right behind something tall
-  (fridge, vending machine, bookcase, the stacked crates; the piano, couch and washer are too low from 6 m up) is safe. You arrive at (-9.5, 0) facing east; cross the
+  (fridge, vending machine, bookcase, the stacked crates; the piano and couch are too low from 6 m up) is safe. You arrive at (-9.5, 0) facing east; cross the
   red tape at x = 7 and the exit (z = 5) opens while her head does a slow 360. A 60 s clock on the north wall: at 0
   she lasers everyone still short of the line. Six scripted contestants in green tracksuits (`entities/contestant.ts`,
   the player's body via `drawBody` colours, numbers floating overhead) run on green and freeze on red; 324 keeps
