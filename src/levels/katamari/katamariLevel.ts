@@ -602,11 +602,13 @@ export class KatamariLevel implements Level {
     } else if (hs < 0.35 * speed && len > this.kat.radius + 0.5) {
       this.stuckT += dt;
       if (this.stuckT > 0.9) {
+        // Back off to one side, whichever side is more open (toward the middle of the room).
         this.stuckT = 0;
         this.dodgeT = 0.7;
-        const side = Math.random() < 0.5 ? 1 : -1;
-        const a = Math.atan2(dz, dx) + Math.PI + side * 1.1;
-        this.dodgeDir = [Math.cos(a), Math.sin(a)];
+        const a0 = Math.atan2(dz, dx) + Math.PI;
+        const open = (s: number) => -(Math.cos(a0 + s * 1.1) * c[0] + Math.sin(a0 + s * 1.1) * c[2]);
+        const side = open(1) + rand(-1, 1) > open(-1) ? 1 : -1;
+        this.dodgeDir = [Math.cos(a0 + side * 1.1), Math.sin(a0 + side * 1.1)];
       }
     } else this.stuckT = 0;
     const accel = Math.min(ACCEL_MAX, ACCEL_BASE + ACCEL_PER_M * d);

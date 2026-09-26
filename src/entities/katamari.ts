@@ -2,7 +2,7 @@ import {
   approachAngle, clamp, fromQuat, mul, quatConj, quatMul, rotateByQuat, rotationX, rotationY, rotationZ, scaling, toQuat, translation,
   type Mat4, type Quat, type Vec3,
 } from '../engine/math';
-import type { Body, BodyModel, Physics } from '../engine/physics';
+import { RAPIER, type Body, type BodyModel, type Physics } from '../engine/physics';
 import type { DrawItem } from '../engine/renderer';
 import { standingRoot } from '../game/body';
 
@@ -125,13 +125,15 @@ export class Katamari {
 
   constructor(physics: Physics, pos: Vec3, radius = KATAMARI_START_RADIUS) {
     this.radius = radius;
+    // Slippery: whoever drives it sets its spin to match its motion, and a grippy ball jams in corners.
     this.body = physics.addBall(pos, radius, {
       mass: START_MASS,
-      friction: 1.2,
+      friction: 0.15,
       restitution: 0.05,
       grabbable: false,
       hidden: true,
     });
+    this.body.collider.setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min);
     this.body.rb.setAngularDamping(0);
     this.body.angularDamping = 0;
     this.princeX = pos[0];
