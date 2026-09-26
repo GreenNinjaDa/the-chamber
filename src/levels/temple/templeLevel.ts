@@ -5,7 +5,6 @@ import {
 import { GROUPS_BOULDER, GROUPS_BOULDER_BRIDGE, GROUPS_DEBRIS, RAPIER, type Body } from '../../engine/physics';
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
 import { drawPortal, PORTAL_SQUEEZE_TIME, PortalArrival } from '../../entities/portal';
-import { PressurePlate } from '../../entities/pressurePlate';
 import { boulderModel, chunkModel, clusterModel, shardModel, slabModel, STONE_COLORS } from '../../entities/rock';
 import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus } from '../level';
 
@@ -13,7 +12,7 @@ import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type Level
  * The boulder temple (an Indiana Jones parody). Its own map: a dark stone tunnel lit only by the
  * torch in your hand. The exit portal is right there... until a boulder drops out of a deep shaft
  * in the ceiling in front of it and chases you down the tunnel, over spiked pits (the widest needs
- * a vine), spikes and loose rocks. At the end a pressure plate stops the boulder, the end wall sinks
+ * a vine), spikes and loose rocks. Reaching the end of the tunnel starts the ending: the end wall sinks
  * into the floor to reveal a second boulder, and the world freezes while your view rolls over; then
  * gravity flips and you fall to the ceiling in a heap, rocks and all. Now the ceiling's pits and spikes are in your way, the new
  * boulder chases you home, and the first one rolls ahead of you and drops back down its shaft
@@ -33,7 +32,9 @@ const WALL_T = 1;
 const Z_START = -24;
 const Z_ALCOVE_END = 169;
 const END_Z = 162; // the dead-end wall that sinks away
-const PLATE_Z = 158;
+/** Reaching the last few metres before the dead end (anywhere across the tunnel) starts the ending. */
+const END_ZONE = 3;
+const END_ZONE_Z = END_Z - END_ZONE;
 const PORTAL_Z = -21;
 const PORTAL_R = 2;
 const SPAWN_Z = -2;
@@ -78,14 +79,12 @@ const FLEE = 10.5;
 /** How quickly the first boulder gets going again after the roll (it starts from rest). */
 const FLEE_GAIN = 0.6;
 
-/** After the plate: the end wall starts to sink this long after, taking WALL_SINK (frozen world or not). */
+/** After reaching the end: the end wall starts to sink this long after, taking WALL_SINK (frozen world or not). */
 const WALL_SINK_AT = 1;
 const WALL_SINK = 1;
-/** The frozen camera turn starts when the first boulder is this close to the plate (m, edge to edge), or after TURN_AFTER s. */
+/** The frozen camera turn starts when the first boulder is this close to the end zone (m), or after TURN_AFTER s. */
 const TURN_WHEN_BOULDER_WITHIN = 1;
 const TURN_AFTER = 2;
-/** The plate's radius (the standard pressure plate). */
-const PLATE_R = 0.95;
 /** The roll: with the world frozen, the camera turns a half turn about the tunnel's axis in this long... */
 const ROLL_TIME = 4;
 /** ...and holds there this long after it's caught up; then gravity snaps over and the player falls, limp for a moment. */
@@ -218,9 +217,8 @@ export class TempleLevel implements Level {
   private holdT = 0;
   private endWall: RAPIER.Collider;
   private wallDrop = 0;
-  /** Seconds since the plate was pressed (-1: not yet). */
-  private sincePlate = -1;
-  private plate: PressurePlate;
+  /** Seconds since the player reached the end (-1: not yet). */
+  private sinceEnd = -1;
   private boulders: Body[] = [];
   /** Boulders parked (kinematic) at a position until they're let go. */
   private parked: (Vec3 | null)[] = [];
@@ -248,12 +246,6 @@ export class TempleLevel implements Level {
     this.levelBody = physics.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
     this.build();
     this.endWall = this.solid([0, H / 2, END_Z + 0.5], [W, H, 1], STONE_WALL, false);
-    this.plate = new PressurePlate(physics, [0, 0, PLATE_Z], [], player, (down) => {
-      if (down && this.stage === 'chase') {
-        this.setStage('endWait');
-        this.sincePlate = 0;
-      }
-    });
     this.placeSpikes();
     this.scatterRocks();
 
@@ -377,8 +369,8 @@ export class TempleLevel implements Level {
       this.pathSpikes.push({ base, tip, radius: SPIKE_R * (0.85 + k * 0.15) });
     };
     const jitter = () => (Math.random() - 0.5) * 0.3;
-    // Kept clear of the arrival spot, the plate and the portal, and off pit openings.
-    const clear = (z: number) => Math.abs(z - SPAWN_Z) > SPAWN_CLEAR && Math.abs(z - PLATE_Z) > 2.5 && z < END_Z - 1;
+    // Kept clear of the arrival spot, the end zone and the portal, and off pit openings.
+    const clear = (z: number) => Math.abs(z - SPAWN_Z) > SPAWN_CLEAR && z < END_ZONE_Z - 1 && z < END_Z - 1;
     const overGap = (z: number, gaps: [number, number][], margin = 0.3) => gaps.some(([a, b]) => z > a - margin && z < b + margin);
     const pick = (ok: (z: number) => boolean) => {
       for (let tries = 0; tries < 40; tries++) {
@@ -390,7 +382,7 @@ export class TempleLevel implements Level {
 
     // Rows, spread evenly along the run (nudged off any pit), each one a random pattern.
     const rows = (count: number, gaps: [number, number][], y: number, dir: number) => {
-      const from = SPAWN_Z + SPAWN_CLEAR + 1, to = PLATE_Z - 3;
+      const from = SPAWN_Z + SPAWN_CLEAR + 1, to = END_ZONE_Z - 3;
       for (let k = 0; k < count; k++) {
         const kinds = [ROWS.left, ROWS.right, ROWS.sides];
         const xs = Math.random() < FULL_ROW_CHANCE ? ROWS.full : kinds[Math.floor(Math.random() * kinds.length)];
@@ -531,12 +523,11 @@ export class TempleLevel implements Level {
     this.t += dt;
     this.stageT += dt;
     this.arrival.update(dt);
-    this.plate.update(dt);
     const me = player.pos;
 
-    if (this.sincePlate >= 0) {
-      this.sincePlate += dt;
-      const k = clamp((this.sincePlate - WALL_SINK_AT) / WALL_SINK, 0, 1);
+    if (this.sinceEnd >= 0) {
+      this.sinceEnd += dt;
+      const k = clamp((this.sinceEnd - WALL_SINK_AT) / WALL_SINK, 0, 1);
       if (k > 0 && this.wallDrop < H + 0.1) {
         // The end wall sinks into the floor with a rumble: a second boulder was behind it.
         this.wallDrop = easeInOut(k) * (H + 0.1);
@@ -563,11 +554,16 @@ export class TempleLevel implements Level {
         }
         break;
       case 'chase':
-        break; // until the pressure plate at the end
+        // Until you reach the end of the tunnel.
+        if (player.mode === 'control' && me[2] > END_ZONE_Z) {
+          this.setStage('endWait');
+          this.sinceEnd = 0;
+        }
+        break;
       case 'endWait': {
-        // The world freezes for the turn once the first boulder is nearly on the plate (its edge
-        // within a metre of the plate's), or after a couple of seconds, whichever comes first.
-        const gap = Math.abs(PLATE_Z - this.boulderPos(0)[2]) - BOULDER_R - PLATE_R;
+        // The world freezes for the turn once the first boulder is nearly into the end zone (its
+        // edge within a metre of it), or after a couple of seconds, whichever comes first.
+        const gap = END_ZONE_Z - this.boulderPos(0)[2] - BOULDER_R;
         if (gap <= TURN_WHEN_BOULDER_WITHIN || this.stageT >= TURN_AFTER) this.startTurn();
         break;
       }

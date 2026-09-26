@@ -74,8 +74,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   to sprint-jump, have vines), past spikes (rows across the floor, full rows kept short and at least 5 m from any pit;
   ~50 out of the walls at all heights; random singles; none within 8.5 m of the spawn; not solid, touching one knocks you loose for 0.01 s, then you recover) and ~84 loose rocks of mixed shapes (70-140 kg: pushed slowly, not kicked; they fall when
   gravity flips; debris, so boulders roll straight through them).
-  A pressure plate at the end (the boulder keeps coming) sinks the end wall 1 s later to reveal a second boulder; the
-  world freezes as soon as the first boulder is within 1 m of the plate or 2 s have passed (`Level.freezeWorld`) while only the camera turns upside down (`camera.turnTarget`), and 0.5 s after
+  Reaching the last 3 m of the tunnel (the boulder keeps coming) sinks the end wall 1 s later to reveal a second
+  boulder; the world freezes as soon as the first boulder is within 1 m of that zone or 2 s have passed (`Level.freezeWorld`) while only the camera turns upside down (`camera.turnTarget`), and 0.5 s after
   it settles gravity snaps over: everything, the player included (stunned 0.1 s, then immune to knocks for 1 s so landing head first doesn't
   stun them again), falls to the ceiling.
   The map never moves. The way back has the ceiling's own pits
