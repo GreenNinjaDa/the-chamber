@@ -1,3 +1,4 @@
+import { tone } from '../../engine/audio';
 import { add, clamp, easeInOut, lerp, mul, rotationY, rotationZ, scale, scaling, segment, sub, translation, type Vec3 } from '../../engine/math';
 import type { RAPIER } from '../../engine/physics';
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
@@ -143,6 +144,7 @@ export class PacmanLevel implements Level {
   private ghostsVisible = true;
   private score = 0;
   private powerEaten = 0;
+  private waka = false;
   /** Seconds left on the bonus cherry (0: none). */
   private cherryT = 0;
   private heading: [number, number] = [0, -1];
@@ -307,10 +309,13 @@ export class PacmanLevel implements Level {
       if (pellet.pos[1] < p[1] - 0.3 || pellet.pos[1] > p[1] + 1.9) continue;
       pellet.eaten = true;
       this.pelletsLeft--;
+      this.waka = !this.waka;
+      tone(this.waka ? 330 : 220, 0.09, { to: this.waka ? 220 : 330, wave: 'triangle', vol: 0.25 });
       if (pellet.power) {
         this.score += POWER_SCORE;
         this.powerEaten++;
         this.crew.frighten(FRIGHT_TIME);
+        for (let i = 0; i < 6; i++) tone(200 + i * 60, 0.1, { to: 700 + i * 60, wave: 'square', vol: 0.08, at: i * 0.1 });
         this.bursts.push({ pos: pellet.pos, t: 0, color: POWER_COLOR, kind: 'pop' });
       } else {
         this.score += PELLET_SCORE;
@@ -371,6 +376,7 @@ export class PacmanLevel implements Level {
     const points = GHOST_SCORES[Math.min(this.crew.eatChain, GHOST_SCORES.length - 1)];
     this.crew.eatChain++;
     this.score += points;
+    tone(200, 0.35, { to: 1600, wave: 'square', vol: 0.12 });
     g.eaten();
     const at: Vec3 = [g.pos[0], 1.1, g.pos[2]];
     this.bursts.push({ pos: at, t: 0, color: [0.3, 0.45, 2.2], kind: 'pop' });

@@ -1,3 +1,4 @@
+import { sfx, Tune } from '../../engine/audio';
 import { add, mul, rotationY, scaling, translation, type Mat4, type Vec3 } from '../../engine/math';
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
 import { CHAMBER_HALF } from '../../game/chamber';
@@ -51,6 +52,14 @@ interface Chair {
   by: Racer | 'player' | null;
 }
 
+/** Something jaunty to walk round in circles to. [note, beats]. */
+const DITTY: [string | null, number][] = [
+  ['C5', 0.5], ['E5', 0.5], ['G5', 0.5], ['E5', 0.5], ['F5', 0.5], ['A5', 0.5], ['G5', 1],
+  ['E5', 0.5], ['G5', 0.5], ['C6', 0.5], ['B5', 0.5], ['A5', 0.5], ['G5', 0.5], ['F5', 0.5], ['E5', 0.5],
+  ['D5', 0.5], ['F5', 0.5], ['A5', 0.5], ['F5', 0.5], ['G5', 0.5], ['B5', 0.5], ['C6', 1],
+  ['G5', 0.5], ['E5', 0.5], ['D5', 0.5], ['B4', 0.5], ['C5', 1], [null, 1],
+];
+
 type Phase = 'intro' | 'music' | 'scramble' | 'out' | 'reset' | 'won';
 
 interface Death {
@@ -81,6 +90,7 @@ export class ChairsLevel implements Level {
   private phaseT = 0;
   private round = 0;
   private musicFor = 0;
+  private music = new Tune(DITTY, 150, { wave: 'square', vol: 0.08, bass: true });
   private time = 0;
   private death: Death | null = null;
   private playerSeat: Chair | null = null;
@@ -186,6 +196,8 @@ export class ChairsLevel implements Level {
         if (this.arrival.done && this.phaseT > 1.5) this.startMusic();
         break;
       case 'music':
+        if (this.status === 'playing' && player.mode === 'control') this.music.start();
+        else this.music.stop();
         this.updateMusic(dt);
         break;
       case 'scramble':
@@ -273,6 +285,8 @@ export class ChairsLevel implements Level {
     }
     if (this.phaseT >= this.musicFor) {
       // The music stops.
+      this.music.stop();
+      sfx.scratch();
       this.setPhase('scramble');
       this.shout.text = 'SKRRRT!';
       for (const r of this.racers) if (!r.out) r.delay = rand(r.react[0], r.react[1]);
