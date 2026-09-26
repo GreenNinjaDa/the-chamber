@@ -350,6 +350,25 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   line between its lanes) and the note plays (the lead only sounds when you hit; drums and bass run on song time). Misses
   drain the rock meter on the north wall; the crowd down both sides cheers, bobs or boos with it. Empty it and you're
   booed off (tomatoes, then the stage catapults you); finish the song and the exit opens for the encore.
+- **Level 34 — Angry Birds** (`src/levels/birds/`): you are the pig. You land just east of a fortress
+  (`entities/blocks.ts`: wood planks and posts, glass, stone, TNT crates; a west wall, two three-storey towers, the
+  pig's house with TNT in the living room, loose planks and blocks to build with). A giant slingshot rises behind
+  the west wall (the view turns to it) and six birds pop up onto the wall top (`entities/birds.ts`); then "YOU ARE
+  THE PIG." and your head goes green with a snout, ears and beady eyes. One bird at a time hops into the pouch
+  (name and quip over the slingshot), which pulls back along the aim (creak) for 2.2 s, holds still 0.55 s (aim
+  locked) and lets go (twang): arcs over the wall at half gravity, ~2 s, aimed at your chest with a growing lead,
+  leaving white puffs until the next shot. Red (no lead), the Blues (split in three halfway, ±0.24 rad), Chuck
+  (stops dead mid-air with a "!" for 0.35 s, then zooms at 27 m/s at where you were when he stopped), Bomb (2.2 s
+  fuse after landing, then stays put; blast with cover), Red again (full lead, lobs over cover), Terence (1.6 m,
+  420 kg, through everything, then rolls a few metres). Birds are deadly in flight (faster than 6 m/s, swept against
+  every body part; Terence also while rolling): POPPED in green smoke; once they've hit anything they're just
+  physical (they knock you, tumble, knock blocks over), so any cover in the way saves you. Blocks take damage from
+  sudden speed changes and from the impulse through their contacts (tunables in `MATERIALS`; not from being
+  carried or thrown), darken, and break into splinters / shards / chunks and dust; TNT goes off on a hard knock
+  (chains); a fast stone block on your head or chest is SQUASHED; blasts use grenade-style cover. Everything broken
+  scores the birds points (popups; "BIRDS: 12,450" and three stars on the north wall; a popped pig is 5,000).
+  Survive all six (~60 s): the slingshot wilts, LEVEL FAILED (for the birds), the pig laughs, the exit opens.
+  `?birdShot=N` starts with the Nth bird.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -390,13 +409,17 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   `BodySlicer` to test beams against the player's body parts, `LaserPylon`), `gnome.ts` (big garden gnome:
   `spawnGnome(physics, feet, look)`, arm poses in `GNOME_POSES`, glowing eyes, and `drawGnomeHat(out, headFrame)` for
   anyone else's head), `snake.ts` (grid snake: movement, AI, colliders, model), `pixelText.ts` (5x7
-  dot-matrix text built from blocks; `pattern: Pattern.emissive` makes glowing LEDs), `apple.ts`, `ghost.ts` (arcade ghost: `drawGhost`, normal / scared / flashing / eyes only), `plush.ts` (plush toys: `spawnPlush(physics, 'alien', pos, look)`), `claw.ts` (claw-machine claw and gantry: `driveTo`, hub height `y`, prong `angle`, `distanceTo` for grabbing it), `bowling.ts` (2 m bowling pins: `spawnPin`, `pinSpots`, `uprightness`; `drawBowlingBall` with finger holes), `hexFloor.ts` (`HexFloor`: a floor of hexagonal tiles, each a
+  dot-matrix text built from blocks, letters, digits and `! ? : . , -`; `pattern: Pattern.emissive` makes glowing LEDs), `apple.ts`, `ghost.ts` (arcade ghost: `drawGhost`, normal / scared / flashing / eyes only), `plush.ts` (plush toys: `spawnPlush(physics, 'alien', pos, look)`), `claw.ts` (claw-machine claw and gantry: `driveTo`, hub height `y`, prong `angle`, `distanceTo` for grabbing it), `bowling.ts` (2 m bowling pins: `spawnPin`, `pinSpots`, `uprightness`; `drawBowlingBall` with finger holes), `hexFloor.ts` (`HexFloor`: a floor of hexagonal tiles, each a
   static collider, that flash and drop once touched; `support` / `touch` / `freeze` / `regrowFrom`; drawn with the
   chamfered `'hextile'` mesh from renderer.ts), `livingRoom.ts` (sofa / armchair in any colour, coffee table,
   beanbag, piano bench: `spawnFurniture`, sofas and armchairs with seat / back / arm colliders so you stand on the
   cushions; `drawRug`, `drawPainting`), `giantDuck.ts` (a 4 m rubber duck you can stand on: a fixed body the level
   moves with `moveTo`, which carries a rider along), `elevator.ts` (the chamber as an elevator car: doors, handrails,
-  LED floor indicator `FloorIndicator`, button panel `CarPanel`, crosshead and grate, the scrolling shaft). `chess.ts` (chess pieces, a crown), `hippo.ts` (a toy hippo head on an extending neck). Put new
+  LED floor indicator `FloorIndicator`, button panel `CarPanel`, crosshead and grate, the scrolling shaft). `chess.ts` (chess pieces, a crown), `hippo.ts` (a toy hippo head on an extending neck),
+  `blocks.ts` (Angry Birds building kit: `spawnBlock(physics, 'wood' | 'glass' | 'stone' | 'tnt', centre, size)`,
+  per-material damage tunables in `MATERIALS`; the level deals the damage), `birds.ts` (`drawBird` for Red, Blue,
+  Chuck, Bomb, Terence with angry brows; the giant `Slingshot` with `pullTo` / `release` / `rise` / `sag`;
+  `drawPigFace(out, headFrame, pop)` puts a snout, ears and eyes on any head; `drawStar` for score boards). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`

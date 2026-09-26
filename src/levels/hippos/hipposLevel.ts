@@ -221,7 +221,7 @@ export class HipposLevel implements Level {
       if (this.poured % 3 === 0) tone(1800 + Math.random() * 900, 0.05, { wave: 'triangle', vol: 0.08, at: 0.5 });
     }
     const playing = t > 3.2 && this.over < 0;
-    if (playing && this.status === 'playing') this.music.start();
+    if (playing && this.status === 'playing' && !this.death) this.music.start();
     else this.music.stop();
     if (playing && !this.death && this.status === 'playing' && ((t > SECOND_POUR_AT + 2 && this.marbles.length === 0) || t > GAME_TIME)) this.gameOver();
 
