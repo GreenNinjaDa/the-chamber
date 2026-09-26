@@ -97,16 +97,23 @@ const SECOND_AT = 0.32;
 const SWEEP_START = HEAD_PIN_Z + 1.9;
 const SWEEP_END = -HALF + 0.9;
 const SWEEP_LIFT = 8.4;
-const SWEEP_HEIGHT = 0.62;
-const SWEEP_DEPTH = 0.3;
-const SWEEP_DROP_TIME = 1.3;
-const SWEEP_HOLD = 0.7;
-const SWEEP_SPEED = 3.0;
-const SWEEP_RAISE_TIME = 0.9;
-const SWEEP_RETURN_SPEED = 7;
+/**
+ * The bar: low and thin, and quick, so it's under you only briefly: jumping when it's about a
+ * metre away clears it (a window of about 0.3 s).
+ */
+const SWEEP_HEIGHT = 0.55;
+const SWEEP_DEPTH = 0.25;
+const SWEEP_DROP_TIME = 1.1;
+const SWEEP_HOLD = 0.6;
+const SWEEP_SPEED = 4.0;
+const SWEEP_RAISE_TIME = 0.7;
+const SWEEP_RETURN_SPEED = 9;
 /** New pins come down from this high (their bases) over RACK_TIME. */
 const RACK_TOP = 10.4;
-const RACK_TIME = 2.6;
+const RACK_TIME = 2.4;
+/** After the last ball of a frame: when the verdict goes up, and when the sweep starts. */
+const SCORE_AT = 1.0;
+const SWEEP_AT = 2.0;
 const HEAD_BOTTOM = 10.4;
 const HEAD_TOP = 12.3;
 
@@ -300,6 +307,7 @@ export class BowlingLevel implements Level {
     this.exit.update(dt, player);
     if (this.exit.entered && this.status === 'playing') this.status = 'exited';
 
+    this.keepCameraAboveFloor();
     this.runPhase(dt);
     this.updateBalls(dt);
     this.updateGiant(dt);
@@ -325,6 +333,15 @@ export class BowlingLevel implements Level {
         ]);
       }
     }
+  }
+
+  /** The floor is at three heights (lane, gutters, pit): keep the camera above whichever it's over. */
+  private keepCameraAboveFloor() {
+    const { camera } = this.ctx;
+    const b = camera.bounds;
+    if (!b) return;
+    const [x, , z] = camera.pos;
+    b.min[1] = z < PIT_EDGE - 0.3 ? PIT_Y + 0.5 : Math.abs(x) > LANE_HALF + 0.3 ? GUTTER_Y + 0.35 : 0.35;
   }
 
   private setPhase(phase: BowlingLevel['phase']) {
@@ -363,8 +380,8 @@ export class BowlingLevel implements Level {
         }
         break;
       case 'settle':
-        if (t > 1.1 && t - dt <= 1.1 && alive) this.scoreFrame();
-        if (t > 2.4 && alive) {
+        if (t > SCORE_AT && t - dt <= SCORE_AT && alive) this.scoreFrame();
+        if (t > SWEEP_AT && alive) {
           this.setPhase('sweep');
           this.sweep.state = 'down';
           this.sweep.t = 0;
@@ -377,12 +394,12 @@ export class BowlingLevel implements Level {
         }
         break;
       case 'rack':
-        if (this.rackT < 0 && t > 0.9 && alive) {
+        if (this.rackT < 0 && t > 0.6 && alive) {
           this.setPhase('pause');
         }
         break;
       case 'pause':
-        if (t > (this.frame >= FRAMES.length ? 1.2 : 1.0) && alive) {
+        if (t > (this.frame >= FRAMES.length ? 1.2 : 0.6) && alive) {
           this.frame++;
           this.startFrame();
         }
@@ -762,10 +779,10 @@ export class BowlingLevel implements Level {
     const bottom = s.lift + (onLane ? 0.03 : GUTTER_Y + 0.03);
     const top = bottom + SWEEP_HEIGHT;
     const ahead = s.z - p[2]; // > 0: the player is north of the bar, where it's going
-    const reach = SWEEP_DEPTH / 2 + 0.35 + 0.1;
+    const reach = SWEEP_DEPTH / 2 + 0.37;
     let hit = false;
-    if (s.state === 'down') hit = Math.abs(ahead) < reach - 0.05 && bottom < p[1] + 1.8 && top > p[1] + 0.1;
-    else hit = ahead > -0.15 && ahead < reach && p[1] < top - 0.08;
+    if (s.state === 'down') hit = Math.abs(ahead) < reach && bottom < p[1] + 1.8 && top > p[1] + 0.1;
+    else hit = ahead > -0.15 && ahead < reach && p[1] < top - 0.15;
     if (!hit) return;
     player.kill([0, 1.5, -3.5], { violence: 0 });
     camera.addShake(0.5);

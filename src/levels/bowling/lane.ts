@@ -25,8 +25,8 @@ export const TUNNEL_END = 16;
 export const HEAD_PIN_Z = PIT_EDGE + 1.0 + 3 * 1.6 * Math.sqrt(3) / 2;
 
 const WALL = [0.86, 0.87, 0.88];
-const WOOD = [0.5, 0.29, 0.11];
-const WOOD_DECK = [0.58, 0.36, 0.15];
+const WOOD = [0.42, 0.23, 0.08];
+const WOOD_DECK = [0.5, 0.3, 0.12];
 const GUTTER = [0.1, 0.1, 0.11];
 const PIT = [0.015, 0.015, 0.018];
 const CURTAIN = [0.02, 0.02, 0.03];
@@ -97,6 +97,12 @@ export function buildLaneDraws(): DrawItem[] {
   for (const s of [-1, 1]) {
     const [a, b] = s < 0 ? [-HALF, -LANE_HALF] : [LANE_HALF, HALF];
     box([a, GUTTER_Y - 0.5, PIT_EDGE], [b, GUTTER_Y, HALF], GUTTER, { spec: 0.5 });
+    // A dark band along the foot of the wall and a steel lip on the lane's edge, so the (sunken,
+    // mostly hidden) gutters read from the middle of the lane.
+    const wx = s * (HALF - 0.01);
+    box([wx - 0.012, GUTTER_Y, PIT_EDGE], [wx + 0.012, 0.3, HALF], GUTTER, { spec: 0.4 });
+    const lx = s * LANE_HALF;
+    box([lx - 0.05, -0.04, PIT_EDGE], [lx + 0.05, 0.012, HALF], [0.45, 0.47, 0.5], { spec: 0.9 });
   }
   box([-HALF, PIT_Y - 0.5, -HALF], [HALF, PIT_Y, PIT_EDGE], PIT, { spec: 0 });
   box([-HALF, PIT_Y, PIT_EDGE], [HALF, -1, PIT_EDGE + 0.5], PIT, { spec: 0 });
