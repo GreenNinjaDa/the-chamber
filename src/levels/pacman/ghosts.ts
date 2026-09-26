@@ -18,13 +18,13 @@ type State = 'house' | 'leaving' | 'maze' | 'eyes' | 'entering' | 'reviving';
 
 // --- Tunables --------------------------------------------------------------------------------
 /** m/s. Walking is 5 and sprinting 8.5. */
-export const GHOST_SPEED = 4.3;
+export const GHOST_SPEED = 4.0;
 const SCARED_SPEED = 2.4;
 const EYES_SPEED = 10;
 const HOUSE_SPEED = 2.4;
 /** Blinky speeds up ("Cruise Elroy") when this few pellets are left, and again at the second count. */
 const ELROY_PELLETS = [20, 8];
-const ELROY_SPEED = [4.9, 5.4];
+const ELROY_SPEED = [4.5, 5.0];
 /** Scatter / chase phases (s), alternating, starting with scatter; the last one lasts forever. */
 const SCHEDULE = [6, 20, 6, 20, 5, Infinity];
 /** Seconds after the start that each ghost leaves the house. */
@@ -232,7 +232,7 @@ export class Ghost {
       yaw: this.yaw,
       look: this.look,
       color: this.color,
-      bright: GHOST_BRIGHT,
+      bright: 1 + (GHOST_BRIGHT - 1) * crew.darkness,
       mode,
       time,
       phase: this.phase,
@@ -263,6 +263,8 @@ export class GhostCrew {
   /** Ghosts eaten on the current power pellet (for 200, 400, 800, 1600). */
   eatChain = 0;
   pelletsLeft = Infinity;
+  /** How dark the room is (0-1): the darker, the brighter the ghosts are drawn. */
+  darkness = 1;
   private quarry: Quarry = { x: 0, z: 0, hi: 0, hj: -1 };
 
   constructor() {

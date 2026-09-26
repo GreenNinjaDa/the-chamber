@@ -152,6 +152,19 @@ export function addMazeColliders(physics: Physics): RAPIER.Collider[] {
  */
 export function drawMaze(out: DrawItem[], rise: number, flash: boolean) {
   if (rise <= 0) return;
+  if (rise < 1) {
+    buildMaze(out, rise, flash);
+    return;
+  }
+  // Fully up it never moves: build it once (per outline colour) and reuse the items.
+  const key = flash ? 'flash' : 'normal';
+  const items = (fullMaze[key] ??= buildMaze([], 1, flash));
+  for (const item of items) out.push(item);
+}
+
+const fullMaze: { normal?: DrawItem[]; flash?: DrawItem[] } = {};
+
+function buildMaze(out: DrawItem[], rise: number, flash: boolean): DrawItem[] {
   const h = MAZE_WALL_HEIGHT;
   const dy = -(h + 0.05) * (1 - rise);
   const rim = flash ? RIM_FLASH : RIM;
@@ -189,6 +202,7 @@ export function drawMaze(out: DrawItem[], rise: number, flash: boolean) {
     opacity: 0.22,
     shadow: false,
   });
+  return out;
 }
 
 /** Pushes a circle (the player) out of any wall it overlaps; returns the corrected position. */

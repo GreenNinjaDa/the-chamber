@@ -1,4 +1,4 @@
-import { add, clamp, easeInOut, lerp, mul, scale, scaling, segment, sub, translation, type Vec3 } from '../../engine/math';
+import { add, clamp, easeInOut, lerp, mul, rotationY, rotationZ, scale, scaling, segment, sub, translation, type Vec3 } from '../../engine/math';
 import type { RAPIER } from '../../engine/physics';
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
 import { CHAMBER_HALF } from '../../game/chamber';
@@ -26,6 +26,8 @@ const RISE_TIME = 1.8;
 const READY_TIME = 2.2;
 /** The camera's swoop back down behind the player at the end of READY!. */
 const CAMERA_RETURN = 0.8;
+/** Highest camera pitch while the maze is up, so the camera stays above the walls (about 2 m up). */
+const MAX_PITCH = -0.1;
 /** Eating reach (m, from the player's feet, across the floor) for pellets and power pellets. */
 const EAT_RADIUS = 0.75;
 const POWER_EAT_RADIUS = 0.9;
@@ -36,6 +38,16 @@ const FRIGHT_TIME = 7;
 const PELLET_SCORE = 10;
 const POWER_SCORE = 50;
 const GHOST_SCORES = [200, 400, 800, 1600];
+/** A cherry turns up under the ghost house after this many pellets, for CHERRY_TIME seconds. */
+const CHERRY_AT = [25, 60];
+const CHERRY_TIME = 9.5;
+const CHERRY_SCORE = 100;
+const CHERRY_EAT_RADIUS = 0.9;
+const CHERRY_POS: Vec3 = [cellX(6), 0, cellZ(8)];
+const CHERRY_RED = [2.0, 0.07, 0.05];
+const CHERRY_SHINE = [2.5, 2.2, 2.2];
+const CHERRY_STEM = [0.55, 0.3, 0.08];
+const CHERRY_LEAF = [0.2, 1.1, 0.15];
 /** The high score on the wall. Billy Mitchell's perfect game; nobody's beating it in here. */
 const HIGH_SCORE = 3333360;
 /** Pellets float at waist height. */
@@ -131,6 +143,8 @@ export class PacmanLevel implements Level {
   private ghostsVisible = true;
   private score = 0;
   private powerEaten = 0;
+  /** Seconds left on the bonus cherry (0: none). */
+  private cherryT = 0;
   private heading: [number, number] = [0, -1];
   private quarry: Quarry = { x: 0, z: 0, hi: 0, hj: -1 };
   private bursts: Burst[] = [];
@@ -227,6 +241,7 @@ export class PacmanLevel implements Level {
         }
         break;
       case 'play':
+        this.cherryT = Math.max(0, this.cherryT - dt);
         this.eatPellets();
         this.crew.pelletsLeft = this.pelletsLeft;
         this.crew.update(dt, this.quarry, this.t);
@@ -241,6 +256,8 @@ export class PacmanLevel implements Level {
         break;
     }
     if (!this.crew.running) this.crew.update(dt, this.quarry, this.t);
+    // While the maze is up, keep the camera above the walls: no looking up (there's nothing up there).
+    if (this.rise > 0.3) camera.pitch = Math.min(camera.pitch, MAX_PITCH);
 
     this.updateLabels(dt);
     for (const b of this.bursts) b.t += dt;
@@ -297,7 +314,24 @@ export class PacmanLevel implements Level {
       } else {
         this.score += PELLET_SCORE;
       }
+      // Bonus fruit appears under the ghost house after so many pellets, like the arcade's.
+      const eatenCount = this.pellets.length - this.pelletsLeft;
+      if (CHERRY_AT.includes(eatenCount)) this.cherryT = CHERRY_TIME;
     }
+    if (this.cherryT > 0 && Math.hypot(CHERRY_POS[0] - p[0], CHERRY_POS[2] - p[2]) < CHERRY_EAT_RADIUS) {
+      this.cherryT = 0;
+      this.score += CHERRY_SCORE;
+      this.bursts.push({ pos: CHERRY_POS, t: 0, color: CHERRY_RED, kind: 'pop' });
+      this.popup(CHERRY_POS, String(CHERRY_SCORE), '#ffb8ff');
+    }
+  }
+
+  private popup(at: Vec3, text: string, color: string) {
+    const popup = this.popups.find((u) => u.t < 0) ?? this.popups[0];
+    popup.t = 0;
+    popup.pos = at;
+    popup.label.text = text;
+    popup.label.color = color;
   }
 
   private checkGhosts() {
@@ -339,10 +373,7 @@ export class PacmanLevel implements Level {
     g.eaten();
     const at: Vec3 = [g.pos[0], 1.1, g.pos[2]];
     this.bursts.push({ pos: at, t: 0, color: [0.3, 0.45, 2.2], kind: 'pop' });
-    const popup = this.popups.find((u) => u.t < 0) ?? this.popups[0];
-    popup.t = 0;
-    popup.pos = at;
-    popup.label.text = String(points);
+    this.popup(at, String(points), '#5ff8ff');
     this.ctx.camera.addShake(0.15);
   }
 
@@ -471,10 +502,27 @@ export class PacmanLevel implements Level {
       }
     }
 
+    this.crew.darkness = this.dark;
     if (this.ghostsVisible) this.crew.draw(out, time, -MAZE_WALL_HEIGHT * (1 - this.rise), this.ctx.camera.pos);
+    if (this.cherryT > 0 && this.phase === 'play') this.drawCherry(out);
     this.drawBursts(out);
     this.arrival.draw(out);
     this.exit.draw(out);
+  }
+
+  /** The bonus cherry: two cherries on stems joined at a leaf, turning slowly and bobbing. */
+  private drawCherry(out: DrawItem[]) {
+    // Blink for the last two seconds before it goes.
+    if (this.cherryT < 2 && Math.floor(this.cherryT * 6) % 2 === 0) return;
+    const m = mul(translation([CHERRY_POS[0], 0.55 + Math.sin(this.t * 3) * 0.08, CHERRY_POS[2]]), rotationY(this.t * 1.5));
+    const joint: Vec3 = [0.12, 0.95, 0];
+    for (const [x, y] of [[-0.22, 0.2], [0.2, 0.12]]) {
+      const c: Vec3 = [x, y, 0];
+      out.push({ mesh: 'sphere', model: mul(m, translation(c), scaling([0.22, 0.22, 0.22])), color: CHERRY_RED, pattern: Pattern.emissive });
+      out.push({ mesh: 'sphere', model: mul(m, translation([x - 0.08, y + 0.09, -0.15]), scaling([0.05, 0.05, 0.05])), color: CHERRY_SHINE, pattern: Pattern.emissive, shadow: false });
+      out.push({ mesh: 'cylinder', model: mul(m, segment([x * 0.6, y + 0.2, 0], joint, 0.025)), color: CHERRY_STEM, pattern: Pattern.emissive });
+    }
+    out.push({ mesh: 'sphere', model: mul(m, translation([0.25, 1.0, 0]), rotationZ(-0.5), scaling([0.16, 0.05, 0.08])), color: CHERRY_LEAF, pattern: Pattern.emissive });
   }
 
   private drawBursts(out: DrawItem[]) {

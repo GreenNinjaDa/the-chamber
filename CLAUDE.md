@@ -86,6 +86,20 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   does the player from when the first boulder starts rolling until 5 m before the last jump (over the shaft), when the
   torch also goes out. The map is one fixed body (not kinematic: Rapier's character
   controller won't climb slopes on kinematic colliders).
+- **Level 6 — Pac-Man** (`src/levels/pacman/`): after the arrival the floor goes dark navy, the sun dims to a moon
+  and a 13×13-cell maze (`maze.ts`: black blocks outlined in glowing arcade blue, 1.5 m tall so you can't jump
+  onto them but the camera sees over; 2.25 m corridors; a ghost house with a pink door in the middle) rises out of
+  the floor, shoving the player out of its way, while the camera shows the whole board from above (READY!). 81
+  pellets and 4 blinking power pellets float at waist height; the player glows warm (the level's point light).
+  Four ghosts (`entities/ghost.ts`, `ghosts.ts`) leave the house one by one (0 / 2.5 / 6 / 10 s) and roam cell by
+  cell at 4 m/s with the arcade brains (Blinky chases, Pinky aims 4 cells ahead, Inky pincers through Blinky,
+  Clyde gets shy within 5 cells), alternating scatter / chase; Blinky speeds up with 20 and 8 pellets left. A power
+  pellet makes them blue, wobbly and random for 7 s (flashing the last 2): touch one to eat it (200 / 400 / 800 /
+  1600; its eyes zip home and it revives). A cherry (100) turns up under the house after 25 and 60 pellets.
+  Touching a ghost otherwise: the world freezes, the ghosts vanish, the player spins, shrinks and pops (GAME
+  OVER, naming the ghost). All pellets eaten: the maze flashes, sinks, and the exit opens; the last 3 pellets get
+  purple markers. Score and an unbeatable HIGH SCORE (3,333,360) on the north wall; no looking up while the maze
+  is up (keeps the camera above the walls).
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -117,7 +131,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
 - `src/entities/` — things that can appear in more than one level (or the lobby / sandbox), each with its model:
   `junk.ts` (28 pieces of household junk; `spawnJunk(physics, junk('fridge'), pos)`), `grenade.ts` (pineapple
   model), `giant.ts`, `dart.ts`, `portal.ts` (entrance / exit portals), `props.ts` (Lever, Button), `cake.ts`, `companions.ts`,
-  `pressurePlate.ts`, `uselessBox.ts`, `rock.ts` (textured stone: `boulderModel`, `chunkModel`, `slabModel`, `shardModel`, `clusterModel`; `Pattern.rock`). Put new
+  `pressurePlate.ts`, `uselessBox.ts`, `rock.ts` (textured stone: `boulderModel`, `chunkModel`, `slabModel`, `shardModel`, `clusterModel`; `Pattern.rock`), `ghost.ts` (arcade ghost: `drawGhost`, normal / scared /
+  flashing / eyes only). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
