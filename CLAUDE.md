@@ -86,16 +86,18 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   does the player from when the first boulder starts rolling until 5 m before the last jump (over the shaft), when the
   torch also goes out. The map is one fixed body (not kinematic: Rapier's character
   controller won't climb slopes on kinematic colliders).
-- **Level 6 — The Claw** (`src/levels/claw/`): you're a prize in a claw machine (dark felt floor, a glass
-  front, starry backdrops, chasing marquee bulbs). 48 plush toys (`entities/plush.ts`: three-eyed aliens, teddies,
-  giant ducks, beach balls; light, bouncy, settled into heaps before you arrive) slow you down when you wade through
-  them. The exit is the prize chute in the north-east corner (too tall to climb, a clear guard on top) with a portal
-  at the bottom. An unseen kid has three credits (display over the glass: CREDITS / TIME): each one the claw
+- **Level 6 — The Claw** (`src/levels/claw/`): you're a prize in a claw machine, a closed cabinet (dark felt
+  floor, a glass front, starry backdrops, chasing marquee bulbs, a ceiling of fluorescent tubes that casts no
+  shadows). 48 plush toys (`entities/plush.ts`: three-eyed aliens, teddies, giant ducks, beach balls; light, bouncy,
+  settled into heaps before you arrive) slow you down when you wade through them. The exit is the prize chute in
+  the north-east corner (too tall to climb, a clear guard on top) with a portal at the bottom; E on its PUSH flap
+  gets a lecture. An unseen kid has three credits (display over the glass: CREDITS / TIME): each one the claw
   (`entities/claw.ts`, on a gantry, swinging on its cable) wanders, decides (an alien, or more often each credit the
-  spot you're on), hovers till the clock runs out (a light pool marks the spot), drops (a direct hit on the head
-  knocks you), closes on whatever is nearest its axis, rises, jiggles (grabbed toys usually slip; the first one
-  usually makes it), and carries what's left to the chute. Hold E or left mouse near it while it's down to hang
-  off a prong (`player.mode = 'swinging'`) and it takes you to the chute; let go above ~4.5 m and you splat
+  spot you're on), hovers till the clock runs out (a light pool marks the spot; from the 2nd credit he sometimes
+  changes his mind with 2.6 s to go), drops (a direct hit on the head knocks you), closes on whatever is nearest
+  its axis, rises, jiggles (grabbed toys usually slip; the first one usually makes it), and carries what's left to
+  the chute. Hold E or left mouse near it while it's down to hang off a prong (`player.mode = 'swinging'`; WASD
+  kicks it into a little swing) and it takes you to the chute; let go above ~4.5 m and you splat
   (landing speed; ~3 m just knocks you down). Grabbed without holding on, you always slip at the jiggle. Out of
   credits, the lights go out and every alien turns to stare at you, eyes glowing. The aliens chant ("Ooooh...
   the claaaw!") as world labels.
