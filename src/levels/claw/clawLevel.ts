@@ -451,7 +451,7 @@ export class ClawLevel implements Level {
       p.body.rb.setLinearDamping(2);
     }
     for (let i = 0; i < 240; i++) physics.world.step();
-    for (const c of bins) physics.world.removeCollider(c, false);
+    for (const c of bins) physics.world.removeCollider(c, true); // wake anything leaning on them
     for (let i = 0; i < 240; i++) physics.world.step();
     for (const c of room) physics.world.removeCollider(c, false);
     for (const p of this.prizes) {
