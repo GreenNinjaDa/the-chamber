@@ -86,6 +86,19 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   does the player from when the first boulder starts rolling until 5 m before the last jump (over the shaft), when the
   torch also goes out. The map is one fixed body (not kinematic: Rapier's character
   controller won't climb slopes on kinematic colliders).
+- **Level 6 — Snake** (`src/levels/snake/`): you are the apple. After the arrival the floor boots up row by row
+  into an old phone LCD (pale olive, 16 x 16 grid of 1.5 m cells), "NOKLA — Connecting people." appears on the north
+  wall, a panel there slides open and the phone-game snake (`entities/snake.ts`) comes out: dark pixel blocks 1.35 m
+  wide and 1.6 m tall (too tall to jump), each a static collider moved one cell per step (60 ms slide), head with
+  cube eyes (pupils follow you) and a flicking forked tongue. Starts 5 long at 0.32 s/step, speeds up to 0.2 s over
+  80 s (always slower than sprinting), grows one block every 6 steps. AI: greedy toward your cell (0.25 s lead,
+  Manhattan, prefers straight on), never reverses, never steps into a wall or itself (the leaving tail cell is free),
+  8% blunders; it looks ahead for dead ends (time-aware flood fill, pockets under 10 cells) always for its first 15 s,
+  then 85% of steps, but only 10% with you within 4 cells (tunnel vision: lure it close to make it coil). No safe
+  move = crash: lurch, the classic blink, blocks pop away from the head, pixel-block "GAME OVER" (`entities/pixelText.ts`)
+  plus a quip on the north wall, exit opens. Caught (it enters your cell, you're right in front of its mouth, or its
+  head pushes into you) = swallowed whole (shrink into its mouth, gulp, +3 blocks, a bulge runs down to the tail),
+  then GAME OVER with the snake's length as SCORE. The score shows in pixel digits on the north wall.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -117,7 +130,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
 - `src/entities/` — things that can appear in more than one level (or the lobby / sandbox), each with its model:
   `junk.ts` (28 pieces of household junk; `spawnJunk(physics, junk('fridge'), pos)`), `grenade.ts` (pineapple
   model), `giant.ts`, `dart.ts`, `portal.ts` (entrance / exit portals), `props.ts` (Lever, Button), `cake.ts`, `companions.ts`,
-  `pressurePlate.ts`, `uselessBox.ts`, `rock.ts` (textured stone: `boulderModel`, `chunkModel`, `slabModel`, `shardModel`, `clusterModel`; `Pattern.rock`). Put new
+  `pressurePlate.ts`, `uselessBox.ts`, `rock.ts` (textured stone: `boulderModel`, `chunkModel`, `slabModel`, `shardModel`, `clusterModel`; `Pattern.rock`),
+  `snake.ts` (grid snake: movement, AI, colliders, model), `pixelText.ts` (5x7 dot-matrix text built from blocks). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
