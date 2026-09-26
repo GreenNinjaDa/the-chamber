@@ -43,8 +43,8 @@ const RIPPLE_SPEED = 45;
 const TILE_GROW = 0.12;
 /** The rising lava: its height, and how long it rises, holds and drains (s). */
 const HIGH_TIDE = 1.0;
-const RISE_TIME = 4.5;
-const HOLD_TIME = 3.5;
+const RISE_TIME = 5.5;
+const HOLD_TIME = 2.5;
 const DRAIN_TIME = 2.5;
 /** The finale: the lava rises this high and the duck floats with this much of it under water. */
 const FINALE_TIDE = 0.55;
@@ -52,7 +52,7 @@ const DUCK_DRAFT = 0.25;
 const DUCK_DROP_AT = 0.9;
 const DUCK_DROP_HEIGHT = 18;
 const DUCK_GRAVITY = 22;
-const SAIL_SPEED = 2.0;
+const SAIL_SPEED = 2.4;
 /**
  * Where the duck may land (clear spots in the room, all a good sail from the exit); it picks the
  * nearest one that isn't too near you.
@@ -73,7 +73,7 @@ const HOT = [1, 0.3, 0.06];
 const CRUST = [0.08, 0.035, 0.02];
 const FLOOR = [0.6, 0.61, 0.63];
 
-const RED_FABRIC = [0.62, 0.2, 0.13];
+const RED_FABRIC = [0.55, 0.08, 0.06];
 const BLUE_FABRIC = [0.1, 0.25, 0.72];
 const MUSTARD_FABRIC = [0.78, 0.56, 0.1];
 const ORANGE_FABRIC = [0.95, 0.42, 0.08];
@@ -182,30 +182,30 @@ type Step =
   | { kind: 'finale' };
 
 const SCRIPT: Step[] = [
-  { kind: 'say', line1: 'OK. NEW GAME.', line2: "I MADE IT UP. IT'S THE BEST GAME.", time: 3.4 },
+  { kind: 'say', line1: 'OK. NEW GAME.', line2: "I MADE IT UP. IT'S THE BEST GAME.", time: 3 },
   {
-    kind: 'rule', header: 'RULE #1', line1: 'THE FLOOR IS LAVA!', line2: '', floor: true, active: 7,
-    after: ['OK. THE FLOOR IS NOT LAVA.', "GO ON, TOUCH IT. IT'S FINE."], afterTime: 2.8,
+    kind: 'rule', header: 'RULE #1', line1: 'THE FLOOR IS LAVA!', line2: '', floor: true, active: 6,
+    after: ['OK. THE FLOOR IS NOT LAVA.', "GO ON, TOUCH IT. IT'S FINE."], afterTime: 2.4,
   },
   {
     kind: 'rule', header: 'RULE #2', line1: 'THE COUCHES ARE LAVA!', line2: 'ARMCHAIRS ARE NOT COUCHES. RELAX.', floor: false,
-    items: (it) => it.kind === 'sofa', cause: 'sofa', active: 5, after: ['COUCHES ARE COUCHES AGAIN.', 'SIT ON THEM. I DARE YOU.'], afterTime: 2.6,
+    items: (it) => it.kind === 'sofa', cause: 'sofa', active: 4.5, after: ['COUCHES ARE COUCHES AGAIN.', 'SIT ON THEM. I DARE YOU.'], afterTime: 2.2,
   },
   {
     kind: 'rule', header: 'RULE #3', line1: 'THE FLOOR IS LAVA AGAIN.', line2: 'SO ARE THE CRATES.', floor: true,
-    items: (it) => it.kind === 'crate', cause: 'crate', active: 7, after: ['BREAK TIME.', 'NOTHING IS LAVA. FOR NOW.'], afterTime: 2.6,
+    items: (it) => it.kind === 'crate', cause: 'crate', active: 6, after: ['BREAK TIME.', 'NOTHING IS LAVA. FOR NOW.'], afterTime: 2.2,
   },
   {
     kind: 'fake', header: 'RULE #4', line1: 'THE CEILING IS LAVA!', line2: '',
-    reveal: ["...WE DON'T HAVE A CEILING.", "YOU'RE FINE. WHY ARE YOU DUCKING?"], revealTime: 3.4,
+    reveal: ["...WE DON'T HAVE A CEILING.", "YOU'RE FINE. WHY ARE YOU DUCKING?"], revealTime: 2.8,
   },
   {
     kind: 'rule', header: 'RULE #5', line1: 'EVERYTHING BLUE IS LAVA.', line2: 'AND THE FLOOR. OBVIOUSLY.', floor: true,
-    items: (it) => it.blue, cause: 'blue', active: 7, after: ['BLUE IS BACK.', 'I LIKE BLUE AGAIN.'], afterTime: 2.4,
+    items: (it) => it.blue, cause: 'blue', active: 6, after: ['BLUE IS BACK.', 'I LIKE BLUE AGAIN.'], afterTime: 2.2,
   },
   {
     kind: 'rule', header: 'RULE #6', line1: 'THE FLOOR IS LAVA.', line2: "SO IS WHATEVER YOU'RE STANDING ON.", floor: true,
-    underfoot: true, cause: 'underfoot', active: 6.5, after: ['NICE MOVES.', "I WAS HOPING YOU'D FALL IN."], afterTime: 2.4,
+    underfoot: true, cause: 'underfoot', active: 5.5, after: ['NICE MOVES.', "I WAS HOPING YOU'D FALL IN."], afterTime: 2.2,
   },
   { kind: 'rising', header: 'RULE #7', line1: 'THE FLOOR IS LAVA', line2: "AND IT'S RISING.", after: ["OK. IT'S GOING DOWN.", "IT'S GOING DOWN. STILL LAVA, THOUGH."], afterTime: 0 },
   { kind: 'finale' },
@@ -276,6 +276,8 @@ export class FloorLavaLevel implements Level {
 
   // The floor: warming up, lava (and since when, for the ripple), cooling.
   private floorWarn = 0;
+  /** Blink cycles so far: things about to turn to lava blink faster as the countdown runs out. */
+  private blinkT = 0;
   private floorMolten = false;
   private floorT = 0;
   private floorCool = 0;
@@ -409,14 +411,22 @@ export class FloorLavaLevel implements Level {
       const k = item.cool;
       for (let i = first; i < out.length; i++) out[i].color = mix(out[i].color, CRUST, k);
     } else if (item.warn > 0) {
-      // Heating up: glowing orange, pulsing faster as the countdown runs out.
-      const w = item.warn;
-      const k = w * (0.65 + 0.35 * Math.sin(this.time * (8 + w * 14)));
-      for (let i = first; i < out.length; i++) {
-        out[i].color = mix(out[i].color, HOT, k * 0.9);
-        out[i].highlight = k;
+      // Heating up: blinking molten, faster and longer as the countdown runs out.
+      if (this.blink(item.warn)) {
+        for (let i = first; i < out.length; i++) {
+          out[i].pattern = Pattern.lava;
+          out[i].param = 2;
+        }
+      } else {
+        const k = item.warn * 0.45;
+        for (let i = first; i < out.length; i++) out[i].color = mix(out[i].color, HOT, k);
       }
     }
+  }
+
+  /** During a countdown, whether things about to turn to lava show as lava right now (they blink). */
+  private blink(warn: number) {
+    return warn > 0.02 && this.blinkT % 1 < 0.3 + warn * 0.45;
   }
 
   // --- Screens ----------------------------------------------------------------------------------
@@ -505,7 +515,7 @@ export class FloorLavaLevel implements Level {
         }
         if (this.at(COUNT, dt)) {
           this.countdown(0, '');
-          hud.show('LAVA!', '', 1);
+          hud.show('LAVA!', '', 0.8);
           if (step.floor) this.meltFloor();
           for (const it of this.items) if (it.doomed) this.melt(it);
         }
@@ -534,7 +544,7 @@ export class FloorLavaLevel implements Level {
         }
         if (this.at(COUNT, dt)) {
           this.countdown(0, '');
-          hud.show('LAVA!', '', 1);
+          hud.show('LAVA!', '', 0.8);
           this.meltFloor();
         }
         if (t >= COUNT) {
@@ -547,7 +557,7 @@ export class FloorLavaLevel implements Level {
           this.coolFloor();
           this.show('', 'OK. NOTHING IS LAVA.', 'CATCH YOUR BREATH. YOU WILL NEED IT.');
         }
-        if (t >= end + 2.6) this.begin(this.index + 1);
+        if (t >= end + 2.2) this.begin(this.index + 1);
         break;
       }
       case 'finale':
@@ -628,8 +638,7 @@ export class FloorLavaLevel implements Level {
       }
       const fall = t - DUCK_DROP_AT;
       const y = Math.max(0, DUCK_DROP_HEIGHT - 0.5 * DUCK_GRAVITY * fall * fall);
-      // (The first frame puts it up in the sky: no speed from wherever it was waiting.)
-      duck.moveTo([this.duckSpot[0], y, this.duckSpot[2]], duck.yaw, duck.pos[1] < -1 ? 0 : dt);
+      duck.moveTo([this.duckSpot[0], y, this.duckSpot[2]], duck.yaw);
       // Anyone underneath is about to have a very bad day.
       const alive = player.mode === 'control' && !this.death;
       if (alive && y < player.pos[1] + 1.8 && y > player.pos[1] - 0.5 && duck.over(player.pos[0], player.pos[2], 0.2)) this.squash();
@@ -655,7 +664,7 @@ export class FloorLavaLevel implements Level {
     if (this.moltenT < 0) {
       this.moltenT = 0;
       this.countdown(0, '');
-      hud.show('LAVA!', '', 1);
+      hud.show('LAVA!', '', 0.8);
       this.meltFloor();
       for (const it of this.items) this.melt(it);
     }
@@ -709,7 +718,8 @@ export class FloorLavaLevel implements Level {
       yaw += clamp(diff, -dt * 0.9, dt * 0.9);
       duck.roll = Math.sin(this.time * 1.1) * 0.03;
     }
-    duck.moveTo(pos, yaw, dt);
+    // Anyone on it goes along for the ride.
+    duck.moveTo(pos, yaw, this.ctx.player);
   }
 
   // --- Your feet --------------------------------------------------------------------------------
@@ -769,11 +779,6 @@ export class FloorLavaLevel implements Level {
     const { player } = this.ctx;
     const lava = this.feet();
     if (this.standing === DUCK_SURFACE) this.boarded = true;
-    // Riding the duck: anywhere over its back (on it, or hopping about on it) you move with it.
-    // (Standing on a bobbing kinematic body, onGround flickers, so this doesn't rely on the feet.)
-    const p = player.pos, duck = this.duck;
-    const riding = duck.visible && duck.over(p[0], p[2], 0.2) && p[1] > duck.pos[1] + 0.3 && p[1] < duck.pos[1] + DUCK_BACK + 1.6;
-    player.platformVel = riding ? duck.pointVelocity(p) : [0, 0, 0];
     if (lava) {
       if (!this.wasTouching) this.contact += TOUCH_MIN;
       this.contact += dt;
@@ -908,14 +913,17 @@ export class FloorLavaLevel implements Level {
     if (this.floorMolten) this.floorT += dt;
     this.floorCool = Math.max(0, this.floorCool - dt / 1.3);
     if (!this.floorMolten && this.floorCool <= 0 && !this.isCounting()) this.floorWarn = Math.max(0, this.floorWarn - dt * 2);
+    let warn = this.floorWarn;
     for (const it of this.items) {
       it.cool = Math.max(0, it.cool - dt / 1.3);
       if (!it.doomed && !this.isCounting()) it.warn = Math.max(0, it.warn - dt * 2);
       if (it.sinkT >= 0) this.sink(it, dt);
+      warn = Math.max(warn, it.warn);
     }
+    // Blinking speeds up as the countdown runs out (and starts on the normal look).
+    this.blinkT = warn > 0 ? this.blinkT + dt * (1.2 + warn * warn * 6) : 0.5;
     this.moveDuck(dt);
     if (this.arrival.done && alive) this.checkFeet(dt);
-    else player.platformVel = [0, 0, 0];
 
     // Burning up.
     if (this.burning >= 0) {
@@ -1036,21 +1044,18 @@ export class FloorLavaLevel implements Level {
       const first = out.length;
       drawRug(out, RUG_CENTRE, RUG_SIZE);
       if (this.floorCool > 0) for (let i = first; i < out.length; i++) out[i].color = mix(out[i].color, CRUST, this.floorCool);
-      else if (this.floorWarn > 0) {
-        const k = this.floorWarn * (0.6 + 0.4 * Math.sin(this.time * (8 + this.floorWarn * 14)));
-        for (let i = first; i < out.length; i++) out[i].color = mix(out[i].color, HOT, k * 0.7);
-      }
+      else if (this.floorWarn > 0) for (let i = first; i < out.length; i++) out[i].color = mix(out[i].color, CRUST, this.floorWarn * 0.5);
     }
 
-    // Warming up: the seams between the floor panels glow, brighter and brighter.
+    // Warming up: the seams between the floor panels (and across the rug) glow, brighter and wider.
     if (this.floorWarn > 0 && !this.floorMolten) {
       const w = this.floorWarn;
       const flicker = 0.75 + 0.25 * Math.sin(this.time * (10 + w * 20));
-      const c = [2.4 * w * flicker + 0.2 * w, 0.55 * w * flicker, 0.08 * w];
+      const c = [2.6 * w * flicker + 0.2 * w, 0.5 * w * flicker, 0.06 * w];
       for (let i = 0; i <= TILES; i++) {
         const v = -H + i * TILE;
-        out.push({ mesh: 'box', model: mul(translation([v, 0.003, 0]), scaling([0.05 + w * 0.05, 0.004, H * 2])), color: c, pattern: Pattern.emissive, shadow: false });
-        out.push({ mesh: 'box', model: mul(translation([0, 0.003, v]), scaling([H * 2, 0.004, 0.05 + w * 0.05])), color: c, pattern: Pattern.emissive, shadow: false });
+        out.push({ mesh: 'box', model: mul(translation([v, 0.016, 0]), scaling([0.05 + w * 0.08, 0.004, H * 2])), color: c, pattern: Pattern.emissive, shadow: false });
+        out.push({ mesh: 'box', model: mul(translation([0, 0.016, v]), scaling([H * 2, 0.004, 0.05 + w * 0.08])), color: c, pattern: Pattern.emissive, shadow: false });
       }
     }
 

@@ -1,12 +1,13 @@
 import { add, mul, rotationX, rotationY, rotationZ, scaling, translation, type Mat4, type Vec3 } from '../engine/math';
 import { RAPIER, type Physics } from '../engine/physics';
 import { Pattern, type DrawItem } from '../engine/renderer';
+import type { Player } from '../game/player';
 
 /*
  * A giant rubber duck (4 m long, 2.2 m tall) you can stand on, moved by hand by the level (drop it,
  * float it, sail it), so it never tips over. It's a fixed body teleported every frame rather than a
- * kinematic one: Rapier's character controller can't jump up alongside kinematic colliders. Riders
- * are carried along with `pointVelocity` (player.platformVel). Its back is 1.1 m up, low enough to
+ * kinematic one: Rapier's character controller can't jump up alongside kinematic colliders. `moveTo`
+ * carries a rider along. Its back is 1.1 m up, low enough to
  * jump onto from the floor; the head is a ball on top at the front. Its local frame has the origin at
  * the middle of its flat bottom and the beak pointing along -z.
  */
@@ -26,8 +27,8 @@ const HEAD: Vec3 = [0, 1.45, -1.2];
 /** Footprint half-sizes (x, z), for landing on things. */
 export const DUCK_HALF: [number, number] = [BODY_R[0], BODY_R[2]];
 
-const YELLOW = [1, 0.8, 0.07];
-const WING = [0.97, 0.68, 0.04];
+const YELLOW = [1, 0.7, 0.04];
+const WING = [0.97, 0.6, 0.03];
 const BEAK = [1, 0.42, 0.04];
 
 export class GiantDuck {
@@ -36,9 +37,6 @@ export class GiantDuck {
   /** Where its bottom centre is, and which way it faces (yaw 0: beak toward -z). */
   pos: Vec3;
   yaw: number;
-  /** How fast it moved last frame (m/s), and turned (rad/s): for carrying riders along. */
-  vel: Vec3 = [0, 0, 0];
-  yawRate = 0;
   /** Visual only: squash on landing (0 = none, >0 flattened), and a little rocking roll (rad). */
   squash = 0;
   roll = 0;
@@ -82,27 +80,33 @@ export class GiantDuck {
     for (const c of this.colliders) c.setEnabled(solid);
   }
 
-  /** Moves it to `pos` facing `yaw`, and works out how fast it went, for riders (dt 0: a teleport). */
-  moveTo(pos: Vec3, yaw: number, dt: number) {
-    if (dt <= 0) {
-      // Teleported: not moving.
-      this.vel = [0, 0, 0];
-      this.yawRate = 0;
-    } else {
-      this.vel = [(pos[0] - this.pos[0]) / dt, (pos[1] - this.pos[1]) / dt, (pos[2] - this.pos[2]) / dt];
-      this.yawRate = Math.atan2(Math.sin(yaw - this.yaw), Math.cos(yaw - this.yaw)) / dt;
+  /** Is the player on its back, or hopping about just over it? */
+  carries(player: Player) {
+    const p = player.pos;
+    return player.mode === 'control' && this.visible && this.over(p[0], p[2], 0.2) &&
+      p[1] > this.pos[1] + 0.3 && p[1] < this.pos[1] + DUCK_BACK + 1.6;
+  }
+
+  /**
+   * Moves it to `pos` facing `yaw`, taking `rider` along if it carries them. They're moved directly
+   * rather than given a platform velocity: walking the character controller along on a moving slope
+   * makes you creep down it and off.
+   */
+  moveTo(pos: Vec3, yaw: number, rider?: Player) {
+    if (rider && this.carries(rider)) {
+      const p = rider.pos;
+      const turn = yaw - this.yaw, c = Math.cos(turn), s = Math.sin(turn);
+      const rx = p[0] - this.pos[0], rz = p[2] - this.pos[2];
+      // Turning by `turn` about +y takes (x, z) to (x cos + z sin, -x sin + z cos).
+      p[0] = pos[0] + rx * c + rz * s;
+      p[2] = pos[2] - rx * s + rz * c;
+      p[1] += pos[1] - this.pos[1];
+      rider.syncCollider();
     }
     this.pos = [...pos];
     this.yaw = yaw;
     this.rb.setTranslation({ x: pos[0], y: pos[1], z: pos[2] }, false);
     this.rb.setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) }, false);
-  }
-
-  /** The velocity of the duck's surface at world point `p` (its motion plus its turning). */
-  pointVelocity(p: Vec3): Vec3 {
-    const rx = p[0] - this.pos[0], rz = p[2] - this.pos[2];
-    // Spinning about +y at yawRate: v = w x r.
-    return [this.vel[0] + this.yawRate * rz, this.vel[1], this.vel[2] - this.yawRate * rx];
   }
 
   /** Is the point (x, z) over its footprint (with `margin` to spare)? */
