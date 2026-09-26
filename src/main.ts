@@ -20,6 +20,7 @@ import { SunburnLevel } from './levels/sunburn/sunburnLevel';
 import { MinesLevel } from './levels/mines/minesLevel';
 import { FroggerLevel } from './levels/frogger/froggerLevel';
 import { ChairsLevel } from './levels/chairs/chairsLevel';
+import { HexagoneLevel } from './levels/hexagone/hexagoneLevel';
 import { RedLightLevel } from './levels/redLight/redLightLevel';
 import { LaserLevel } from './levels/lasers/laserLevel';
 import { GnomeLevel } from './levels/gnomes/gnomeLevel';
@@ -47,6 +48,7 @@ const LEVELS: ((ctx: LevelContext) => Level)[] = [
   (ctx) => new FroggerLevel(ctx),
   (ctx) => new SnakeLevel(ctx),
   (ctx) => new ChairsLevel(ctx),
+  (ctx) => new HexagoneLevel(ctx),
 ];
 const params = new URLSearchParams(location.search);
 /** `?sandbox` opens the mechanics test room; `?level=N` skips the lobby and starts at level N. */

@@ -276,3 +276,43 @@ export function tube(inner = 0.5, segments = 32): MeshData {
   }
   return b.build();
 }
+
+/**
+ * Flat-shaded hexagonal prism: circumradius 1 in the xz plane (corners at 0°, 60°... from +x,
+ * "flat-top" when seen from above), y in [-0.5, 0.5]. The top edge can be chamfered: the top face
+ * shrinks by `bevelIn` (radius) and the sides start `bevelDown` below the top, with a sloped band
+ * between them that catches the light (e.g. floor tiles).
+ */
+export function hexPrism(bevelIn = 0, bevelDown = 0): MeshData {
+  const b = new Builder();
+  const corner = (k: number, r: number, y: number): number[] => {
+    const a = (k * Math.PI) / 3;
+    return [Math.cos(a) * r, y, Math.sin(a) * r];
+  };
+  /** A flat quad (or triangle when p2 === p3), wound to face along `n`. */
+  const face = (pts: number[][], n: number[]) => {
+    const e1 = [pts[1][0] - pts[0][0], pts[1][1] - pts[0][1], pts[1][2] - pts[0][2]];
+    const e2 = [pts[2][0] - pts[0][0], pts[2][1] - pts[0][1], pts[2][2] - pts[0][2]];
+    const c = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+    const ordered = c[0] * n[0] + c[1] * n[1] + c[2] * n[2] >= 0 ? pts : [...pts].reverse();
+    const idx = ordered.map((p) => b.vert(p[0], p[1], p[2], n[0], n[1], n[2]));
+    for (let i = 1; i + 1 < idx.length; i++) b.tri(idx[0], idx[i], idx[i + 1]);
+  };
+  const top = 0.5, shoulder = 0.5 - bevelDown, inner = 1 - bevelIn;
+  const cos30 = Math.cos(Math.PI / 6);
+  // Top and bottom faces.
+  face([0, 1, 2, 3, 4, 5].map((k) => corner(k, inner, top)), [0, 1, 0]);
+  face([0, 1, 2, 3, 4, 5].map((k) => corner(k, 1, -0.5)), [0, -1, 0]);
+  for (let k = 0; k < 6; k++) {
+    // Outward normal of the edge between corners k and k + 1 (at 30° + 60° k).
+    const a = ((k + 0.5) * Math.PI) / 3;
+    const nx = Math.cos(a), nz = Math.sin(a);
+    face([corner(k, 1, shoulder), corner(k + 1, 1, shoulder), corner(k + 1, 1, -0.5), corner(k, 1, -0.5)], [nx, 0, nz]);
+    if (bevelIn > 0 || bevelDown > 0) {
+      const run = bevelIn * cos30, rise = bevelDown;
+      const len = Math.hypot(run, rise) || 1;
+      face([corner(k, inner, top), corner(k + 1, inner, top), corner(k + 1, 1, shoulder), corner(k, 1, shoulder)], [(nx * rise) / len, run / len, (nz * rise) / len]);
+    }
+  }
+  return b.build();
+}
