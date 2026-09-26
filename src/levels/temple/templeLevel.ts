@@ -1,5 +1,5 @@
 import {
-  add, clamp, dot, easeInOut, length, mul, normalize, rotationX, rotationZ, scale, scaling, segment, sub, toQuat, transformPoint, translation,
+  add, clamp, dot, easeInOut, length, mul, normalize, rotationX, rotationZ, scale, scaling, segment, sub, toQuat, transformDir, transformPoint, translation,
   type Mat4, type Vec3,
 } from '../../engine/math';
 import { GROUPS_BOULDER, GROUPS_BOULDER_BRIDGE, RAPIER, type Body } from '../../engine/physics';
@@ -11,22 +11,21 @@ import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type Level
  * The boulder temple (an Indiana Jones parody). Its own map: a dark, sloping stone tunnel lit only
  * by the torch in your hand. The exit portal is right there... until a boulder drops out of the
  * ceiling in front of it and chases you down the tunnel, over spiked pits (one needs a vine).
- * At the dead end the wall sinks into the floor to reveal a second boulder, and the whole temple
- * slowly rolls over: a quarter turn puts you on the side wall for a moment, another puts you on the
- * ceiling, and the new boulder chases you home. The first one rolls ahead of you and drops down its own shaft,
+ * At the dead end the wall sinks into the floor to reveal a second boulder, and gravity slowly
+ * rolls over: a quarter turn drops you onto the side wall for a moment, another onto the ceiling,
+ * and the new boulder chases you home. The first one rolls ahead of you and drops down its own shaft,
  * now a pit, which you cross on a second vine to reach the portal. Boulders kill on contact.
  *
- * The map is built flat in "track" space (floor y = 0, ceiling y = H, running along +z) on one
- * body; the level matrix tilts it into a slope and rolls it about the tunnel's own axis, so the
- * player's physics never has to handle walls or ceilings. The body is fixed (the character
- * controller only climbs slopes on fixed colliders) and only goes kinematic while it turns.
+ * The map is built in "track" space (floor y = 0, ceiling y = H, running along +z) on one fixed
+ * body. It never moves: the flip turns gravity (the physics world's and the player's own) about
+ * the tunnel's axis, so the player really does fall onto the wall and then the ceiling.
  */
 
 // --- Track layout (track space) -----------------------------------------------------------------
 const H = 5; // tunnel height
 const W = 4.6; // tunnel width (a 4 m boulder leaves no room to dodge past)
 const WALL_T = 1;
-const SLOPE = 0.06; // drop per metre, downhill toward +z
+const SLOPE = 0; // drop per metre toward +z (flat: gravity has to be square to the walls and ceiling too)
 const Z_START = -20;
 const Z_ALCOVE_END = 87;
 const END_Z = 80; // the dead-end wall that sinks away
@@ -64,7 +63,7 @@ const FLEE = 10.5;
 
 const END_WAIT = 1;
 const WALL_SINK = 1;
-/** The roll: each quarter turn takes this long, with a pause standing on the side wall in between. */
+/** The gravity roll: each quarter turn takes this long, with a pause standing on the side wall in between. */
 const QUARTER_TURN = 2.5;
 const ON_THE_WALL = 1.5;
 const DEATH_SCREEN_DELAY = 1.6;
@@ -327,17 +326,12 @@ export class TempleLevel implements Level {
         break;
       case 'turn1':
       case 'turn2': {
+        // Gravity turns about the tunnel's axis; the player (and their camera) turn with it.
         const k = easeInOut(clamp(this.stageT / QUARTER_TURN, 0, 1));
-        this.flip = rollMatrix((Math.PI / 2) * ((this.stage === 'turn2' ? 1 : 0) + k));
-        this.setLevelPose();
-        this.placeParked();
+        this.setGravity((Math.PI / 2) * ((this.stage === 'turn2' ? 1 : 0) + k));
         if (this.stageT >= QUARTER_TURN) {
-          if (this.stage === 'turn1') {
-            this.land();
-            this.setStage('onWall');
-          } else {
-            this.endFlip();
-          }
+          if (this.stage === 'turn1') this.setStage('onWall');
+          else this.endFlip();
         }
         break;
       }
@@ -413,41 +407,28 @@ export class TempleLevel implements Level {
     b.rb.setLinvel({ x: next[0], y: next[1], z: next[2] }, true);
   }
 
-  /**
-   * A quarter turn of the temple about the tunnel's axis. The player hangs where they are while it
-   * turns around them; the boulders freeze and ride along.
-   */
+  /** A quarter turn of gravity. The boulders freeze where they are until it's all over. */
   private startTurn(stage: 'turn1' | 'turn2') {
-    const { player } = this.ctx;
-    player.mode = 'held';
     if (stage === 'turn1') {
       this.parked = this.boulders.map((_, i) => this.boulderTrack(i));
       for (const b of this.boulders) b.rb.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
       this.chasing = null;
     }
-    this.levelBody.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
+    this.ctx.camera.addShake(0.3);
     this.setStage(stage);
   }
 
-  /** After a turn: fix the temple in place again and set the player down on whatever is now the floor. */
-  private land() {
-    const { player, camera } = this.ctx;
-    this.levelBody.setBodyType(RAPIER.RigidBodyType.Fixed, true);
-    this.setLevelPose();
-    const me = this.toTrack(player.pos);
-    const down = this.dirToTrack([0, -1, 0]);
-    const feet: Vec3 = Math.abs(down[0]) > Math.abs(down[1])
-      ? [Math.sign(down[0]) * (W / 2 - 0.03), clamp(me[1], 0.5, H - 0.5), me[2]] // a side wall
-      : [clamp(me[0], -W / 2 + 0.5, W / 2 - 0.5), down[1] > 0 ? H - 0.03 : 0.03, me[2]]; // ceiling (or floor)
-    player.pos = this.toWorld(feet);
-    player.resume();
-    camera.addShake(0.4);
+  /** Gravity rolled by `angle` about the tunnel's axis (0: normal, π/2: onto a side wall, π: onto the ceiling). */
+  private setGravity(angle: number) {
+    const g = rotationZ(angle);
+    this.ctx.player.setGravity(g);
+    this.ctx.physics.setGravityDirection(transformDir(g, [0, -1, 0]));
   }
 
   private endFlip() {
     const { camera } = this.ctx;
     this.flipped = true;
-    this.land();
+    this.setGravity(Math.PI);
     this.setStage('chaseBack');
     // Both boulders fall to the new floor; the first rolls off ahead, the second chases you home.
     this.release(0, scale(this.dirToWorld([0, 0, -1]), FLEE));
@@ -465,37 +446,39 @@ export class TempleLevel implements Level {
     return this.flipped ? VINE2 : VINE1;
   }
 
-  /** The world-space plane a vine swings in: its pivot, and the horizontal direction it carries you. */
-  private vineFrame(vine: Vine): { pivot: Vec3; ahead: Vec3 } {
+  /** A vine's swing plane: its pivot, which way is down (gravity), and the direction it carries you. */
+  private vineFrame(vine: Vine): { pivot: Vec3; ahead: Vec3; down: Vec3 } {
+    const up = this.ctx.player.up;
     const d = this.dirToWorld([0, 0, vine.dir]);
-    return { pivot: this.toWorld(vine.pivot), ahead: normalize([d[0], 0, d[2]]) };
+    const ahead = normalize(sub(d, scale(up, dot(d, up))));
+    return { pivot: this.toWorld(vine.pivot), ahead, down: scale(up, -1) };
   }
 
   private updateVines(dt: number, me: Vec3) {
     const { player } = this.ctx;
     const vine = this.activeVine();
-    const { pivot, ahead } = this.vineFrame(vine);
+    const { pivot, ahead, down } = this.vineFrame(vine);
     if (this.swing) {
       const s = this.swing;
       s.t += dt;
       const k = clamp(s.t / SWING_TIME, 0, 1);
       const angle = s.from + (SWING_TO - s.from) * easeInOut(k);
-      const hand = add(pivot, add(scale(ahead, Math.sin(angle) * VINE_LEN), [0, -Math.cos(angle) * VINE_LEN, 0]));
-      player.pos = [hand[0], hand[1] - HANG, hand[2]];
+      const hand = add(pivot, add(scale(ahead, Math.sin(angle) * VINE_LEN), scale(down, Math.cos(angle) * VINE_LEN)));
+      player.pos = add(hand, scale(down, HANG));
       if (k >= 1) {
         this.swing = null;
         this.vineCooldown = 1;
-        player.resume(add(scale(ahead, RELEASE_FORWARD), [0, RELEASE_UP, 0]));
+        player.resume(add(scale(ahead, RELEASE_FORWARD), scale(down, -RELEASE_UP)));
       }
       return;
     }
     if (player.mode !== 'control' || player.onGround || this.vineCooldown > 0 || this.rolling()) return;
     // Jumped into the vine? Grab it if your hands pass close to the rope while heading the right way.
-    const hands = add(player.pos, [0, HANG, 0]);
-    const bottom: Vec3 = [pivot[0], pivot[1] - VINE_LEN, pivot[2]];
-    if (distToSegment(hands, pivot, bottom) > 0.9 || dot(player.vel, ahead) < 0.5) return;
+    const hands = add(player.pos, scale(down, -HANG));
+    const bottom = add(pivot, scale(down, VINE_LEN));
+    if (distToSegment(hands, pivot, bottom) > 1.3 || dot(player.vel, ahead) < 0.5) return;
     const rel = sub(hands, pivot);
-    const from = clamp(Math.atan2(dot(rel, ahead), -rel[1]), -1, 0.2);
+    const from = clamp(Math.atan2(dot(rel, ahead), dot(rel, down)), -1, 0.2);
     player.mode = 'swinging';
     player.facing = Math.atan2(-ahead[0], -ahead[2]);
     this.swing = { vine, t: 0, from };
@@ -512,7 +495,7 @@ export class TempleLevel implements Level {
       const c = b.rb.translation();
       const centre: Vec3 = [c.x, c.y, c.z];
       for (const h of [0.3, 1.0, 1.7]) {
-        if (length(sub(add(player.pos, [0, h, 0]), centre)) > BOULDER_R + 0.3) continue;
+        if (length(sub(add(player.pos, scale(player.up, h)), centre)) > BOULDER_R + 0.3) continue;
         const v = b.rb.linvel();
         if (player.mode !== 'control') player.resume();
         player.kill([v.x * 1.2, v.y * 1.2 + 4, v.z * 1.2], { violence: 45, origin: centre });
@@ -547,7 +530,7 @@ export class TempleLevel implements Level {
     }
     if (player.mode !== 'control' || this.death) return;
     const centre = this.portalCentre();
-    if (length(sub(add(player.pos, [0, 1.2, 0]), centre)) < PORTAL_R + 0.2) {
+    if (length(sub(add(player.pos, scale(player.up, 1.2)), centre)) < PORTAL_R + 0.2) {
       player.shrinkInto(centre, PORTAL_SQUEEZE_TIME);
       this.exiting = 0;
     }
@@ -608,9 +591,9 @@ export class TempleLevel implements Level {
     drawPortal(out, this.portalCentre(), n, PORTAL_R, true);
     this.arrival.draw(out);
     const vine = this.activeVine();
-    const { pivot } = this.vineFrame(vine);
+    const { pivot, down } = this.vineFrame(vine);
     const player = this.ctx.player;
-    const end: Vec3 = this.swing ? add(player.pos, [0, HANG, 0]) : [pivot[0], pivot[1] - VINE_LEN, pivot[2]];
+    const end: Vec3 = this.swing ? add(player.pos, scale(down, -HANG)) : add(pivot, scale(down, VINE_LEN));
     out.push({ mesh: 'cylinder', model: segment(pivot, end, 0.05), color: VINE_COLOR });
     for (let i = 1; i < 5; i++) {
       const p = add(pivot, scale(sub(end, pivot), i / 5));
@@ -639,11 +622,6 @@ export class TempleLevel implements Level {
   cameraShot(): CameraShot | null {
     return this.arrival.cameraShot();
   }
-}
-
-/** Rolls the temple by `angle` about the tunnel's own axis (track z, at mid-height). */
-function rollMatrix(angle: number): Mat4 {
-  return mul(translation([0, H / 2, 0]), rotationZ(angle), translation([0, -H / 2, 0]));
 }
 
 /** A rough, almost-round boulder in its body frame. */

@@ -127,6 +127,11 @@ export class Physics {
     }
   }
 
+  /** Points gravity along `down` (a unit vector), at the usual strength. */
+  setGravityDirection(down: Vec3) {
+    this.world.gravity = { x: down[0] * GRAVITY, y: down[1] * GRAVITY, z: down[2] * GRAVITY };
+  }
+
   /** Static, invisible collision box (level geometry draws itself separately). */
   addStaticBox(center: Vec3, size: Vec3, rotation?: Quat): RAPIER.Collider {
     const desc = RAPIER.ColliderDesc.cuboid(size[0] / 2, size[1] / 2, size[2] / 2)

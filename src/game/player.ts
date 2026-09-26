@@ -1,6 +1,7 @@
 import type { Input } from '../engine/input';
 import {
-  approachAngle, basis, clamp, cross, dot, easeInOut, length, mul, multiply, normalize, scale, scaling, sub, translation,
+  add, approachAngle, basis, clamp, cross, dot, easeInOut, identity, length, mul, multiply, normalize, scale, scaling, sub, transformDir, translation,
+  untransformDir,
   type Mat4, type Vec3,
 } from '../engine/math';
 import { GROUPS_PLAYER_CAPSULE, GROUPS_QUERY_WORLD, RAPIER, type Body, type Physics } from '../engine/physics';
@@ -154,6 +155,13 @@ export class Player {
    */
   portalScale = 1;
   inPortal = false;
+  /**
+   * The player's gravity: a rotation from their own frame (feet down, head up along +y) to the
+   * world. Identity normally; a level can turn it (see setGravity) to walk on walls and ceilings.
+   */
+  gravity: Mat4 = identity();
+  /** Which way is up for the player (world space). */
+  up: Vec3 = [0, 1, 0];
   /** Torso fatness for this life only (1 = normal); reset() puts it back. */
   girth = 1;
   /** Multiplies walking / sprinting speed and acceleration, for this life only. */
@@ -180,6 +188,36 @@ export class Player {
     this.inPortal = false;
     this.girth = 1;
     this.speedScale = 1;
+    this.gravity = identity();
+    this.up = [0, 1, 0];
+  }
+
+  /**
+   * Turns the player's gravity to `rotation` (from their frame to the world). They pivot about
+   * the middle of their body, so turning in place doesn't push them into the floor. The level is
+   * responsible for turning the physics world's gravity to match (Physics.setGravityDirection).
+   */
+  setGravity(rotation: Mat4) {
+    const centre = this.center();
+    this.gravity = rotation;
+    this.up = normalize(transformDir(rotation, [0, 1, 0]));
+    this.pos = sub(centre, scale(this.up, CAPSULE_HALF + PLAYER_RADIUS));
+    this.controller?.setUp({ x: this.up[0], y: this.up[1], z: this.up[2] });
+    this.collider?.setRotation(toQuatRot(rotation));
+    this.driveFeet = [...this.pos];
+  }
+
+  /** Standing at `feet` facing `facing`, in the player's gravity. */
+  private root(feet: Vec3, facing: number): Mat4 {
+    return mul(translation(feet), this.gravity, standingRoot([0, 0, 0], facing));
+  }
+
+  private toLocal(v: Vec3): Vec3 {
+    return untransformDir(this.gravity, v);
+  }
+
+  private toWorld(v: Vec3): Vec3 {
+    return transformDir(this.gravity, v);
   }
 
   /** Sucks the player into a portal centred at `pivot`: they shrink into it over `seconds`. */
@@ -235,18 +273,20 @@ export class Player {
     // flies into the (invisible, wider than the body) capsule, so nothing could ever hit the body.
     this.controller.setApplyImpulsesToDynamicBodies(false);
 
-    this.body = new PhysBody(physics, poseFrames(standingRoot(this.pos, this.facing), REST_POSE));
+    this.body = new PhysBody(physics, poseFrames(this.root(this.pos, this.facing), REST_POSE));
     this.driveFeet = [...this.pos];
     physics.substepHooks.push((h) => this.substep(h));
     physics.postStepHooks.push(() => this.checkHits());
   }
 
   private center(): Vec3 {
-    return [this.pos[0], this.pos[1] + CAPSULE_HALF + PLAYER_RADIUS, this.pos[2]];
+    return add(this.pos, scale(this.up, CAPSULE_HALF + PLAYER_RADIUS));
   }
 
   update(dt: number, input: Input, camYaw: number, obstacles: Circle[], camPitch = 0) {
     this.time += dt;
+    // Movement is worked out in the player's own frame (up = +y), then turned back into the world.
+    this.vel = this.toLocal(this.vel);
     const stunned = this.stun > 0;
     this.stun = Math.max(0, this.stun - dt);
     this.knockGrace = Math.max(0, this.knockGrace - dt);
@@ -256,7 +296,7 @@ export class Player {
     if (this.gettingUp && !stunned && this.body) {
       this.getUpTime += dt;
       const p = this.body.position('pelvis');
-      const off = Math.hypot(p[0] - this.pos[0], p[1] - (this.pos[1] + 0.98), p[2] - this.pos[2]);
+      const off = length(sub(p, add(this.pos, scale(this.up, 0.98))));
       if ((off < GETUP_DONE_DISTANCE && this.body.muscle >= 1) || this.getUpTime > GETUP_MAX_TIME) {
         this.gettingUp = false;
         this.knockGrace = KNOCK_GRACE_TIME;
@@ -292,8 +332,8 @@ export class Player {
     let delta = scale(this.vel, dt);
     if (stunned && this.body) {
       // While knocked loose, the capsule is dragged along by the tumbling body.
-      const p = this.body.position('pelvis');
-      delta = [(p[0] - this.pos[0]) * Math.min(1, dt * 8), delta[1], (p[2] - this.pos[2]) * Math.min(1, dt * 8)];
+      const p = this.toLocal(sub(this.body.position('pelvis'), this.pos));
+      delta = [p[0] * Math.min(1, dt * 8), delta[1], p[2] * Math.min(1, dt * 8)];
     }
     this.move(delta, dt);
 
@@ -324,6 +364,7 @@ export class Player {
 
     this.driveFeet = before;
     this.driveVel = dt > 0 ? scale(sub(this.pos, before), 1 / dt) : [0, 0, 0];
+    this.vel = this.toWorld(this.vel);
   }
 
   /** Moves by `delta`, sliding along walls, stepping up small ledges and pushing loose objects. */
@@ -338,13 +379,15 @@ export class Player {
     // `pos` is the source of truth (levels may teleport the player), so sync the capsule first.
     const c = this.center();
     col.setTranslation({ x: c[0], y: c[1], z: c[2] });
-    ctrl.computeColliderMovement(col, { x: delta[0], y: delta[1], z: delta[2] }, undefined, GROUPS_QUERY_WORLD);
-    const m = ctrl.computedMovement();
-    this.pos = [this.pos[0] + m.x, this.pos[1] + m.y, this.pos[2] + m.z];
+    const d = this.toWorld(delta);
+    ctrl.computeColliderMovement(col, { x: d[0], y: d[1], z: d[2] }, undefined, GROUPS_QUERY_WORLD);
+    const mw = ctrl.computedMovement();
+    this.pos = [this.pos[0] + mw.x, this.pos[1] + mw.y, this.pos[2] + mw.z];
+    const m = this.toLocal([mw.x, mw.y, mw.z]);
     this.onGround = ctrl.computedGrounded();
     if (this.onGround && this.vel[1] < 0) this.vel[1] = 0;
-    if (delta[1] > 0 && m.y < delta[1] * 0.5) this.vel[1] = Math.min(this.vel[1], 0); // bumped head
-    if (dt > 0 && this.pos[1] < -20) this.pos[1] = 0; // fell out of the world
+    if (delta[1] > 0 && m[1] < delta[1] * 0.5) this.vel[1] = Math.min(this.vel[1], 0); // bumped head
+    if (dt > 0 && this.pos[1] < -20 && this.up[1] > 0.9) this.pos[1] = 0; // fell out of the world
     this.pushObstacles(ctrl);
     const n = this.center();
     col.setTranslation({ x: n[0], y: n[1], z: n[2] });
@@ -362,7 +405,8 @@ export class Player {
       const len = Math.hypot(dx, dz);
       if (len < 1e-3) continue;
       const nx = dx / len, nz = dz / len;
-      const into = this.vel[0] * nx + this.vel[2] * nz;
+      const vw = this.toWorld(this.vel);
+      const into = vw[0] * nx + vw[2] * nz;
       if (into <= 0) continue;
       // Light things get shoved along at walking speed; heavier ones only budge slowly.
       const mass = rb.mass();
@@ -401,7 +445,7 @@ export class Player {
     // Limbs collide with each other only while the body is limp (dead or knocked loose).
     body.setSelfCollision(this.mode === 'ragdoll' || body.muscle < 0.3);
     if (this.mode === 'ragdoll') {
-      body.drive(h, poseFrames(standingRoot(this.pos, this.facing), this.pose), [0, 0, 0], this.pose);
+      body.drive(h, poseFrames(this.root(this.pos, this.facing), this.pose), [0, 0, 0], this.pose);
       return;
     }
     if (this.mode !== 'control') {
@@ -413,7 +457,7 @@ export class Player {
       this.driveFeet[1] + this.driveVel[1] * h,
       this.driveFeet[2] + this.driveVel[2] * h,
     ];
-    const targets = poseFrames(standingRoot(this.driveFeet, this.facing), this.pose);
+    const targets = poseFrames(this.root(this.driveFeet, this.facing), this.pose);
     const pelvis = body.position('pelvis');
     const farAway = Math.hypot(pelvis[0] - targets.pelvis[12], pelvis[1] - targets.pelvis[13], pelvis[2] - targets.pelvis[14]) > 2;
     // A teleported player snaps their body over rather than dragging it through the room.
@@ -432,7 +476,7 @@ export class Player {
     if (this.mode !== 'control' || !this.physics || !body) return;
     for (const b of this.physics.bodies) {
       const t = b.rb.translation();
-      if (Math.hypot(t.x - this.pos[0], t.y - this.pos[1] - 1, t.z - this.pos[2]) > 4) continue;
+      if (length(sub([t.x, t.y, t.z], add(this.pos, this.up))) > 4) continue;
       const v = b.rb.linvel();
       this.incoming.set(b, [v.x, v.y, v.z]);
     }
@@ -524,7 +568,7 @@ export class Player {
     this.onGround = false;
     const body = this.body;
     if (body) {
-      body.teleport(poseFrames(standingRoot(this.pos, this.facing), REST_POSE));
+      body.teleport(poseFrames(this.root(this.pos, this.facing), REST_POSE));
       body.setEnabled(true);
     }
     this.driveFeet = [...this.pos];
@@ -551,12 +595,12 @@ export class Player {
   emerge(centre: Vec3, facing: number, velocity: Vec3, stunSeconds: number) {
     this.mode = 'control';
     this.facing = facing;
-    this.pos = [centre[0], centre[1] - 0.95, centre[2]];
+    this.pos = sub(centre, scale(this.up, 0.95));
     this.vel = [0, 0, 0];
     this.onGround = false;
     const body = this.body;
     if (body) {
-      body.teleport(poseFrames(standingRoot(this.pos, facing), REST_POSE));
+      body.teleport(poseFrames(this.root(this.pos, facing), REST_POSE));
       body.setEnabled(true);
       body.parts.chest.setAngvel({ x: (Math.random() - 0.5) * 6, y: (Math.random() - 0.5) * 4, z: (Math.random() - 0.5) * 6 }, true);
     }
@@ -575,14 +619,14 @@ export class Player {
     this.gettingUp = true;
     this.getUpTime = 0;
     this.body.addVelocity(velocity);
-    this.vel = [this.vel[0] + velocity[0] * 0.6, Math.max(this.vel[1], velocity[1] * 0.3), this.vel[2] + velocity[2] * 0.6];
+    const v = this.toLocal(this.vel), push = this.toLocal(velocity);
+    this.vel = this.toWorld([v[0] + push[0] * 0.6, Math.max(v[1], push[1] * 0.3), v[2] + push[2] * 0.6]);
   }
 
   /** Call once per tick after the physics step. */
   afterPhysics() {
     if (this.mode === 'ragdoll' && this.body) {
-      const p = this.body.position('pelvis');
-      this.pos = [p[0], p[1] - 0.98, p[2]];
+      this.pos = sub(this.body.position('pelvis'), scale(this.up, 0.98));
     }
   }
 
@@ -617,7 +661,7 @@ export class Player {
     const horizontal = this.mode === 'flying' || this.mode === 'stuck' || this.mode === 'splat';
     return horizontal
       ? mul(translation(this.pos), alongDirection(this.flightDir), translation([0, -0.9, 0]))
-      : standingRoot(this.pos, this.facing);
+      : this.root(this.pos, this.facing);
   }
 
   private computePose(): Pose {
@@ -706,4 +750,23 @@ function alongDirection(dir: Vec3): Mat4 {
   const z = normalize(sub(up, scale(y, dot(up, y))));
   const x = cross(y, z);
   return basis(x, y, z, [0, 0, 0]);
+}
+
+/** A pure rotation matrix as a Rapier quaternion. */
+function toQuatRot(m: Mat4): { x: number; y: number; z: number; w: number } {
+  const t = m[0] + m[5] + m[10];
+  if (t > 0) {
+    const s = Math.sqrt(t + 1) * 2;
+    return { w: 0.25 * s, x: (m[6] - m[9]) / s, y: (m[8] - m[2]) / s, z: (m[1] - m[4]) / s };
+  }
+  if (m[0] > m[5] && m[0] > m[10]) {
+    const s = Math.sqrt(1 + m[0] - m[5] - m[10]) * 2;
+    return { w: (m[6] - m[9]) / s, x: 0.25 * s, y: (m[4] + m[1]) / s, z: (m[8] + m[2]) / s };
+  }
+  if (m[5] > m[10]) {
+    const s = Math.sqrt(1 + m[5] - m[0] - m[10]) * 2;
+    return { w: (m[8] - m[2]) / s, x: (m[4] + m[1]) / s, y: 0.25 * s, z: (m[9] + m[6]) / s };
+  }
+  const s = Math.sqrt(1 + m[10] - m[0] - m[5]) * 2;
+  return { w: (m[1] - m[4]) / s, x: (m[8] + m[2]) / s, y: (m[9] + m[6]) / s, z: 0.25 * s };
 }

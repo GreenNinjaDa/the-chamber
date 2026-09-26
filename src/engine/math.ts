@@ -88,6 +88,16 @@ export function mul(...ms: Mat4[]): Mat4 {
   return out;
 }
 
+/** Rotates (and scales) a direction by m, ignoring its translation. */
+export function transformDir(m: Mat4, v: Vec3): Vec3 {
+  return [m[0] * v[0] + m[4] * v[1] + m[8] * v[2], m[1] * v[0] + m[5] * v[1] + m[9] * v[2], m[2] * v[0] + m[6] * v[1] + m[10] * v[2]];
+}
+
+/** The inverse of transformDir for a pure rotation (its transpose). */
+export function untransformDir(m: Mat4, v: Vec3): Vec3 {
+  return [m[0] * v[0] + m[1] * v[1] + m[2] * v[2], m[4] * v[0] + m[5] * v[1] + m[6] * v[2], m[8] * v[0] + m[9] * v[1] + m[10] * v[2]];
+}
+
 export function transformPoint(m: Mat4, v: Vec3): Vec3 {
   return [
     m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12],

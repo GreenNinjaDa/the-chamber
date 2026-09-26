@@ -68,15 +68,15 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   (a hit to the head or chest knocks you into the lava), and the 3rd rock from the end sinks 1.8 m and back over
   10 s, carrying you. Lava death is a plain collapse.
 - **Level 5 — Raiders of the Lost Chamber** (`src/levels/temple/`, work in progress): its own map, no test chamber. A
-  dark sloping stone tunnel lit by a torch in the player's hand. A boulder drops from a ceiling shaft between the
+  dark stone tunnel lit by a torch in the player's hand. A boulder drops from a ceiling shaft between the
   player and the exit portal and chases them (rubber-banded: sprinting stays ahead, walking gets caught) over four
   spiked pits (the wide one has a vine: jump into it and it swings you across). At the dead end the wall sinks to
-  reveal a second boulder and the whole temple slowly rolls over about the tunnel's axis: a quarter turn onto the
-  side wall (a 1.5 s pause standing there), then another onto the ceiling. The map rotates, never the player's physics;
-  the map body is fixed (the character controller won't climb slopes on kinematic colliders) and only goes
-  kinematic while turning. The new boulder chases them back; the first
+  reveal a second boulder and gravity slowly rolls over about the tunnel's axis: a quarter turn drops the player
+  onto the side wall (a 1.5 s pause standing there), then another onto the ceiling. The map never moves; gravity
+  (the physics world's and the player's own) turns, and the camera turns with the player. The new boulder chases them back; the first
   rolls ahead and drops down its shaft, now a pit, crossed on a second vine to reach the portal. Boulders kill on
-  contact. The map is built flat in "track" space on one kinematic body; the level matrix tilts and flips it.
+  contact. The map is built in "track" space on one fixed body (fixed, not kinematic: Rapier's character controller
+  won't climb slopes on kinematic colliders).
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber). `Environment.pointLight` adds one
@@ -144,6 +144,9 @@ Shared mechanics available to levels (via `ctx`):
 - The upper body aims at the camera: the torso twists toward where you look and looking down bends you over
   (and crouches you when standing still), which physically lowers the head and chest, so ducking behind low
   cover works against anything that checks body parts (e.g. grenade blasts). Tunables: `AIM_*` in player.ts.
+- `player.setGravity(rotation)` turns the player's gravity (from their frame, up = +y, to the world): movement,
+  jumping, the capsule, the ragdoll's pose and the camera's up all follow; they pivot about their middle. Turn the
+  physics world's gravity to match with `physics.setGravityDirection(down)`. `player.up` is their current up.
 - `player.resume(velocity)` puts the player back in normal control after a scripted mode; `player.partFrames()`
   gives each body part's frame (e.g. to put a torch in the right hand, `foreArmR`).
 - Boulders use `GROUPS_BOULDER`, and invisible `GROUPS_BOULDER_BRIDGE` colliders are floors only boulders touch

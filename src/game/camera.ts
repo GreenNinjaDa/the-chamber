@@ -1,5 +1,5 @@
 import type { Input } from '../engine/input';
-import { add, clamp, lerp3, lookAt, perspective, scale, sub, type Vec3 } from '../engine/math';
+import { add, clamp, lerp3, lookAt, perspective, scale, sub, transformDir, type Vec3 } from '../engine/math';
 import type { CameraView } from '../engine/renderer';
 import { CHAMBER_HALF } from './chamber';
 import type { Player } from './player';
@@ -19,9 +19,12 @@ export class ThirdPersonCamera {
   private shake = 0;
   /** Keep the camera inside the test chamber (levels with their own map turn this off). */
   confine = true;
+  /** The camera's up (follows the player's gravity). */
+  up: Vec3 = [0, 1, 0];
 
   reset(yaw = 0) {
     this.confine = true;
+    this.up = [0, 1, 0];
     this.yaw = yaw;
     this.pitch = -0.2;
     this.shake = 0;
@@ -40,9 +43,12 @@ export class ThirdPersonCamera {
 
   follow(dt: number, player: Player) {
     const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
-    const fwd: Vec3 = [-Math.sin(this.yaw) * cp, sp, -Math.cos(this.yaw) * cp];
-    const right: Vec3 = [Math.cos(this.yaw), 0, -Math.sin(this.yaw)];
-    const shoulder = add(add(player.pos, [0, 1.65, 0]), scale(right, SHOULDER_OFFSET));
+    // Yaw and pitch are in the player's own frame, so the view turns with their gravity.
+    const g = player.gravity;
+    const fwd = transformDir(g, [-Math.sin(this.yaw) * cp, sp, -Math.cos(this.yaw) * cp]);
+    const right = transformDir(g, [Math.cos(this.yaw), 0, -Math.sin(this.yaw)]);
+    this.up = player.up;
+    const shoulder = add(add(player.pos, scale(player.up, 1.65)), scale(right, SHOULDER_OFFSET));
     const desired = sub(shoulder, scale(fwd, DISTANCE));
     if (!this.confine) {
       this.moveTo(desired, add(shoulder, scale(fwd, 10)), dt, 18);
@@ -76,7 +82,7 @@ export class ThirdPersonCamera {
     const pos = add(this.pos, offset);
     return {
       pos,
-      view: lookAt(pos, add(this.target, offset), [0, 1, 0]),
+      view: lookAt(pos, add(this.target, offset), this.up),
       proj: perspective(this.fov, aspect, 0.1, 1500),
     };
   }
