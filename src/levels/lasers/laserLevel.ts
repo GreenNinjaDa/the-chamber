@@ -52,6 +52,8 @@ const SINK_TIME = 1.6;
 const WALLS_AT = SINK_AT + SINK_TIME + 0.8;
 /** Pause between one wall finishing and the next appearing (s). */
 const WALL_PAUSE = 0.8;
+/** Debugging: `?laserSkip=N` starts the show N seconds in (e.g. 45 for the walls, 70 for the finale). */
+const SKIP = Number(new URLSearchParams(location.search).get('laserSkip')) || 0;
 
 /** Hit tests step beams along at most this far (m) at a time, so nothing thin slips between ticks. */
 const HIT_STEP = 0.04;
@@ -159,6 +161,8 @@ class Spinner {
   ext = 0;
   /** It comes out opposite the player, turned by up to this much either way (random). */
   readonly offset: number;
+  /** Aimed (it only aims while it isn't out yet). */
+  placed = false;
   constructor(readonly dir: 1 | -1, spread: number) {
     this.offset = (Math.random() * 2 - 1) * spread;
   }
@@ -290,7 +294,7 @@ export class LaserLevel implements Level {
 
     if (this.t < 0) {
       if (!this.arrival.done) return;
-      this.t = 0;
+      this.t = SKIP;
     }
     this.t += dt;
     const t = this.t;
@@ -347,12 +351,13 @@ export class LaserLevel implements Level {
 
   private updateSpinner(s: Spinner, dt: number, t: number, onAt: number, offAt: number, speed: (t: number) => number) {
     s.prev = s.angle;
-    if (t < onAt) {
+    if (t < onAt || !s.placed) {
       // Not out yet: point it away from the player (give or take), so it grows out on the far side.
       const pos = this.ctx.player.pos;
       s.angle = s.prev = Math.atan2(pos[2], pos[0]) + Math.PI + s.offset;
       s.ext = 0;
-      return;
+      s.placed = t >= onAt;
+      if (t < onAt) return;
     }
     s.ext = clamp((t - onAt) / EXTEND_TIME, 0, 1) * (1 - clamp((t - offAt) / EXTEND_TIME, 0, 1));
     const spin = smooth((t - onAt - EXTEND_TIME - SPIN_DELAY) / SPIN_UP);
