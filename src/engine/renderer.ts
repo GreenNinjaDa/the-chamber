@@ -1,12 +1,16 @@
 import sceneCode from '../shaders/scene.wgsl?raw';
 import shadowCode from '../shaders/shadow.wgsl?raw';
-import { box, cone, cylinder, holePlate, roundBox, sphere, tube, wedge, type MeshData } from './meshes';
+import { box, cone, cylinder, hexPrism, holePlate, roundBox, sphere, tube, wedge, type MeshData } from './meshes';
 import {
   add, lookAt, multiply, normalMatrix, normalize, ortho, scale,
   type Mat4, type Vec3,
 } from './math';
 
-export type MeshName = 'box' | 'sphere' | 'cylinder' | 'cone' | 'roundbox' | 'bevelbox' | 'holeplate' | 'tube' | 'wedge';
+/**
+ * 'hextile' is a flat-top hexagonal prism (circumradius 1, y in [-0.5, 0.5]) with a chamfered top
+ * edge, proportioned for floor tiles scaled about [R, 0.4 R, R].
+ */
+export type MeshName = 'box' | 'sphere' | 'cylinder' | 'cone' | 'roundbox' | 'bevelbox' | 'holeplate' | 'tube' | 'wedge' | 'hextile';
 
 /** Surface patterns understood by scene.wgsl. */
 export const Pattern = {
@@ -129,6 +133,7 @@ export class Renderer {
       holeplate: this.upload(holePlate(HOLE_PLATE_RATIO)),
       tube: this.upload(tube(TUBE_INNER_RATIO)),
       wedge: this.upload(wedge()),
+      hextile: this.upload(hexPrism(0.1, 0.25)),
     };
 
     this.frameBuffer = device.createBuffer({

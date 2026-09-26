@@ -256,6 +256,22 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   OVER, naming the ghost). All pellets eaten: the maze flashes, sinks, and the exit opens; the last 3 pellets get
   purple markers. Score and an unbeatable HIGH SCORE (3,333,360) on the north wall; no looking up while the maze
   is up (keeps the camera above the walls).
+- **Level 25 — Hex-A-Gone** (`src/levels/hexagone/`; Fall Guys' disappearing floor): no test chamber but an 18 m white shaft
+  (`chamber: { none: true }`, same 24 x 24 footprint) with three floors of candy hex tiles (`entities/hexFloor.ts`,
+  corner radius 0.95 m, 295 per floor, tops at 13.5 / 9 / 4.5 m: pink, yellow, blue) over glowing goo (1.2 m, with a
+  green point light). You land on the top floor with six contestants; a 3-2-1-GO on the LED board on the north wall
+  (with an "N LEFT" count; "NO LOITERING" on the south wall), then any tile anyone stands on flashes and drops 0.5 s
+  later (the player arms whatever their capsule rests on, so standing still lasts 0.5-1 s; hops only eat the tile
+  you land on). Falling through lands you on the floor below; the goo dissolves you (DISSOLVED). Contestants: old 001
+  shuffles and drops through all three floors in the first seconds, 067 is good and hops a lot, 218 sprints and
+  panics, 324 is slow and jumps short, 101 stops to cheer whenever someone goes out (and falls through), 456 is
+  steady; they steer toward intact floor, avoid each other and gaps they can't jump, and splash into the goo with an
+  OUT! label (most are out by 25-45 s). Last one standing, or still up when the 60 s clock runs out, wins: the floor
+  stops dropping, your floor grows back in a ripple and the exit opens in the east wall at its height (it moves if
+  you still fall to another floor). The level places the camera itself (`cameraShot`): the usual over-the-shoulder
+  view, kept under the floor overhead and above the one underfoot wherever there are tiles (after a fall it follows
+  you down through your hole); dissolved, it looks down at the splash. `?hexTime=N` sets the round length, `?hexSolo`
+  leaves the contestants out.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -295,7 +311,9 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   `BodySlicer` to test beams against the player's body parts, `LaserPylon`), `gnome.ts` (big garden gnome:
   `spawnGnome(physics, feet, look)`, arm poses in `GNOME_POSES`, glowing eyes, and `drawGnomeHat(out, headFrame)` for
   anyone else's head), `snake.ts` (grid snake: movement, AI, colliders, model), `pixelText.ts` (5x7
-  dot-matrix text built from blocks), `apple.ts`, `ghost.ts` (arcade ghost: `drawGhost`, normal / scared / flashing / eyes only), `plush.ts` (plush toys: `spawnPlush(physics, 'alien', pos, look)`), `claw.ts` (claw-machine claw and gantry: `driveTo`, hub height `y`, prong `angle`, `distanceTo` for grabbing it), `bowling.ts` (2 m bowling pins: `spawnPin`, `pinSpots`, `uprightness`; `drawBowlingBall` with finger holes). Put new
+  dot-matrix text built from blocks), `apple.ts`, `ghost.ts` (arcade ghost: `drawGhost`, normal / scared / flashing / eyes only), `plush.ts` (plush toys: `spawnPlush(physics, 'alien', pos, look)`), `claw.ts` (claw-machine claw and gantry: `driveTo`, hub height `y`, prong `angle`, `distanceTo` for grabbing it), `bowling.ts` (2 m bowling pins: `spawnPin`, `pinSpots`, `uprightness`; `drawBowlingBall` with finger holes), `hexFloor.ts` (`HexFloor`: a floor of hexagonal tiles, each a
+  static collider, that flash and drop once touched; `support` / `touch` / `freeze` / `regrowFrom`; drawn with the
+  chamfered `'hextile'` mesh from renderer.ts). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
