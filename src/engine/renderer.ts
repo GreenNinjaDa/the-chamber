@@ -27,7 +27,7 @@ export interface DrawItem {
   model: Mat4;
   color: ArrayLike<number>;
   pattern?: number;
-  /** Pattern parameter: panel size for `panels`, opacity for `blob`. */
+  /** Pattern parameter: panel size for `panels`, opacity for `blob`, 1 = green goo for `lava`. */
   param?: number;
   spec?: number;
   /** 0..1 pulsing glow for the thing under the crosshair. */
