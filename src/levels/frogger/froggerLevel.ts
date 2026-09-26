@@ -1,3 +1,4 @@
+import { noise, tone } from '../../engine/audio';
 import { add, mul, rotationY, scaling, translation, type Mat4, type Vec3 } from '../../engine/math';
 import type { RAPIER } from '../../engine/physics';
 import { Pattern, type DrawItem } from '../../engine/renderer';
@@ -100,6 +101,8 @@ export class FroggerLevel implements Level {
   private lastRaft: Raft | null = null;
   private bubbles: { pos: Vec3; age: number }[] = [];
   private splash: Vec3 | null = null;
+  /** Seconds until the traffic may honk again. */
+  private honkT = 0;
   private labelList: WorldLabel[] = [
     { pos: [-CHAMBER_HALF + 0.3, 4.2, 0], text: 'CAUTION: TEST SUBJECTS CROSSING', size: 0.55, color: '#ffd166' },
     { pos: [CHAMBER_HALF - 0.3, 4.6, 0], text: 'DO NOT DRINK THE GOO', size: 0.5, color: '#b6ff7a' },
@@ -158,6 +161,7 @@ export class FroggerLevel implements Level {
   }
 
   update(dt: number) {
+    this.honkT -= dt;
     const { player, hud, physics } = this.ctx;
     const death = this.death;
     if (death && this.status === 'playing') {
@@ -205,6 +209,8 @@ export class FroggerLevel implements Level {
     // Into the goo.
     if (p[0] > RIVER_WEST + 0.1 && p[0] < RIVER_EAST - 0.1 && p[1] < GOO_TOP + 0.1) {
       this.splash = [p[0], GOO_TOP, p[2]];
+      noise(0.6, { freq: 400, to: 90, q: 3, vol: 0.5 });
+      tone(300, 0.5, { to: 60, wave: 'sine', vol: 0.3 });
       player.kill([0, 0.5, 0], { violence: 0 });
       const walled = this.lastRaft && Math.abs(p[2]) > CHAMBER_HALF - 2.5;
       this.die('DISSOLVED', walled
@@ -221,6 +227,13 @@ export class FroggerLevel implements Level {
         const size = VEHICLE_SIZE[it.kind];
         const z = this.loopZ(it.offset, lane.dir, lane.speed);
         const hit = Math.abs(p[0] - lane.x) < size.hw + 0.2 && Math.abs(p[2] - z) < size.hl + 0.2 && p[1] < DECK + size.h - 0.05;
+        // A honk when it's about to be you.
+        const ahead = (p[2] - z) * lane.dir;
+        if (this.honkT <= 0 && ahead > size.hl && ahead < size.hl + 3 && Math.abs(p[0] - lane.x) < size.hw + 0.4) {
+          this.honkT = 1.5;
+          const low = it.kind === 'steamroller' || it.kind === 'forklift';
+          for (const f of low ? [180, 226] : [392, 494]) tone(f, 0.35, { wave: 'square', vol: 0.07 });
+        }
         if (!hit) continue;
         this.runOver(it.kind, lane);
         return;

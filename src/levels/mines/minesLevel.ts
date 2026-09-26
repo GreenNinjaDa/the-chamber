@@ -1,3 +1,4 @@
+import { sfx, tone } from '../../engine/audio';
 import { add, clamp, mul, normalize, rotationX, rotationY, rotationZ, scaling, sub, translation, type Vec3 } from '../../engine/math';
 import type { RAPIER } from '../../engine/physics';
 import { Pattern, type DrawItem } from '../../engine/renderer';
@@ -131,6 +132,10 @@ export class MinesLevel implements Level {
 
   /** Reveals a tile; zeros open up their neighbours in a ripple. */
   private reveal(start: Tile) {
+    if (!start.revealed) {
+      tone(700, 0.05, { wave: 'square', vol: 0.08 });
+      if (start.count === 0) for (let k = 1; k < 5; k++) tone(700 + k * 150, 0.05, { wave: 'square', vol: 0.05, at: k * 0.05 });
+    }
     const queue: [Tile, number][] = [[start, 0]];
     while (queue.length) {
       const [t, ring] = queue.shift()!;
@@ -216,6 +221,7 @@ export class MinesLevel implements Level {
         const f = this.tileAt(hit.point[0], hit.point[2]);
         if (f && !f.revealed) {
           f.flag = !f.flag;
+          tone(f.flag ? 900 : 500, 0.08, { to: f.flag ? 1300 : 350, wave: 'triangle', vol: 0.15 });
           this.updateCounter();
         }
       }
@@ -253,6 +259,7 @@ export class MinesLevel implements Level {
 
   private explode(t: Tile) {
     const { player, camera } = this.ctx;
+    sfx.explosion(0.7);
     t.revealed = true;
     t.revealAt = this.time;
     t.collider.setTranslation({ x: centre(t.i), y: REVEALED_Y, z: centre(t.j) });

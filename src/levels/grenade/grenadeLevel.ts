@@ -1,4 +1,4 @@
-import { sfx } from '../../engine/audio';
+import { sfx, tone } from '../../engine/audio';
 import {
   add, basis, cross, distXZ, dot, fromQuat, length, lerp, mul, normalize, rotateByQuat, rotationZ, scale, scaling,
   segment, sub, translation,
@@ -226,6 +226,7 @@ export class GrenadeLevel implements Level {
   private nextGrenade = 0;
   private nextGrenadeAt = FIRST_GRENADE_AT;
   private grenade: LiveGrenade | null = null;
+  private beeped = false;
   private lastBlast: { at: number; pos: Vec3; thrownOut: boolean; byShrapnel: boolean; inSight: boolean; big: boolean } | null = null;
   private fragments: Fragment[] = [];
   private tracers: Tracer[] = [];
@@ -262,8 +263,14 @@ export class GrenadeLevel implements Level {
       this.nextGrenadeAt = Infinity;
     }
     if (this.grenade) {
-      this.grenade.fuseLeft -= dt;
-      if (this.grenade.fuseLeft <= 0) this.explode(this.grenade);
+      const g = this.grenade;
+      g.fuseLeft -= dt;
+      const elapsed = g.spec.fuse - g.fuseLeft;
+      const period = lerp(0.9, 0.08, Math.min(1, elapsed / g.spec.fuse));
+      const lightOn = elapsed % period < period * 0.45;
+      if (lightOn && !this.beeped) tone(g.spec.radius > 0.5 ? 440 : g.spec.radius > 0.2 ? 1500 : 2000, 0.06, { wave: 'square', vol: 0.07 });
+      this.beeped = lightOn;
+      if (g.fuseLeft <= 0) this.explode(g);
     }
 
     // After each blast, decide what happens next.

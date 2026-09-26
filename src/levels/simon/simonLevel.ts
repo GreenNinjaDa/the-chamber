@@ -1,3 +1,4 @@
+import { noise, tone } from '../../engine/audio';
 import { add, basis, clamp, mul, scale, scaling, translation, type Vec3 } from '../../engine/math';
 import type { Body } from '../../engine/physics';
 import { Pattern, type DrawItem } from '../../engine/renderer';
@@ -17,6 +18,8 @@ import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type Level
 
 type Pad = 0 | 1 | 2 | 3;
 const PAD_NAME = ['GREEN', 'RED', 'YELLOW', 'BLUE'];
+/** Each pad's tone (Hz), like the 1978 toy's. */
+const PAD_TONE = [415, 310, 252, 209];
 /** Which way each pad lies from the centre (x, z): as on the toy, with north at the top. */
 const PAD_DIR: [number, number][] = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
 /** Angle (from +x toward +z) where each quarter-disc pad starts. */
@@ -338,6 +341,7 @@ export class SimonLevel implements Level {
       return;
     }
     this.glow[pad] = 1;
+    tone(PAD_TONE[pad], 0.4, { wave: 'triangle', vol: 0.3 });
     this.lastRepeat = pad;
     this.repeated++;
     this.progress(step);
@@ -350,6 +354,8 @@ export class SimonLevel implements Level {
   private fling(big: string, small: string, hint: string) {
     const { player, camera } = this.ctx;
     if (this.death || player.mode !== 'control') return;
+    tone(42, 0.8, { wave: 'sawtooth', vol: 0.3 });
+    noise(0.3, { freq: 2000, to: 200, vol: 0.4, at: 0.05 });
     const yaw = Math.random() * Math.PI * 2;
     this.catapult = { pos: [player.pos[0], surfaceY(player.pos[0], player.pos[2]), player.pos[2]], yaw, t: 0 };
     // Up and away over the hinge side.
@@ -445,7 +451,10 @@ export class SimonLevel implements Level {
         const on = 0.55, off = 0.2, lead = 0.8;
         const k = (this.stepT - lead) / (on + off);
         const i = Math.floor(k);
-        if (k >= 0 && i < step.seq!.length && k - i < on / (on + off)) this.glow[step.seq![i]] = 1;
+        if (k >= 0 && i < step.seq!.length && k - i < on / (on + off)) {
+          if (this.glow[step.seq![i]] < 0.9) tone(PAD_TONE[step.seq![i]], on, { wave: 'triangle', vol: 0.3 });
+          this.glow[step.seq![i]] = 1;
+        }
         if (k > step.seq!.length + 0.3) this.begin(this.index + 1);
         break;
       }

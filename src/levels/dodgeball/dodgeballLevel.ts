@@ -1,3 +1,4 @@
+import { noise, tone } from '../../engine/audio';
 import { add, length, mul, normalize, quatConj, rotateByQuat, rotationX, rotationY, scale, scaling, segment, sub, translation, type Vec3 } from '../../engine/math';
 import type { Body } from '../../engine/physics';
 import { Pattern, type DrawItem } from '../../engine/renderer';
@@ -287,6 +288,8 @@ export class DodgeballLevel implements Level {
 
   private fire(t: Turret, eye: Vec3, dist: number) {
     const { player } = this.ctx;
+    noise(0.15, { freq: 600, to: 150, vol: 0.4 });
+    tone(160, 0.12, { to: 70, wave: 'square', vol: 0.15 });
     t.charge = 0;
     t.cooldown = rand(COOLDOWN[0], COOLDOWN[1]);
     // Lead the player, a bit wobbly, and lob it up enough to arrive at chest height.
