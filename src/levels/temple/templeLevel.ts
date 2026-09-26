@@ -135,9 +135,9 @@ const DEATH_SCREEN_DELAY = 1.6;
 /**
  * See-through-ness: boulders when the camera is inside one, and the player from when the first
  * boulder starts rolling until just before the last jump (over the shaft, on the way back), when
- * the torch also goes out. 0.3 = 70% transparent.
+ * the torch also goes out. 0.4 = 60% transparent.
  */
-const SEE_THROUGH = 0.3;
+const SEE_THROUGH = 0.4;
 /** The player turns solid (and the torch goes out) this far before the shaft's edge on the way back. */
 const LAST_JUMP_LEAD = 5;
 

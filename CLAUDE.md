@@ -82,7 +82,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   and spikes; the new boulder chases, the first rolls off from rest and drops into its shaft (12 m deep, so both
   boulders fit with room to spare), crossed on a second vine to the portal. Vines are physical ropes: hold E or left
   mouse near one to hang on at that length (`player.hanging` for the pose); let go to fly on; each snaps after one
-  use. Boulders kill on contact with a small push. Boulders go 70% see-through with the camera inside them, and so
+  use. Boulders kill on contact with a small push. Boulders go 60% see-through with the camera inside them, and so
   does the player from when the first boulder starts rolling until 5 m before the last jump (over the shaft), when the
   torch also goes out. The map is one fixed body (not kinematic: Rapier's character
   controller won't climb slopes on kinematic colliders).
