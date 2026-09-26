@@ -95,6 +95,9 @@ export class Crewmate {
   /** Ejected: tumbling up into space. */
   private ejT = 0;
   private ejSpin = 0;
+  /** Seconds since it was killed, and the red spray. */
+  private deadT = 0;
+  private gore: { pos: Vec3; vel: Vec3; r: number }[] = [];
 
   constructor(readonly color: CrewColor, pos: Vec3, facing: number) {
     this.pos = [...pos];
@@ -133,6 +136,17 @@ export class Crewmate {
       spin: (Math.random() < 0.5 ? -1 : 1) * (7 + Math.random() * 5),
       landed: false,
     };
+    // A spray of red (visible from across the room), and a puddle that spreads.
+    this.deadT = 0;
+    this.gore.length = 0;
+    for (let i = 0; i < 10; i++) {
+      const a = Math.random() * Math.PI * 2, s = 1.5 + Math.random() * 3;
+      this.gore.push({
+        pos: [this.pos[0], this.pos[1] + DEAD_CUT + 0.05, this.pos[2]],
+        vel: [Math.cos(a) * s + (dx / d) * 1.5, 3 + Math.random() * 4, Math.sin(a) * s + (dz / d) * 1.5],
+        r: 0.06 + Math.random() * 0.06,
+      });
+    }
   }
 
   /** Ejected: flung up out of the room, tumbling, and never seen again. */
@@ -153,6 +167,13 @@ export class Crewmate {
       return;
     }
     if (this.state === 'dead') {
+      this.deadT += dt;
+      for (const g of this.gore) {
+        if (g.pos[1] <= 0.02) continue;
+        g.vel[1] -= GRAVITY * dt;
+        for (let k = 0; k < 3; k++) g.pos[k] += g.vel[k] * dt;
+        if (g.pos[1] <= 0.02) g.pos[1] = 0.02;
+      }
       const top = this.top;
       if (top && !top.landed) {
         top.vel[1] -= GRAVITY * dt;
@@ -212,7 +233,13 @@ export class Crewmate {
       return;
     }
     if (this.state === 'dead') {
-      // The bottom half, with a bone sticking out.
+      // A puddle, the spray, and the bottom half with a bone sticking out.
+      const pr = 0.35 + 0.75 * clamp(this.deadT / 1.2, 0, 1);
+      out.push({ mesh: 'cylinder', model: mul(translation([this.pos[0] + 0.15, 0.011, this.pos[2] - 0.1]), scaling([pr, 0.01, pr * 0.85])), color: [0.4, 0.02, 0.03], pattern: Pattern.blob, param: 0.85, shadow: false });
+      for (const g of this.gore) {
+        const flatten = g.pos[1] <= 0.021 ? 0.25 : 1;
+        out.push({ mesh: 'sphere', model: mul(translation(g.pos), scaling([g.r * (2 - flatten), g.r * flatten, g.r * (2 - flatten)])), color: FLESH, spec: 0.6, shadow: false });
+      }
       const m = mul(translation(this.pos), rotationY(this.facing));
       drawLower(out, m, col, shade, DEAD_CUT, 0, 0, false);
       out.push({ mesh: 'cylinder', model: mul(m, translation([0, DEAD_CUT + 0.005, 0]), scaling([R * 0.97, 0.02, R * 0.97])), color: FLESH, spec: 0.5 });
