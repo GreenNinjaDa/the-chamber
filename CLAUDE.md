@@ -323,6 +323,23 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   OVER, naming the ghost). All pellets eaten: the maze flashes, sinks, and the exit opens; the last 3 pellets get
   purple markers. Score and an unbeatable HIGH SCORE (3,333,360) on the north wall; no looking up while the maze
   is up (keeps the camera above the walls).
+- **Level 30 — Katamari** (`src/levels/katamari/`): the chamber is littered with stuff: ~100 tiny things in heaps
+  (`entities/trinkets.ts`), most of the junk, three teddies, and the big pieces against the walls. After the arrival
+  a rainbow beam drops a tiny green prince and a 0.62 m sticky ball (`entities/katamari.ts`) into the NW corner, the
+  King (`entities/king.ts`, a giant crowned head) rises over the north wall, and the board under him says MAKE IT 5
+  METRES. USE ANYTHING. ANYTHING. (size readout, a bar with a red YOU tick at 3.4 m, a 100 s clock). His lines are
+  pinned across the top of the screen (world labels placed in front of the camera). The ball rolls up anything whose
+  biggest extent is at most half its diameter (d² grows by 0.9 × its two biggest extents multiplied): the prince
+  heads for the best thing nearby (bigger preferred), stops now and then to admire his ball, and it speeds up as it
+  grows (1.6 + 0.9 d m/s). Things you carry into it or throw at it stick too ("OH, A VOLUNTEER."). Too-big things
+  bonk. At 3.4 m you count as stuff (1.7 m): the readout and bar go red, a sting, a "!" over it for 1.4 s, then it
+  hunts you (2.6 + 1.25 d, at most 7.3 m/s against a sprint's 8.5; it swerves at 60% of its acceleration, so
+  circling works), detours for anything big right in front of it, and every 5.5 s the King drops in something big
+  it can eat (every other one straight into its path, the rest marked by a beam away from where you're running).
+  Touch it and you're ROLLED UP: stuck on it, flailing, while the camera follows it round. 5 m: it floats up into
+  the sky and becomes a star (the King weeps), and the exit opens. Out of time: "UNACCEPTABLE.", beams from his eyes,
+  ROYALLY ZAPPED. Alone, the prince gets to 3.4 m at about 70 s; feeding it and leading it through the big stuff wins
+  at about 65-90 s. `?katTime=N` sets the clock, `?katSize=D` the starting diameter.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -369,7 +386,13 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   beanbag, piano bench: `spawnFurniture`, sofas and armchairs with seat / back / arm colliders so you stand on the
   cushions; `drawRug`, `drawPainting`), `giantDuck.ts` (a 4 m rubber duck you can stand on: a fixed body the level
   moves with `moveTo`, which carries a rider along), `elevator.ts` (the chamber as an elevator car: doors, handrails,
-  LED floor indicator `FloorIndicator`, button panel `CarPanel`, crosshead and grate, the scrolling shaft). Put new
+  LED floor indicator `FloorIndicator`, button panel `CarPanel`, crosshead and grate, the scrolling shaft),
+  `trinkets.ts` (`TRINKETS`: ~25 tiny household things as `JunkDef`s for `spawnJunk`: cans, mugs, books, shoes,
+  pencils, dice, donuts, a rubber chicken...), `katamari.ts` (`Katamari`: a sticky dynamic ball; `absorb(physics,
+  body)` takes a body out of the world and sticks it on the surface where it touched, turning with the ball;
+  `setRadius`; the prince who pushes it, drawn with `drawPrince`; `dimsOf(body)` gives any body's extents), `king.ts`
+  (`King`: a giant crowned head with a moustache that rises over a wall; `talk`, `tears`, `glow`, `lookAt`, `eye()`
+  for beams). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`

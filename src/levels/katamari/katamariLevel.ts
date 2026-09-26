@@ -812,7 +812,10 @@ export class KatamariLevel implements Level {
     if (this.dangerous && this.noticeT <= 0 && player.mode === 'control' && !player.inPortal) {
       const c = this.kat.centre();
       const reach = this.reachAtPlayer();
-      if (reach > 0 && Math.hypot(player.pos[0] - c[0], player.pos[2] - c[2]) < reach + EAT_REACH) {
+      const side = reach > 0 && Math.hypot(player.pos[0] - c[0], player.pos[2] - c[2]) < reach + EAT_REACH;
+      // (Or on top of it, somehow.)
+      const top = Math.hypot(player.pos[0] - c[0], player.pos[1] + 0.9 - c[1], player.pos[2] - c[2]) < this.kat.radius + 0.9 + EAT_REACH;
+      if (side || top) {
         this.rollUp();
         return;
       }
