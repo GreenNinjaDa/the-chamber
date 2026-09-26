@@ -21,7 +21,7 @@ const RAISED = 0.13;
 const SUNK = 0.07;
 /** The stone slab is a solid block that sticks up this far until it's pressed down to this. */
 const STONE_RAISED = 0.28;
-const STONE_SUNK = 0.06;
+const STONE_SUNK = 0.1;
 /** Stays down this long after losing contact, so a settling object doesn't make it flicker. */
 const RELEASE_DELAY = 0.3;
 
