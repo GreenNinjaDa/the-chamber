@@ -479,8 +479,13 @@ export class ImpostorLevel implements Level {
     const imp = this.impostor;
     let best: Npc | 'player' | null = null, bestScore = -Infinity;
     const candidates: (Npc | 'player')[] = this.innocents();
-    // Not you, at first: you get to see how this works.
-    if (this.kills > 0 && this.playerAlive()) candidates.push('player');
+    // Not you, at first: you get to see how this works. After that, being on your own is asking for it.
+    if (this.kills > 0 && this.playerAlive()) {
+      let lonely = Infinity;
+      for (const o of this.innocents()) lonely = Math.min(lonely, flat(o.c.pos, this.player.pos));
+      if (lonely > 7 && Math.random() < 0.6) return 'player';
+      candidates.push('player');
+    }
     for (const v of candidates) {
       const vp = v === 'player' ? this.player.pos : v.c.pos;
       let lonely = 14;
@@ -1450,7 +1455,7 @@ export class ImpostorLevel implements Level {
             } else if (e) {
               e.c.eject();
               e.label.text = '';
-              e.bubble.text = '';
+              this.say(e, e.impostor ? pick(['gg', 'worth it', 'HOW', 'fine. FINE.', 'i regret nothing']) : pick(['noooo', 'I WAS DOING WIRES', 'you will regret this', 'ok. rude.', 'it was ORANGE', 'bye i guess']), 2.2);
             }
           }
         }
@@ -1636,7 +1641,12 @@ export class ImpostorLevel implements Level {
     const dark = this.light < 0.5;
     for (const n of this.npcs) {
       const c = n.c;
-      if (c.state === 'ejected' || c.hidden) continue;
+      if (c.hidden || (c.state === 'ejected' && !n.bubble.text)) continue;
+      if (c.state === 'ejected') {
+        n.bubble.pos = [c.pos[0], c.pos[1] + 2.1, c.pos[2]];
+        list.push(n.bubble);
+        continue;
+      }
       if (c.alive && (!dark || n === this.impostor)) {
         n.label.pos = [c.pos[0], c.pos[1] + 1.72 + c.lift, c.pos[2]];
         list.push(n.label);
