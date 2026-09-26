@@ -114,8 +114,9 @@ interface Pop {
   grab: { carrot: Carrot; t: number; from: Vec3 } | null;
   holding: boolean;
   grabQueued: boolean;
-  /** The mallet was already coming for this hole when they popped up. */
+  /** The mallet was already coming for this hole when they popped up, or still down on it. */
   intoRing: boolean;
+  intoMallet: boolean;
   /** The camera's yaw and pitch in the burrow, to go back to. */
   view: [number, number];
 }
@@ -547,7 +548,7 @@ export class MolesLevel implements Level {
     const committed = this.ms.hole === h && (this.ms.state === 'travel' || this.ms.state === 'windup' || this.ms.state === 'smash');
     this.pop = {
       hole: h, state: 'rise', t: 0, from: [player.pos[0], 0, player.pos[2]], since: this.t, upTime: 0,
-      grab: null, holding: false, grabQueued: false, intoRing: committed, view: [camera.yaw, camera.pitch],
+      grab: null, holding: false, grabQueued: false, intoRing: committed, intoMallet: false, view: [camera.yaw, camera.pitch],
     };
     // Up top, you face Timmy: the view swings round to the south (the burrow's view comes back when you duck).
     camera.yaw = Math.PI;
@@ -645,6 +646,7 @@ export class MolesLevel implements Level {
     const upFor = pop.upTime;
     const holding = pop.holding;
     const into = pop.intoRing;
+    const intoMallet = pop.intoMallet;
     this.pop = null;
     this.holeUser[pop.hole] = null;
     player.poseOverride = null;
@@ -658,7 +660,8 @@ export class MolesLevel implements Level {
     sfx.laugh(0.4);
     this.tune.stop();
     let small: string;
-    if (into) small = 'You popped up under a falling mallet. Bold. Wrong, but bold.';
+    if (intoMallet) small = 'You popped up into a mallet. It was still there. It was very much still there.';
+    else if (into) small = 'You popped up under a falling mallet. Bold. Wrong, but bold.';
     else if (holding) small = 'So close. The carrot survived. You did not.';
     else if (upFor > 2.2) small = 'Staying up is not a strategy. It’s a target.';
     else small = pick([
@@ -922,6 +925,8 @@ export class MolesLevel implements Level {
 
   private commit(hole: number) {
     const ms = this.ms;
+    // Uh-oh: a rising whistle when it's you he's going for.
+    if (this.pop && this.pop.hole === hole && !this.death) tone(500, 0.35, { to: 1300, wave: 'sine', vol: 0.09 });
     ms.state = 'travel';
     ms.t = 0;
     ms.hole = hole;
@@ -1100,7 +1105,7 @@ export class MolesLevel implements Level {
     const pop = this.pop;
     if (pop && !this.death && pop.hole === ms.hole && (ms.state === 'impact' || (ms.state === 'recover' && ms.t < 0.12)) &&
         this.ctx.player.pos[1] + 1.8 > HIT_LINE) {
-      pop.intoRing = true;
+      pop.intoMallet = true;
       this.whacked();
     }
 
