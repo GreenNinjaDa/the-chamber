@@ -589,7 +589,8 @@ export class PinballLevel implements Level {
         this.power = clamp((this.phaseT - 0.6) / 1.0, 0.12, 1);
         if (this.phaseT > 1.9) {
           this.setPhase('ready');
-          this.showMsg('BALL 1', 2.5, false);
+          this.showMsg('BALL 1', 1.6, false);
+          this.later(1.6, 'BALL 1: YOU', 3, false);
         }
         break;
       case 'ready':
@@ -953,7 +954,9 @@ export class PinballLevel implements Level {
         break;
       case 'pull':
         pl.pull = Math.min(1, pl.t / 0.9);
-        if (pl.t > 1.05) {
+        // Loaded with balls but the player has wandered into the lane: hold it back till they're out of the way.
+        if (pl.t > 1.05 && !playerOn && this.playerInLane()) pl.t = 1.05;
+        else if (pl.t > 1.05) {
           pl.state = 'fire';
           pl.t = 0;
           pl.loaded = 0;
