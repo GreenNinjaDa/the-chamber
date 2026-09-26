@@ -94,7 +94,7 @@ const WALL = [0.86, 0.87, 0.88];
 const DUST = [0.83, 0.74, 0.6];
 
 const AIM_LINES = ['MY TURN!', 'EENY, MEENY...', 'THIS ONE.', 'SHHH...', 'EASY...', 'WATCH THIS.', 'HEHEHE.', 'STEADY...', 'THE WOBBLY ONE.'];
-const PLACE_LINES = ['YOUR TURN!', '...OH WAIT. YOU CAN\'T. MY TURN!', 'BEAT THAT.', 'NAILED IT.', 'PERFECT.', 'I\'M SO GOOD AT THIS.'];
+const PLACE_LINES = ['BEAT THAT.', 'NAILED IT.', 'PERFECT.', 'I’M SO GOOD AT THIS.', 'YOUR TURN! ...JUST KIDDING.', 'TA-DA!'];
 
 const pick = <T>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
 
@@ -468,7 +468,7 @@ export class JengaLevel implements Level {
     }
 
     // Camera: the horizon tilts with the tower.
-    camera.turnTarget = alive && ride ? mul(rotationZ(-(tower.phi[0] + tower.tip) * CAMERA_TILT), rotationX(tower.phi[1] * CAMERA_TILT)) : null;
+    camera.turnTarget = alive && me && !tower.collapsed ? mul(rotationZ(-(tower.phi[0] + tower.tip) * CAMERA_TILT), rotationX(tower.phi[1] * CAMERA_TILT)) : null;
 
     // Creaks, louder and more often the further it leans.
     const danger = tower.collapsed ? 0 : tower.leanAmount() / PHI_MAX;
@@ -505,7 +505,7 @@ export class JengaLevel implements Level {
       return;
     }
     this.pull = { block: b, stage: 'aim', t: 0, fromLayer: b.layer, to: null, from: null, kicked: false };
-    this.say(this.pullsDone === 0 ? 'MY TURN!' : this.pullsDone === 1 ? 'MY TURN AGAIN!' : pick(AIM_LINES));
+    this.say(this.pullsDone === 0 ? 'MY TURN!' : this.pullsDone === 1 ? '...OH WAIT, YOU CAN’T. MY TURN AGAIN!' : pick(AIM_LINES), this.pullsDone === 1 ? 3 : 2.2);
   }
 
   /** The end of the block Timmy pulls it by (world), and the direction it slides out. */
@@ -692,7 +692,7 @@ export class JengaLevel implements Level {
         player.knock(push as Vec3, 0.5);
       }
     }
-    if (!this.death) this.say(pick(PLACE_LINES), 1.8);
+    if (!this.death) this.say(this.pullsDone === 0 ? 'YOUR TURN!' : pick(PLACE_LINES), 1.8);
     p.stage = 'release';
     p.t = 0;
   }
@@ -740,7 +740,7 @@ export class JengaLevel implements Level {
     // A ledge slides out of the east wall (the exit behind it only opens when the tower hits).
     if (f >= LEDGE_AT) {
       if (this.ledgeOut === 0) sfx.slide();
-      this.ledgeOut = Math.min(1, this.ledgeOut + dt / 0.7);
+      this.ledgeOut = Math.min(1, this.ledgeOut + dt / 0.45);
       const x = CHAMBER_HALF + LEDGE_DEPTH / 2 + 0.05 - (LEDGE_DEPTH + 0.05) * easeInOut(this.ledgeOut);
       this.ledge.setTranslation({ x, y: LEDGE_Y - 0.2, z: (LEDGE_Z[0] + LEDGE_Z[1]) / 2 });
     }
@@ -772,7 +772,8 @@ export class JengaLevel implements Level {
   private breakUp() {
     const { player, camera } = this.ctx;
     const tower = this.tower;
-    const onIt = !this.escaped && player.mode === 'control' && !this.death;
+    // Still up there (not mid-jump for the ledge, or already on it)?
+    const onIt = !this.escaped && this.playerOnTop() !== null;
     // It snaps as it hits: faster than it was falling, and coming apart.
     this.pull = null;
     this.predicted = null;
@@ -855,7 +856,7 @@ export class JengaLevel implements Level {
       }
     } else if (this.finaleT >= 0 && !tower.collapsed) {
       // Pointing at the west face, near the top, and pushing.
-      goal = tower.point(Math.max(0, tower.topLayer() - 2), [-BLOCK_L / 2 - 1.6, 0, 0]);
+      goal = tower.point(Math.max(0, tower.topLayer() - 2), [-BLOCK_L / 2 - 2.9, 0, 0]);
       goal[1] += 1.5;
       sharp = 6;
       curl = 1.3;
@@ -1022,7 +1023,7 @@ export class JengaLevel implements Level {
     const exit = this.exit.target();
     if (exit) return [exit];
     // Before the crash opens the exit: the ledge is the place to be.
-    if (this.ledgeOut > 0.5 && !this.death && !this.escaped) return [{ pos: [CHAMBER_HALF - LEDGE_DEPTH / 2, LEDGE_Y + 0.4, EXIT_Z], radius: 1, color: 'purple' }];
+    if (this.ledgeOut >= 1 && !this.death && !this.escaped) return [{ pos: [CHAMBER_HALF - LEDGE_DEPTH / 2, LEDGE_Y + 0.4, EXIT_Z], radius: 1, color: 'purple' }];
     return [];
   }
 

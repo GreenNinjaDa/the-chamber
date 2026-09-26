@@ -493,6 +493,29 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   OVER, naming the ghost). All pellets eaten: the maze flashes, sinks, and the exit opens; the last 3 pellets get
   purple markers. Score and an unbeatable HIGH SCORE (3,333,360) on the north wall; no looking up while the maze
   is up (keeps the camera above the walls).
+- **Level 42 — Jenga** (`src/levels/jenga/`): you land on a square of wood in the floor: the top of a giant Jenga tower
+  (`entities/jenga.ts`: 10 layers of three 4.5 x 0.8 x 1.5 m wood-grain blocks, alternating, base at (4, -4)) that
+  rises out of it to 8 m (invisible walls keep you on while it rises; `player.carry` brings you and your body along).
+  Timmy leans in over the south wall; Lean-o-meters pop up on the north and south walls (a top-down dial, up = away from
+  you, a dot for the lean, green / amber / red). Nine pulls (~6.5 s each, a bit quicker later): he picks a block from
+  the lower layers (never the top three, never leaving a layer on one side block; a random pick nudged toward tipping
+  it your way and further over, capped so the lean with nobody on it stays under 55% of the limit at first, +10% per
+  pull), it glows and gets tapped (his arm goes see-through, `giant.armOpacity`, since it's as wide as the tower; the
+  meters blink a ring where the lean is heading), slides out with dust, and he stacks it on top Jenga-style, usually in
+  the strip you're standing in: a red shadow while it hovers 3 m up (~3 s from lifting), then it drops. Under it:
+  flattened across the slot, head sticking out (SQUASHED); next to it: shoved. The tower isn't simulated block by block:
+  it has a lean (`phi`, the top's tilt) that springs (damped, amplified by 1 / (1 - gamma) as blocks go missing and
+  layers are added) toward the lean the missing blocks cause (toward the side missing support) plus your weight (your
+  offset from the axis) plus jolts (pulls, landings, your jumps), and bends most at the damaged layers; past 8° it
+  topples for real (every block becomes a physics box: JENGA! / TIMBER!). Standing on it slides you downhill past
+  2.3°, the camera's horizon tilts with it, and it creaks more and louder. Walking off (2.2 m below the top) is a SPLAT.
+  After the ninth, "THIS GAME IS BORING.": a ledge slides out of the east wall by the tower's south-east corner
+  (purple marker), he pushes the tower over eastward ("TIMBER!!!", tipping about its bottom east edge, carrying you),
+  and 4.5 s in it hits the wall and comes apart, which knocks the exit open behind the ledge. Jump for the ledge
+  before that (a walking jump from the top reaches it; the tip brings the top closer); still on top = TIMBER.
+  Test bots (~74 s): balancing from the bias (with or without the prediction, even a lazy 0.7 s-late one) always
+  won; standing in the middle and only dodging the blocks toppled after 3-6 pulls. `?jengaSkip=N` does N (tidy) pulls
+  before you arrive (9: straight to the finale).
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -524,7 +547,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   and `PhysBody`, the active ragdoll that follows the animation with joint motors and per-part pose matching)
 - `src/entities/` — things that can appear in more than one level (or the lobby / sandbox), each with its model:
   `junk.ts` (28 pieces of household junk; `spawnJunk(physics, junk('fridge'), pos)`), `grenade.ts` (pineapple
-  model), `giant.ts` (`blindfold` adds a blindfold and a party hat), `dart.ts`, `portal.ts` (entrance / exit portals), `props.ts` (Lever, Button), `cake.ts`, `companions.ts`,
+  model), `giant.ts` (`blindfold` adds a blindfold and a party hat; `armOpacity` draws the reaching arm see-through), `dart.ts`, `portal.ts` (entrance / exit portals), `props.ts` (Lever, Button), `cake.ts`, `companions.ts`,
   `pressurePlate.ts` (round button, or `{ stone: [w, d] }` for a rock slab), `uselessBox.ts`, `rock.ts` (textured stone: `boulderModel`, `chunkModel`, `slabModel`, `shardModel`, `clusterModel`; `Pattern.rock`),
   `doll.ts` (the giant doll with a swivelling head and glowing eyes, plus a `BareTree`), `contestant.ts` (scripted
   NPC in a tracksuit: walk/run, freeze, wobble/sneeze/cheer, dramatic death fall; `drawBody` takes a `BodyColors`
@@ -572,7 +595,13 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   `mole.ts` (whack-a-mole `Mole`: pink nose, whiskers, buck teeth, optional shades; `squash` flattens it, `dazed` gives
   X eyes and circling stars, `armsUp`, `walk` / `walking`, `wiggle`; `drawMole` in any frame, `drawDazedStars` over
   anyone's head), `mallet.ts` (`Mallet`: a giant's rubber mallet posed by `aim` / `swing` / `lift` / `from`; `grip()` is
-  where the giant's hand goes, `face()` the striking face, `squash` on impact). Put new
+  where the giant's hand goes, `face()` the striking face, `squash` on impact), `jenga.ts` (`JengaTower`: layers of
+  three blocks as fixed colliders moved with a scripted lean `phi` that springs toward `target()` (`bias()` from missing
+  and stacked blocks plus an outside `load`, amplified by `gamma()`), `kick` for jolts, `tip` to push it over about its
+  bottom east edge, `frames` per layer, `lay` / `unlay` blocks (a carried one has a world `free` frame; `slide` / `out`
+  pull one out, `glow`, `jiggle`, `raise`), `collapse(spin, about)` turns them all into physics boxes; `drawBlock`,
+  and `Pattern.wood`: wood grain round an object's longest axis, darker end grain and edges, `param` a per-piece
+  seed). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
@@ -626,6 +655,8 @@ Shared mechanics available to levels (via `ctx`):
 - `player.char` (0-1) draws the player burnt to a crisp (this life only).
 - `player.platformVel` — the velocity of whatever the player stands on (a raft, a conveyor), added to their movement;
   levels set it every frame.
+- `player.carry(delta)` — moves the player along with something the level moves itself (a lift, a rising tower): the
+  feet, the capsule and the physical body together, so the body isn't left behind and dragged through the floor.
 - `player.sitting` draws the sitting pose (`SIT_POSE` in body.ts; the level keeps them on the seat).
 - `player.gravityScale` (1; 0 = weightless) and `player.airControl` (1; 0 = the air velocity is left alone, so they
   drift and the level steers) — this life only. `player.poseOverride` draws a level's own `Pose` while in control
