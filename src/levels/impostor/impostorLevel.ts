@@ -63,15 +63,15 @@ const VOTE_REACH = 1.9;
 const PLAYER_COLOR = [0.95, 0.4, 0.07];
 const PLAYER_CSS = '#ff9a4a';
 
-const STATIONS: { kind: StationKind; name: string; anchor: Vec3; normal: Vec3 }[] = [
-  { kind: 'wires', name: 'FIX WIRING', anchor: [-6.5, 0, -CHAMBER_HALF], normal: [0, 0, 1] },
-  { kind: 'terminal', name: 'DOWNLOAD DATA', anchor: [6, 0, -CHAMBER_HALF], normal: [0, 0, 1] },
-  { kind: 'swipe', name: 'SWIPE CARD', anchor: [-CHAMBER_HALF, 0, -5], normal: [1, 0, 0] },
-  { kind: 'chute', name: 'EMPTY GARBAGE', anchor: [-CHAMBER_HALF, 0, 5], normal: [1, 0, 0] },
-  { kind: 'wires', name: 'FIX WIRING', anchor: [-6.5, 0, CHAMBER_HALF], normal: [0, 0, -1] },
-  { kind: 'terminal', name: 'UPLOAD DATA', anchor: [6, 0, CHAMBER_HALF], normal: [0, 0, -1] },
-  { kind: 'dials', name: 'CALIBRATE DISTRIBUTOR', anchor: [CHAMBER_HALF, 0, -7], normal: [-1, 0, 0] },
-  { kind: 'dials', name: 'PRIME SHIELDS', anchor: [CHAMBER_HALF, 0, 7.5], normal: [-1, 0, 0] },
+const STATIONS: { kind: StationKind; name: string; where: string; anchor: Vec3; normal: Vec3 }[] = [
+  { kind: 'wires', name: 'FIX WIRING', where: 'the wires', anchor: [-6.5, 0, -CHAMBER_HALF], normal: [0, 0, 1] },
+  { kind: 'terminal', name: 'DOWNLOAD DATA', where: 'download', anchor: [6, 0, -CHAMBER_HALF], normal: [0, 0, 1] },
+  { kind: 'swipe', name: 'SWIPE CARD', where: 'the card swipe', anchor: [-CHAMBER_HALF, 0, -5], normal: [1, 0, 0] },
+  { kind: 'chute', name: 'EMPTY GARBAGE', where: 'garbage', anchor: [-CHAMBER_HALF, 0, 5], normal: [1, 0, 0] },
+  { kind: 'wires', name: 'FIX WIRING', where: 'the wires', anchor: [-6.5, 0, CHAMBER_HALF], normal: [0, 0, -1] },
+  { kind: 'terminal', name: 'UPLOAD DATA', where: 'upload', anchor: [6, 0, CHAMBER_HALF], normal: [0, 0, -1] },
+  { kind: 'dials', name: 'CALIBRATE DISTRIBUTOR', where: 'the distributor', anchor: [CHAMBER_HALF, 0, -7], normal: [-1, 0, 0] },
+  { kind: 'dials', name: 'PRIME SHIELDS', where: 'shields', anchor: [CHAMBER_HALF, 0, 7.5], normal: [-1, 0, 0] },
 ];
 const VENT_SPOTS: Vec3[] = [[-8.2, 0, -8.2], [8.6, 0, -8.8], [-8.4, 0, 8.6], [7.6, 0, 3.8]];
 
@@ -179,7 +179,7 @@ const IMPOSTOR_CHATTER = [
   'vote {C}', 'why is everyone looking at me', 'orange sus', 'i was with {C}', 'i was literally doing tasks', 'skip. trust me',
   '{C} was faking tasks', "{C}'s screen was off",
 ];
-const BODY_OPENERS = ['{V} is dead', 'BODY BY {P}', '{V} is in two pieces', 'found {V} by {P}', 'uh. {V} has a bone now', '{V} dead. {P}'];
+const BODY_OPENERS = ['{V} is dead', 'body by {P}!!', '{V} is in two pieces', 'found {V} by {P}', 'uh. {V} has a bone now', '{V} dead. by {P}', 'half of {V} is by {P}'];
 const BUTTON_REACTIONS = ['orange why', 'who pressed it', 'this better be good', 'orange called it', 'what did orange see', 'emergency?? where'];
 const REPORT_REACTIONS = ['where', 'rip {V}', 'noooo {V}', 'orange found {V}?', 'who was near {P}?', 'self report?'];
 const VENT_WITNESS = ['I SAW {X} VENT!!', '{X} VENTED', '{X} came out of a VENT', 'VENT. {X}. I SAW IT.'];
@@ -309,6 +309,7 @@ export class ImpostorLevel implements Level {
   private decor: DrawItem[] = [];
   private labelList: WorldLabel[] = [];
   private stationLabels: WorldLabel[] = [];
+  private stationWhere = new Map<TaskStation, string>();
   private youLabel: WorldLabel = { pos: [0, 0, 0], text: 'YOU', size: 0.22, color: PLAYER_CSS };
   private buttonLabel: WorldLabel = { pos: [0, 1.75, 0], text: 'EMERGENCY', size: 0.2, color: '#ff4a3d' };
   private barLabel: WorldLabel = { pos: [0, 8.25, -CHAMBER_HALF + 0.2], text: 'TOTAL TASKS COMPLETED', size: 0.5, color: '#ffffff' };
@@ -345,6 +346,7 @@ export class ImpostorLevel implements Level {
       const st = new TaskStation(physics, s.kind, s.name, s.anchor, s.normal);
       physics.registerUsable(st.collider, new StationUsable(() => this.startPlayerTask(st)));
       this.stations.push(st);
+      this.stationWhere.set(st, s.where);
       this.stationLabels.push({ pos: st.labelPos(), text: s.name, size: 0.17, color: '#cfd8e3' });
     }
     for (const p of VENT_SPOTS) {
@@ -430,15 +432,15 @@ export class ImpostorLevel implements Level {
 
   /** Where something is, in words (for "BODY BY ..."). */
   private placeOf(p: Vec3) {
-    let best = 'THE TABLE', bd = Math.hypot(p[0], p[2]) - 2;
+    let best = 'the table', bd = Math.hypot(p[0], p[2]) - 2;
     for (const s of this.stations) {
       const d = flat(p, s.stand);
       if (d < bd) {
         bd = d;
-        best = s.name.split(' ').pop()!;
+        best = this.stationWhere.get(s) ?? 'the wires';
       }
     }
-    return best.toLowerCase();
+    return best;
   }
 
   private nextTask(n: Npc) {
@@ -543,7 +545,7 @@ export class ImpostorLevel implements Level {
         if (n.station) c.lookAt(add(n.station.stand, [-n.station.normal[0], 0, -n.station.normal[2]]), dt);
         if (n.modeT >= n.taskDur) {
           // Anyone close by (and paying attention) noticed.
-          for (const o of this.innocents()) if (flat(o.c.pos, c.pos) < 4.5 && Math.random() < 0.5) o.sawFake = n;
+          for (const o of this.innocents()) if (flat(o.c.pos, c.pos) < 5.5 && Math.random() < 0.65) o.sawFake = n;
           n.lastStation = n.station;
           n.station = null;
           this.impostorNext(n);
@@ -868,29 +870,42 @@ export class ImpostorLevel implements Level {
     const lines: Line[] = [];
     const place = m.victim ? this.placeOf(m.victim.c.pos) : 'the table';
     const extra = { v: m.victim, p: place };
+    // Nobody says the same thing twice in one meeting.
+    const used = new Set<string>();
+    const fresh = (pool: string[]) => {
+      const left = pool.filter((s) => !used.has(s));
+      const s = pick(left.length ? left : pool);
+      used.add(s);
+      return s;
+    };
     let t = 0.3;
     if (m.reporter !== 'player') {
-      lines.push({ npc: m.reporter, text: this.fill(pick(BODY_OPENERS), m.reporter, extra), at: t, shown: false });
+      lines.push({ npc: m.reporter, text: this.fill(fresh(BODY_OPENERS), m.reporter, extra), at: t, shown: false });
     } else {
       const n = pick(alive);
-      lines.push({ npc: n, text: this.fill(pick(m.kind === 'button' ? BUTTON_REACTIONS : REPORT_REACTIONS), n, extra), at: t, shown: false });
+      lines.push({ npc: n, text: this.fill(fresh(m.kind === 'button' ? BUTTON_REACTIONS : REPORT_REACTIONS), n, extra), at: t, shown: false });
     }
     const order = alive.slice().sort(() => Math.random() - 0.5);
+    const said = (n: Npc) => lines.some((l) => l.npc === n);
     for (const n of order) {
-      if (lines.some((l) => l.npc === n)) continue;
-      t += rand(0.5, 1.1);
+      if (said(n)) continue;
+      t += rand(0.5, 1.0);
       let text: string;
-      if (n.impostor) text = this.fill(pick(IMPOSTOR_CHATTER), n, extra);
-      else if (n.sawVent) text = this.fill(pick(VENT_WITNESS), n, { ...extra, x: n.sawVent });
-      else if (n.sawFake && n.sawFake.c.alive) text = this.fill(pick(FAKE_WITNESS), n, { ...extra, x: n.sawFake, s: n.sawFake.lastStation?.name.toLowerCase() ?? 'wires' });
-      else text = this.fill(pick(CHATTER), n, extra);
+      if (n.impostor) text = this.fill(fresh(IMPOSTOR_CHATTER), n, extra);
+      else if (n.sawVent) text = this.fill(fresh(VENT_WITNESS), n, { ...extra, x: n.sawVent });
+      else if (n.sawFake && n.sawFake.c.alive) text = this.fill(fresh(FAKE_WITNESS), n, { ...extra, x: n.sawFake, s: (n.sawFake.lastStation && this.stationWhere.get(n.sawFake.lastStation)) ?? 'the wires' });
+      else text = this.fill(fresh(CHATTER), n, extra);
       lines.push({ npc: n, text, at: t, shown: false });
     }
-    // A second, shorter round from some of them.
+    // A second, shorter round from some of them (running on into the vote). Witnesses insist.
+    t = Math.max(t, 3.2);
     for (const n of order) {
-      if (Math.random() < 0.45) {
-        t = Math.min(DISCUSS_TIME - 1.2, t + rand(0.4, 0.9));
-        lines.push({ npc: n, text: this.fill(pick(n.impostor ? IMPOSTOR_CHATTER : CHATTER), n, extra), at: t, shown: false });
+      const witness = !n.impostor && (n.sawVent?.c.alive || n.sawFake?.c.alive);
+      if (witness || Math.random() < 0.4) {
+        t = Math.min(DISCUSS_TIME + 2.5, t + rand(0.7, 1.2));
+        const x = n.sawVent ?? n.sawFake;
+        const text = witness && x ? `VOTE ${upper(x)}!!` : this.fill(fresh(n.impostor ? IMPOSTOR_CHATTER : CHATTER), n, extra);
+        lines.push({ npc: n, text, at: t, shown: false });
       }
     }
     m.lines = lines;
@@ -1349,15 +1364,20 @@ export class ImpostorLevel implements Level {
       n.c.vel[0] = n.c.vel[2] = 0;
       if (this.phase !== 'eject' || m.ejected !== n) n.c.lookAt(this.phase === 'vote' ? this.player.pos : [0, 0, 0], dt, 3);
     }
+    // What they say (the talk runs on a little into the vote).
+    if (this.phase === 'discuss' || this.phase === 'vote') {
+      const since = this.phase === 'vote' ? DISCUSS_TIME + t : t;
+      for (const l of m.lines) {
+        if (!l.shown && since >= l.at && l.npc.c.alive) {
+          l.shown = true;
+          this.say(l.npc, l.text, 2.6);
+          l.npc.bubble.color = '#ffffff';
+          tone(rand(500, 800), 0.05, { wave: 'square', vol: 0.04 });
+        }
+      }
+    }
     switch (this.phase) {
       case 'discuss':
-        for (const l of m.lines) {
-          if (!l.shown && t >= l.at && l.npc.c.alive) {
-            l.shown = true;
-            this.say(l.npc, l.text, 2.6);
-            tone(rand(500, 800), 0.05, { wave: 'square', vol: 0.04 });
-          }
-        }
         if (t >= DISCUSS_TIME) {
           this.phase = 'vote';
           this.phaseT = 0;
