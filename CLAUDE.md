@@ -344,6 +344,12 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   the south) and the wall says FLAP. Space flaps (the player stays in `control` mode, pinned to the lane, with
   `gravityScale` 1.25, `airControl` 0 and a flapping `poseOverride`; plus a beak). Green pipes with a 5 m gap slide out
   of the east wall; touching one, or the floor, is death. Ten pipes and you drop to the floor and walk to the exit.
+- **Level 33 — Rock Star** (`src/levels/rock/`; a Guitar Hero parody): the floor is a five-lane note highway, the camera
+  looks down it from behind you, and 44 coloured gems (a fixed chart at 120 bpm: single notes, sustains, two-lane chords,
+  a solo that needs a sprint) slide toward the strike line by your feet. Be in a gem's lane as it crosses (a chord: on the
+  line between its lanes) and the note plays (the lead only sounds when you hit; drums and bass run on song time). Misses
+  drain the rock meter on the north wall; the crowd down both sides cheers, bobs or boos with it. Empty it and you're
+  booed off (tomatoes, then the stage catapults you); finish the song and the exit opens for the encore.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
