@@ -171,6 +171,21 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   lights die, "SKRRRT!") everyone dives for a free chair: you take one just by reaching its seat; the contestants react
   after their own delays. Whoever's left standing is catapulted out, a chair sinks away, repeat: 4 rounds (4, 3, 2,
   1 chairs). Win the last chair and the exit opens.
+- **The Floor Is Lava** (`src/levels/floorLava/`): the kids' game, taken literally, in a living room (red and blue
+  sofas, blue and mustard armchairs, coffee table, beanbags, a blue rug, piano and bench, fridge, washing machine,
+  bathtub, mattress, bookcase, crates, pillows; `entities/livingRoom.ts` plus junk). A host on four wall TVs announces
+  rules ("RULE #n"), each with a 3-2-1 countdown (the digit also big on the HUD with the rule under it); meanwhile
+  whatever is about to turn blinks molten, faster and faster (the floor: its panel seams glow), then it's lava
+  (`Pattern.lava` param 2 on things; the floor goes tile by tile in a quick ripple; the room glows warm). Standing on
+  lava (5 rays down from the feet; any safe surface under you wins) for 0.25 s in all burns you up (`player.char`,
+  smoke, flames); every new touch costs at least 0.05 s, so hopping across only goes so far. Rules: the floor (the
+  rug is floor); the couches (armchairs aren't; a pillow on a couch isn't a couch); the floor and the crates; the
+  ceiling (there isn't one); everything blue, and the floor; the floor and whatever you're standing on; the floor,
+  rising to 1 m (high ground: the piano, the fridge from the washing machine, the crate stairs in the south corners).
+  Finale: "EVERYTHING IS LAVA EXCEPT..." a giant rubber duck (`entities/giantDuck.ts`) drops out of the sky (purple
+  marker; landing on you is QUACKED), 5 s to get on it; everything else melts and sinks into lava rising to 0.55 m,
+  "THE DUCK IS A BOAT NOW." and it sails you to the exit ("THE EXIT IS NOT LAVA. PROBABLY."). ~95 s in all.
+  `?lavaStep=N` starts at step N of the script (8 = the duck).
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -210,7 +225,10 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   `BodySlicer` to test beams against the player's body parts, `LaserPylon`), `gnome.ts` (big garden gnome:
   `spawnGnome(physics, feet, look)`, arm poses in `GNOME_POSES`, glowing eyes, and `drawGnomeHat(out, headFrame)` for
   anyone else's head), `snake.ts` (grid snake: movement, AI, colliders, model), `pixelText.ts` (5x7
-  dot-matrix text built from blocks), `apple.ts`. Put new
+  dot-matrix text built from blocks), `apple.ts`, `livingRoom.ts` (sofa / armchair in any colour, coffee table,
+  beanbag, piano bench: `spawnFurniture`, sofas and armchairs with seat / back / arm colliders so you stand on the
+  cushions; `drawRug`, `drawPainting`), `giantDuck.ts` (a 4 m rubber duck you can stand on: a fixed body the level
+  moves with `moveTo`, which carries a rider along). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
@@ -261,6 +279,10 @@ Shared mechanics available to levels (via `ctx`):
 - `player.torchArm` raises the right arm up and ahead as if holding a torch (the level draws the torch).
 - `player.resume(velocity)` puts the player back in normal control after a scripted mode; `player.partFrames()`
   gives each body part's frame (e.g. to put a torch in the right hand, `foreArmR`).
+- Rapier's character controller can't jump up alongside kinematic colliders (the jump dies at once) or up an
+  overhang (counts as bumping your head): for something moving that the player should climb onto, use a fixed body
+  and teleport it every frame, and move whoever stands on it yourself (`GiantDuck.moveTo`).
+- `Pattern.lava` with `param` 2 draws a thing turned molten (hotter than a pool, and varying with height too).
 - Boulders use `GROUPS_BOULDER`, and invisible `GROUPS_BOULDER_BRIDGE` colliders are floors only boulders touch
   (so they roll over pits the player has to jump). Loose objects on `GROUPS_DEBRIS` behave normally but boulders
   pass through them.

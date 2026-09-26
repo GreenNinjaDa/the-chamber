@@ -468,8 +468,9 @@ export class FloorLavaLevel implements Level {
         this.show('', step.line1, step.line2);
         break;
       case 'rule': {
-        this.show(step.header, step.line1, step.line2);
         this.underfootItem = step.underfoot ? (this.standing ?? this.lastStanding)?.item ?? null : null;
+        const onFloor = step.underfoot && !this.underfootItem;
+        this.show(step.header, step.line1, onFloor ? "SO IS WHATEVER YOU'RE ON. WHICH IS THE FLOOR." : step.line2);
         for (const it of this.items) it.doomed = (step.items?.(it) ?? false) || it === this.underfootItem;
         break;
       }
@@ -500,7 +501,11 @@ export class FloorLavaLevel implements Level {
     this.stepT += dt;
     const t = this.stepT;
     const hud = this.ctx.hud;
-    const rule = (s: { line1: string; line2: string }) => (s.line2 ? `${s.line1} ${s.line2}` : s.line1);
+    // The rule as it reads on the screens, for under the countdown on the HUD.
+    const rule = () => {
+      const s = this.screens[0];
+      return s.line2.text ? `${s.line1.text} ${s.line2.text}` : s.line1.text;
+    };
     switch (step.kind) {
       case 'say':
         if (t >= step.time) this.begin(this.index + 1);
@@ -508,7 +513,7 @@ export class FloorLavaLevel implements Level {
       case 'rule': {
         const end = COUNT + step.active;
         if (t < COUNT) {
-          this.countdown(Math.ceil(COUNT - t), rule(step));
+          this.countdown(Math.ceil(COUNT - t), rule());
           const w = t / COUNT;
           if (step.floor) this.floorWarn = w;
           for (const it of this.items) if (it.doomed) it.warn = w;
@@ -528,7 +533,7 @@ export class FloorLavaLevel implements Level {
         break;
       }
       case 'fake':
-        if (t < COUNT) this.countdown(Math.ceil(COUNT - t), rule(step));
+        if (t < COUNT) this.countdown(Math.ceil(COUNT - t), rule());
         if (this.at(COUNT, dt)) {
           this.countdown(0, '');
           hud.show('...', '', 1);
@@ -539,7 +544,7 @@ export class FloorLavaLevel implements Level {
       case 'rising': {
         const drainAt = COUNT + RISE_TIME + HOLD_TIME, end = drainAt + DRAIN_TIME;
         if (t < COUNT) {
-          this.countdown(Math.ceil(COUNT - t), rule(step));
+          this.countdown(Math.ceil(COUNT - t), rule());
           this.floorWarn = t / COUNT;
         }
         if (this.at(COUNT, dt)) {
@@ -1104,8 +1109,15 @@ export class FloorLavaLevel implements Level {
 
   trackedTargets(): TrackedTarget[] {
     const exit = this.exit.target();
-    return exit ? [exit] : [];
+    if (exit) return [exit];
+    // The duck may land behind you: it's somewhere to go, until you're on it.
+    if (this.duckLandT >= 0 && this.moltenT < 0 && !this.boarded) {
+      this.duckTarget.pos = add(this.duck.pos, [0, 1.2, 0]);
+      return [this.duckTarget];
+    }
+    return [];
   }
+  private duckTarget: TrackedTarget = { pos: [0, 0, 0], radius: 1.8, color: 'purple' };
 
   environment() {
     return this.env;
