@@ -258,7 +258,7 @@ const TIDE_SURFACE: Surface = { kind: 'tide' };
 const OTHER_SURFACE: Surface = { kind: 'other' };
 
 export class FloorLavaLevel implements Level {
-  readonly number = 15;
+  readonly number: number;
   readonly title = 'The Floor Is Lava';
   status: LevelStatus = 'playing';
   private arrival: PortalArrival;
@@ -317,6 +317,7 @@ export class FloorLavaLevel implements Level {
 
   constructor(private ctx: LevelContext) {
     const { physics, hud } = ctx;
+    this.number = ctx.number;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);
     hud.hint('');
@@ -1011,7 +1012,6 @@ export class FloorLavaLevel implements Level {
 
     // The duck, and its shadow as it falls.
     const duck = this.duck;
-    this.duck.lava = 0;
     duck.draw(out);
     if (duck.visible && this.duckLandT < 0 && this.stepT >= DUCK_DROP_AT) {
       const fall = clamp(duck.pos[1] / DUCK_DROP_HEIGHT, 0, 1);

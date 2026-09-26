@@ -95,7 +95,7 @@ interface Screen {
 }
 
 export class SimonLevel implements Level {
-  readonly number = 6;
+  readonly number: number;
   readonly title = 'Simon Says';
   status: LevelStatus = 'playing';
   private arrival: PortalArrival;
@@ -117,6 +117,8 @@ export class SimonLevel implements Level {
   // What the player has done since the current step started.
   private jumps = 0;
   private spin = 0;
+  private spinCam = 0;
+  private spinBody = 0;
   private pressed = false;
   private duckThrown = false;
   private wasOnGround = true;
@@ -137,6 +139,7 @@ export class SimonLevel implements Level {
   private catapult: { pos: Vec3; yaw: number; t: number } | null = null;
 
   constructor(private ctx: LevelContext) {
+    this.number = ctx.number;
     const { physics, hud } = ctx;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);
@@ -267,8 +270,12 @@ export class SimonLevel implements Level {
     this.stepT = 0;
     this.jumps = 0;
     this.spin = 0;
+    this.spinCam = 0;
+    this.spinBody = 0;
     this.pressed = false;
-    this.duckThrown = false;
+    // (A throw made during the pause before this step still counts.)
+    const dv = this.duck.rb.linvel();
+    this.duckThrown = !this.carryingDuck && Math.hypot(dv.x, dv.y, dv.z) > 4;
     this.lastYaw = camera.yaw;
     this.lastFacing = player.facing;
     this.startPad = this.pad;
@@ -380,7 +387,10 @@ export class SimonLevel implements Level {
     if (this.pad !== null && alive && !watching) this.glow[this.pad] = Math.max(this.glow[this.pad], 0.3);
     if (alive) {
       if (this.wasOnGround && !player.onGround && player.vel[1] > 2.5) this.jumps++;
-      this.spin += Math.max(Math.abs(camera.yaw - this.lastYaw), Math.abs(wrap(player.facing - this.lastFacing)));
+      // Net rotation (either way round), by the camera or by the player turning while they run in circles.
+      this.spinCam += camera.yaw - this.lastYaw;
+      this.spinBody += wrap(player.facing - this.lastFacing);
+      this.spin = Math.max(Math.abs(this.spinCam), Math.abs(this.spinBody));
       const carrying = player.carrying === this.duck.collider;
       if (this.carryingDuck && !carrying) {
         const v = this.duck.rb.linvel();

@@ -52,6 +52,9 @@ interface Tile {
   revealAt: number;
   flag: boolean;
   collider: RAPIER.Collider;
+  /** Cached draw items, and the state they were built for. */
+  items: DrawItem[];
+  key: number;
   label: WorldLabel | null;
 }
 
@@ -62,7 +65,7 @@ interface Death {
 }
 
 export class MinesLevel implements Level {
-  readonly number = 8;
+  readonly number: number;
   readonly title = 'Minesweeper';
   status: LevelStatus = 'playing';
   private arrival: PortalArrival;
@@ -82,6 +85,7 @@ export class MinesLevel implements Level {
   private spawn: Vec3;
 
   constructor(private ctx: LevelContext) {
+    this.number = ctx.number;
     const { physics, hud } = ctx;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);
@@ -97,7 +101,7 @@ export class MinesLevel implements Level {
     for (let j = 0; j < N; j++) {
       for (let i = 0; i < N; i++) {
         const collider = physics.addStaticBox([centre(i), RAISED / 2 - 0.02, centre(j)], [TILE, RAISED + 0.04, TILE]);
-        this.tiles.push({ i, j, mine: mines[j * N + i], count: 0, revealed: false, revealAt: Infinity, flag: false, collider, label: null });
+        this.tiles.push({ i, j, mine: mines[j * N + i], count: 0, revealed: false, revealAt: Infinity, flag: false, collider, label: null, items: [], key: -1 });
       }
     }
     for (const t of this.tiles) t.count = this.neighbours(t).filter((n) => n.mine).length;
@@ -178,7 +182,8 @@ export class MinesLevel implements Level {
       const spawnTile = this.tileAt(this.spawn[0], this.spawn[2]);
       if (spawnTile) this.reveal(spawnTile);
       const here = this.tileAt(player.pos[0], player.pos[2]);
-      if (here && !here.mine) this.reveal(here);
+      if (here && here.mine) this.moveMine(here);
+      if (here) this.reveal(here);
       this.exit.openNow();
     }
     if (!this.death && this.status === 'playing') {
@@ -219,6 +224,15 @@ export class MinesLevel implements Level {
 
   private startTime: number | undefined;
 
+  /** The portal dropped you on a mine (it can happen, just): quietly move it somewhere far away. */
+  private moveMine(t: Tile) {
+    const far = this.tiles.filter((o) => !o.mine && !o.revealed && Math.hypot(o.i - t.i, o.j - t.j) > 4);
+    if (!far.length) return;
+    t.mine = false;
+    pick(far).mine = true;
+    for (const o of this.tiles) o.count = this.neighbours(o).filter((n) => n.mine).length;
+  }
+
   private explode(t: Tile) {
     const { player, camera } = this.ctx;
     t.revealed = true;
@@ -241,26 +255,40 @@ export class MinesLevel implements Level {
     this.exit.draw(out);
     const now = this.time;
     for (const t of this.tiles) {
-      const x = centre(t.i), z = centre(t.j);
       const shown = t.revealed && now >= t.revealAt;
-      const minesShown = this.death && t.mine && now >= t.revealAt;
-      if (shown || minesShown) {
-        const boom = this.boom && t.mine && t.revealed;
-        out.push({ mesh: 'box', model: mul(translation([x, 0.005, z]), scaling([TILE - 0.05, 0.02, TILE - 0.05])), color: boom ? TILE_BOOM : TILE_DOWN, spec: 0.1 });
-        if (t.mine) drawMine(out, [x, 0.02, z]);
-      } else {
-        // A raised Windows 95 button: light edges top-left (north, west), dark bottom-right.
-        const w = TILE - 0.06, e = 0.14, h = RAISED;
-        out.push({ mesh: 'box', model: mul(translation([x, h / 2, z]), scaling([w - 2 * e, h, w - 2 * e])), color: TILE_UP, spec: 0.2 });
-        out.push({ mesh: 'box', model: mul(translation([x, h / 2, z - w / 2 + e / 2]), scaling([w, h, e])), color: TILE_LIGHT });
-        out.push({ mesh: 'box', model: mul(translation([x - w / 2 + e / 2, h / 2, z + e / 2]), scaling([e, h, w - e])), color: TILE_LIGHT });
-        out.push({ mesh: 'box', model: mul(translation([x + e / 2, h / 2, z + w / 2 - e / 2]), scaling([w - e, h, e])), color: TILE_DARK });
-        out.push({ mesh: 'box', model: mul(translation([x + w / 2 - e / 2, h / 2, z - e / 2]), scaling([e, h, w - 2 * e])), color: TILE_DARK });
-        if (t.flag) drawFlag(out, [x, RAISED, z]);
-      }
+      const minesShown = !!this.death && t.mine && now >= t.revealAt;
+      const boom = !!this.boom && t.mine && t.revealed;
       if (t.label) t.label.text = shown ? String(t.count) : '';
+      // Tiles only change when revealed, flagged or blown up: rebuild their draw items only then.
+      const key = (shown ? 1 : 0) | (minesShown ? 2 : 0) | (boom ? 4 : 0) | (t.flag ? 8 : 0);
+      if (key !== t.key) {
+        t.key = key;
+        t.items.length = 0;
+        this.drawTile(t.items, t, shown || minesShown, boom);
+      }
+      for (const item of t.items) out.push(item);
     }
+    this.drawRest(out);
+  }
 
+  private drawTile(out: DrawItem[], t: Tile, down: boolean, boom: boolean) {
+    const x = centre(t.i), z = centre(t.j);
+    if (down) {
+      out.push({ mesh: 'box', model: mul(translation([x, 0.005, z]), scaling([TILE - 0.05, 0.02, TILE - 0.05])), color: boom ? TILE_BOOM : TILE_DOWN, spec: 0.1 });
+      if (t.mine) drawMine(out, [x, 0.02, z]);
+    } else {
+      // A raised Windows 95 button: light edges top-left (north, west), dark bottom-right.
+      const w = TILE - 0.06, e = 0.14, h = RAISED;
+      out.push({ mesh: 'box', model: mul(translation([x, h / 2, z]), scaling([w - 2 * e, h, w - 2 * e])), color: TILE_UP, spec: 0.2 });
+      out.push({ mesh: 'box', model: mul(translation([x, h / 2, z - w / 2 + e / 2]), scaling([w, h, e])), color: TILE_LIGHT });
+      out.push({ mesh: 'box', model: mul(translation([x - w / 2 + e / 2, h / 2, z + e / 2]), scaling([e, h, w - e])), color: TILE_LIGHT });
+      out.push({ mesh: 'box', model: mul(translation([x + e / 2, h / 2, z + w / 2 - e / 2]), scaling([w - e, h, e])), color: TILE_DARK });
+      out.push({ mesh: 'box', model: mul(translation([x + w / 2 - e / 2, h / 2, z - e / 2]), scaling([e, h, w - 2 * e])), color: TILE_DARK });
+      if (t.flag) drawFlag(out, [x, RAISED, z]);
+    }
+  }
+
+  private drawRest(out: DrawItem[]) {
     // The face button, with the mine counter and the clock either side, on the north wall.
     const wallZ = -CHAMBER_HALF + 0.12;
     out.push({ mesh: 'bevelbox', model: mul(translation([0, 7, wallZ]), scaling([3.4, 3.4, 0.3])), color: TILE_UP, spec: 0.2 });
@@ -373,7 +401,9 @@ function makeBoard(spawn: Vec3, exitTile: [number, number]): boolean[] {
     const free = [];
     for (let j = 0; j < N; j++) {
       for (let i = 0; i < N; i++) {
-        const near = Math.hypot(centre(i) - spawn[0], centre(j) - spawn[2]) < SAFE_START;
+        // Nearest point of the tile to the spawn, not its centre.
+        const nx = clamp(spawn[0], centre(i) - TILE / 2, centre(i) + TILE / 2), nz = clamp(spawn[2], centre(j) - TILE / 2, centre(j) + TILE / 2);
+        const near = Math.hypot(nx - spawn[0], nz - spawn[2]) < SAFE_START;
         const exitSide = i === exitTile[0] && Math.abs(j - exitTile[1]) <= 0;
         if (!near && !exitSide) free.push(j * N + i);
       }

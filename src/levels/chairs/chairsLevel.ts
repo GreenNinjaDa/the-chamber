@@ -22,7 +22,7 @@ const CIRCLE_SPEED = 0.55; // rad/s
 /** You claim a free chair by getting this close to its seat. */
 const CLAIM = 0.75;
 const MUSIC: number[] = [9, 7.5, 7, 6.5];
-/** Loitering (not going round) this long gets a shout, then this long more gets you flung. */
+/** Loitering (not going round) this long gets a shout; this long in all gets you flung. */
 const LOITER_WARN = 1.0;
 const LOITER_OUT = 3.2;
 const DEATH_SCREEN_DELAY = 1.8;
@@ -70,7 +70,7 @@ const CAST: { look: ContestantLook; react: [number, number]; speed: number }[] =
 ];
 
 export class ChairsLevel implements Level {
-  readonly number = 14;
+  readonly number: number;
   readonly title = 'Musical Chairs';
   status: LevelStatus = 'playing';
   private arrival: PortalArrival;
@@ -93,6 +93,7 @@ export class ChairsLevel implements Level {
   private env: Environment = { ...DEFAULT_ENV, sunColor: [0.55, 0.45, 0.65], skyColor: [0.1, 0.05, 0.16], fogColor: [0.12, 0.07, 0.16], pointLight: { pos: [0, 7, 0], color: [0, 0, 0], range: 20 } };
 
   constructor(private ctx: LevelContext) {
+    this.number = ctx.number;
     const { hud } = ctx;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);
@@ -257,7 +258,8 @@ export class ChairsLevel implements Level {
       const r = Math.hypot(player.pos[0], player.pos[2]);
       const going = Math.abs(da / Math.max(dt, 1e-4)) > 0.18 && r > BAND[0] && r < BAND[1];
       this.loiter = going ? Math.max(0, this.loiter - dt * 2) : this.loiter + dt;
-      this.shout.text = this.loiter > LOITER_WARN ? pick(['KEEP WALKING!', 'NO CAMPING!', 'ROUND AND ROUND!']) : '';
+      if (this.loiter <= LOITER_WARN) this.shout.text = '';
+      else if (!this.shout.text) this.shout.text = pick(['KEEP WALKING!', 'NO CAMPING!', 'ROUND AND ROUND!']);
       if (this.loiter > LOITER_OUT) {
         this.shout.text = '';
         this.flingPlayer('NO CAMPING', pick([
