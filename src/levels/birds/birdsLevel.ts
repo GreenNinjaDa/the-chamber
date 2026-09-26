@@ -330,6 +330,8 @@ interface Flyer {
   fuse: number;
   gone: boolean;
   blink: number;
+  /** Seconds it can't hurt the pig (they're carrying it, or just threw it). */
+  grace: number;
 }
 
 interface Death {
@@ -350,7 +352,8 @@ interface Popup {
   t: number;
 }
 
-type Phase = 'intro' | 'load' | 'aim' | 'hold' | 'flight' | 'end';
+/** `end`: out of birds (the pig won); `over`: the pig's popped, nothing more happens. */
+type Phase = 'intro' | 'load' | 'aim' | 'hold' | 'flight' | 'end' | 'over';
 
 export class BirdsLevel implements Level {
   readonly number: number;
@@ -396,7 +399,7 @@ export class BirdsLevel implements Level {
 
   private nameLabel: WorldLabel = { pos: [0, 0, 0], text: '', size: 1.1, color: '#fff' };
   private quipLabel: WorldLabel = { pos: [0, 0, 0], text: '', size: 0.55, color: '#fff' };
-  private alertLabel: WorldLabel = { pos: [0, 0, 0], text: '', size: 1.4, color: '#ffd84a' };
+  private alertLabel: WorldLabel = { pos: [0, 0, 0], text: '', size: 2.4, color: '#ffd84a' };
   private labelList: WorldLabel[] = [];
   private breakSounds = 0;
   private knockSounds = 0;
@@ -544,6 +547,13 @@ export class BirdsLevel implements Level {
 
     if (this.pendingDeath && !this.death) this.squashed(this.pendingDeath.vel);
     this.pendingDeath = null;
+    // Whatever the pig carries (and throws) doesn't count its own throw as a hit, and a bird
+    // the pig throws doesn't pop them.
+    const held = player.carrying;
+    if (held) {
+      for (const b of this.blocks) if (b.body.collider.handle === held.handle) b.grace = 30;
+      for (const f of this.flyers) if (!f.gone && f.body.collider.handle === held.handle) f.grace = 0.8;
+    }
 
     this.script(dt);
     this.updatePerched(dt);
@@ -787,6 +797,7 @@ export class BirdsLevel implements Level {
     const f: Flyer = {
       shot, bird, r, body, prev: [...pos], lastVel: [...vel], age: 0, flight, landed: -1, justLanded: false, frame,
       trailT: 0, trailBig: true, split: false, charge: -1, dashTarget: [0, 0, 0], dashing: false, fuse: -1, gone: false, blink: rand(1, 3),
+      grace: 0,
     };
     this.flyers.push(f);
     return f;
@@ -799,6 +810,11 @@ export class BirdsLevel implements Level {
   }
 
   private nextShot() {
+    // The pig's popped: no need for more birds. They just celebrate.
+    if (this.death) {
+      this.phase = 'over';
+      return;
+    }
     this.shotIndex++;
     if (this.shotIndex >= SHOTS.length) this.finish();
     else this.startLoad();
@@ -844,6 +860,11 @@ export class BirdsLevel implements Level {
         continue;
       }
       if (p === this.loaded) continue;
+      if (this.death && p.hop < 0 && Math.random() < dt * 2) {
+        // A popped pig: the birds on the wall bounce with joy.
+        p.hopFrom = [...p.pos];
+        p.hop = 0;
+      }
       if (p.hop >= 0) {
         p.hop = Math.min(1, p.hop + dt * 2.6);
         const k = p.hop;
@@ -917,7 +938,8 @@ export class BirdsLevel implements Level {
       }
 
       // Hitting the pig: tested along the whole step, fast birds skip a lot.
-      const lethal = speed > (f.bird === 'terence' ? TERENCE_LETHAL_SPEED : LETHAL_SPEED);
+      f.grace = Math.max(0, f.grace - dt);
+      const lethal = f.grace <= 0 && speed > (f.bird === 'terence' ? TERENCE_LETHAL_SPEED : LETHAL_SPEED);
       if (alive && frames && lethal && !this.death) {
         for (const name of PART_NAMES) {
           const m = frames[name];
@@ -1050,8 +1072,10 @@ export class BirdsLevel implements Level {
       const dv = Math.hypot(lv.x - b.lastVel[0], lv.y - b.lastVel[1], lv.z - b.lastVel[2]);
       b.lastVel[0] = lv.x; b.lastVel[1] = lv.y; b.lastVel[2] = lv.z;
       const def = MATERIALS[b.material];
-      if (dv > BLOCK_EVENT_DV) {
-        if (import.meta.env.DEV && dv > 2) this.debugLog.push(`dv ${b.material} ${dv.toFixed(1)}`);
+      if (b.grace > 0) {
+        // Just thrown by the pig: the throw itself doesn't count as a hit.
+        b.grace--;
+      } else if (dv > BLOCK_EVENT_DV) {
         if (dv > def.dv0) this.damage(b, (dv - def.dv0) / def.dvScale);
         if (b.material === 'tnt' && dv > def.dv0) this.light(b, TNT_DELAY);
         this.crushPartners(b.body, b.body.rb.mass() * dv);
@@ -1084,7 +1108,6 @@ export class BirdsLevel implements Level {
         f.dashing = false;
       }
       const J = f.body.rb.mass() * dv;
-      if (import.meta.env.DEV) this.debugLog.push(`bird ${f.bird} dv=${dv.toFixed(1)} J=${J.toFixed(0)}`);
       // Whatever it hit takes the blow; if the contact isn't there (fast hits), the nearest block does.
       if (!this.crushPartners(f.body, J)) {
         const t = f.body.rb.translation();
@@ -1113,10 +1136,8 @@ export class BirdsLevel implements Level {
     return any;
   }
 
-  debugLog: string[] = [];
   private crush(b: Block, J: number) {
     const def = MATERIALS[b.material];
-    if (import.meta.env.DEV && J > 20) this.debugLog.push(`crush ${b.material} J=${J.toFixed(0)}`);
     if (J <= def.j0) return;
     if (b.material === 'tnt') {
       this.light(b, TNT_DELAY);

@@ -53,6 +53,8 @@ export interface Block {
   fuse: number;
   /** Velocity after the last physics step (for spotting sudden hits). */
   lastVel: Vec3;
+  /** Physics steps left during which sudden speed changes don't count (e.g. it's being carried or thrown). */
+  grace: number;
 }
 
 const WOOD = [0.74, 0.46, 0.2];
@@ -86,7 +88,7 @@ export function spawnBlock(physics: Physics, material: Material, center: Vec3, s
   const def = MATERIALS[material];
   const s: Vec3 = material === 'tnt' ? [TNT_SIZE, TNT_SIZE, TNT_SIZE] : size;
   const mass = material === 'tnt' ? TNT_MASS : Math.max(1, s[0] * s[1] * s[2] * def.density);
-  const block: Block = { body: null!, material, size: s, hp: 1, broken: false, fuse: -1, lastVel: [0, 0, 0] };
+  const block: Block = { body: null!, material, size: s, hp: 1, broken: false, fuse: -1, lastVel: [0, 0, 0], grace: 0 };
   const model = material === 'wood' ? woodModel(block) : material === 'glass' ? glassModel(block) : material === 'stone' ? stoneModel(block) : tntModel(block);
   block.body = physics.addBox(center, s, { mass, friction: def.friction, restitution: def.restitution, rotation, model });
   return block;
