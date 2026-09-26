@@ -397,8 +397,8 @@ export class TamagotchiLevel implements Level {
   private stink = new PixelSprite(STINK, { 1: [0.45, 0.7, 0.15] }, { shadow: false });
   private skullWorld = new PixelSprite(SKULL, { 1: [0.2, 0.9, 0.3] }, { pattern: Pattern.emissive, shadow: false });
   private waveCrest = new PixelSprite(
-    ['....fff..', '..ffwwff.', '.fwwwwwwf', 'fwwwdddww', 'wwdddddww', 'wddddddd.'],
-    { f: [0.95, 0.98, 1], w: [0.45, 0.75, 1], d: [0.18, 0.45, 0.9] },
+    ['...ffff..', '..fwwwwf.', '.fwwwwwww', 'fwwwwdwww', 'wwwddddww', 'wdddddddd'],
+    { f: [0.85, 0.95, 1], w: [0.22, 0.58, 0.98], d: [0.08, 0.3, 0.8] },
     { spec: 0.8 },
   );
   private slabArrow = new PixelSprite(ARROW_LEFT, { 1: [0.55, 0.65, 0.42] }, { pattern: Pattern.emissive, shadow: false });
@@ -933,6 +933,13 @@ export class TamagotchiLevel implements Level {
       }
     } else if (w.phase === 'run') {
       w.x += w.dir * WAVE_SPEED * dt;
+      // Spray off the crest.
+      for (let i = 0; i < 2; i++) {
+        this.bits.push({
+          pos: [w.x + w.dir * 0.4, rand(0.5, 0.9), rand(-11.6, 11.6)], vel: [w.dir * rand(3, 7), rand(2, 4.5), rand(-0.6, 0.6)],
+          t: 0, life: rand(0.35, 0.6), size: rand(0.08, 0.16), color: Math.random() < 0.5 ? [0.95, 0.98, 1] : [0.5, 0.78, 1],
+        });
+      }
       for (const p of this.poops) if (!p.carried && Math.abs(p.pos[0] - w.x) < 0.9) p.carried = true;
       for (const p of this.poops) if (p.carried) p.pos[0] = w.x + w.dir * 0.4;
       if (this.alive() && Math.abs(player.pos[0] - w.x) < WAVE_CORE / 2 + 0.25 && player.pos[1] < WAVE_H) {
@@ -981,6 +988,8 @@ export class TamagotchiLevel implements Level {
       else if (n.t > DARK_GRACE) {
         this.addHearts('happy', -DARK_DRAIN * dt);
         if (Math.floor(n.t) !== n.beeped) {
+          // Grumpy, once a second (a popup the first time).
+          if (n.beeped === 0) this.popup(pick(['PAST YOUR BEDTIME  -♥', 'CRANKY  -♥', 'CAN\'T SLEEP  -♥']), '#8fb0ff');
           n.beeped = Math.floor(n.t);
           sound.alarm();
         }
@@ -1314,7 +1323,7 @@ export class TamagotchiLevel implements Level {
 
     // Lights.
     const dark = this.night && this.night.t < DARK_TIME && !this.death ? 1 : 0;
-    this.light += ((dark ? 0.06 : 1) - this.light) * Math.min(1, dt * (dark ? 14 : 5));
+    this.light += ((dark ? 0.03 : 1) - this.light) * Math.min(1, dt * (dark ? 14 : 5));
 
     // Music: a jolly loop by day, a lullaby at night, nothing once it's dead or dropped.
     const musical = this.lifeT >= 0 && !this.death && !this.dropped && this.status === 'playing';
@@ -1657,8 +1666,16 @@ export class TamagotchiLevel implements Level {
       const normal: Vec3 = [Math.sin(a), 0, Math.cos(a)];
       const pos: Vec3 = [f.pos[0], f.pos[1] + bob, f.pos[2]];
       const hl = f.usable.highlight;
-      if (f.kind === 'meal') this.burger.draw(out, time, pos, right, U, normal, 0.15 * k, 0.6 * k, { lift: 0, highlight: hl });
-      else this.candy.draw(out, time, pos, right, U, normal, 0.14 * k, 0.5 * k, { lift: 0, highlight: hl });
+      if (f.kind === 'meal') {
+        // Two crossed copies: a round voxel burger from any side.
+        this.burger.draw(out, time, pos, right, U, normal, 0.15 * k, 0.75 * k, { lift: 0, highlight: hl });
+        this.burger.draw(out, time, pos, normal, U, [-right[0], -right[1], -right[2]], 0.15 * k, 0.75 * k, { lift: 0, highlight: hl });
+      }
+      else {
+        // A sweet faces you (wobbling), so you always see its stripes.
+        const y = this.ctx.camera.yaw + Math.sin(time * 2.5 + f.spin) * 0.5;
+        this.candy.draw(out, time, pos, [Math.cos(y), 0, -Math.sin(y)], U, [Math.sin(y), 0, Math.cos(y)], 0.14 * k, 0.9 * k, { lift: 0, highlight: hl });
+      }
       // Its shadow (bigger and darker as it comes down).
       const hgt = f.pos[1];
       const r = f.landed ? 0.9 : clamp(1.6 - hgt * 0.05, 0.6, 1.6);
@@ -1790,7 +1807,7 @@ export class TamagotchiLevel implements Level {
     // Sick: a little green skull over your head.
     if (this.sick && !this.death) {
       const { right, normal } = this.billboard();
-      this.skullWorld.draw(out, time, add(player.pos, [0, 2.45 + Math.sin(time * 3) * 0.08, 0]), right, U, normal, 0.06, 0.05, { lift: 0 });
+      this.skullWorld.draw(out, time, add(player.pos, [0, 2.3 + Math.sin(time * 3) * 0.06, 0]), right, U, normal, 0.05, 0.05, { lift: 0 });
     }
     // Asleep: z's.
     if (this.night?.asleep) {
@@ -1885,7 +1902,7 @@ export class TamagotchiLevel implements Level {
     if (this.evolveT >= 0 && this.evolveT < 1.9) flash = 1 + 0.8 * (Math.floor(this.evolveT * 6) % 2);
     const pink = this.t < 0 ? 0 : smooth(this.t / FLOOD_TIME);
     e.sunColor = [1.7 * l * flash, 1.62 * l * flash, 1.55 * l * flash];
-    const sky = lerp(1, 0.12, 1 - l);
+    const sky = lerp(1, 0.035, 1 - l);
     e.skyColor = [lerp(0.2, 0.34, pink) * sky, lerp(0.3, 0.3, pink) * sky, lerp(0.5, 0.46, pink) * sky];
     e.groundColor = [lerp(0.22, 0.3, pink) * sky, lerp(0.2, 0.22, pink) * sky, lerp(0.18, 0.26, pink) * sky];
     e.fogColor = [lerp(0.72, 0.9, pink) * sky, lerp(0.8, 0.76, pink) * sky, lerp(0.9, 0.86, pink) * sky];

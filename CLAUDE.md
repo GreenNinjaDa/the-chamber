@@ -493,6 +493,31 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   OVER, naming the ghost). All pellets eaten: the maze flashes, sinks, and the exit opens; the last 3 pellets get
   purple markers. Score and an unbeatable HIGH SCORE (3,333,360) on the north wall; no looking up while the maze
   is up (keeps the camera above the walls).
+- **Level 42 — Tamagotchi** (`src/levels/tamagotchi/`): you are the pet. After the arrival the walls flood candy pink
+  (a plastic egg: a rim round the top, a keychain loop, printed pixel hearts and stars), the north wall becomes the
+  LCD (`entities/tamagotchi.ts` `PixelSprite`s: six menu icons FOOD LIGHT PLAY MEDICINE BATHROOM DISCIPLINE, the
+  play field, HUNGRY / HAPPY hearts, AGE, WT) and big A / B / C buttons push out of the south wall. An egg wobbles
+  and hatches into a pixel you that follows you about the screen. Timmy (the giant, peeking over the south wall now
+  and then with a bored line) presses A to walk the highlight along the icons (sometimes all the way round), B to
+  pick one, C when it's done; one action at a time, 1-3.5 s apart: FEED (a MEAL / SNACK submenu, then a spinning
+  voxel burger or a candy drops from the sky with a shadow, purple marker, a BONK if it lands on your head; E near
+  it eats: meal +2.5 HUNGRY +1 LB, candy +1.5 HAPPY +0.5 HUNGRY +2 LB; full: "no thanks"); PLAY (3 rounds: a giant
+  LCD-pixel slab with an arrow underneath hovers over one half of the floor, which flashes red for 2.4 / 2.1 / 1.8 s,
+  then slams: on that half (or within 0.3 m of the dashed line) = SQUASHED, dodged = +0.8 HAPPY, a clean sweep
+  +0.6 and -1 LB); BATHROOM (after you've pooped: every 24-30 s a swirl plops out behind you, with stink lines and
+  flies; stepping in one makes you sick, a skull over your head, hearts drain 1.6x) sends a wave 0.62 m high (to
+  jump; hit = FLUSHED) from a wall across the floor, carrying the poops away; LIGHT (8 s dark with a lullaby: a
+  glowing bed appears 6-11 m away; standing still on it sits you down asleep, HAPPY stops draining and 3 s of sleep
+  is +1; awake after 1.6 s drains 0.32/s); DISCIPLINE ("NO!" flashes, then its letters fly out of the screen and
+  slide at where you're going, 12 m/s: a hit knocks you over, -0.75 HAPPY); MEDICINE (only when sick: a giant
+  syringe chases you; its jab cures you, knocks you and costs 0.5 HAPPY; dodge it 7.5 s and you stay sick). Hearts
+  drain (HUNGRY 1/14 s, HAPPY 1/14 s, +35% by the end); Timmy feeds a hungry pet (≤ 2.4) and plays with a sad one
+  (≤ 1.6) first, and nothing starts that would outlast its life. Either row at zero: YOUR TAMAGOTCHI HAS DIED (the
+  LCD shows a ghost and a grave, a gravestone rises by your body and your see-through ghost floats up with a halo
+  and wings). 80 s of life: WHAT? It evolves (flashing), into A SLIGHTLY OLDER TEST SUBJECT with a moustache;
+  Timmy is bored ("MUM! can I get a PHONE?"), drops it (whistle, crash, cracked LCD) and the exit opens. Weight
+  over 8 LB slows you 6% a pound (`speedScale`, `girth`). Test bots (eat what they need, dodge, jump, sleep): 3/3
+  wins; never eating starves at ~40 s, standing still is squashed in the first PLAY.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -533,7 +558,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   `BodySlicer` to test beams against the player's body parts, `LaserPylon`), `gnome.ts` (big garden gnome:
   `spawnGnome(physics, feet, look)`, arm poses in `GNOME_POSES`, glowing eyes, and `drawGnomeHat(out, headFrame)` for
   anyone else's head), `snake.ts` (grid snake: movement, AI, colliders, model), `pixelText.ts` (5x7
-  dot-matrix text built from blocks, letters, digits and `! ? : . , -`; `pattern: Pattern.emissive` makes glowing LEDs), `apple.ts`, `ghost.ts` (arcade ghost: `drawGhost`, normal / scared / flashing / eyes only), `plush.ts` (plush toys: `spawnPlush(physics, 'alien', pos, look)`), `claw.ts` (claw-machine claw and gantry: `driveTo`, hub height `y`, prong `angle`, `distanceTo` for grabbing it), `bowling.ts` (2 m bowling pins: `spawnPin`, `pinSpots`, `uprightness`; `drawBowlingBall` with finger holes), `hexFloor.ts` (`HexFloor`: a floor of hexagonal tiles, each a
+  dot-matrix text built from blocks, letters, digits and `! ? : . , -`; `pattern: Pattern.emissive` makes glowing LEDs;
+  `textBitmap(text)` gives the glyph rows for other pixel renderers), `apple.ts`, `ghost.ts` (arcade ghost: `drawGhost`, normal / scared / flashing / eyes only), `plush.ts` (plush toys: `spawnPlush(physics, 'alien', pos, look)`), `claw.ts` (claw-machine claw and gantry: `driveTo`, hub height `y`, prong `angle`, `distanceTo` for grabbing it), `bowling.ts` (2 m bowling pins: `spawnPin`, `pinSpots`, `uprightness`; `drawBowlingBall` with finger holes), `hexFloor.ts` (`HexFloor`: a floor of hexagonal tiles, each a
   static collider, that flash and drop once touched; `support` / `touch` / `freeze` / `regrowFrom`; drawn with the
   chamfered `'hextile'` mesh from renderer.ts), `livingRoom.ts` (sofa / armchair in any colour, coffee table,
   beanbag, piano bench: `spawnFurniture`, sofas and armchairs with seat / back / arm colliders so you stand on the
@@ -572,7 +598,11 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   `mole.ts` (whack-a-mole `Mole`: pink nose, whiskers, buck teeth, optional shades; `squash` flattens it, `dazed` gives
   X eyes and circling stars, `armsUp`, `walk` / `walking`, `wiggle`; `drawMole` in any frame, `drawDazedStars` over
   anyone's head), `mallet.ts` (`Mallet`: a giant's rubber mallet posed by `aim` / `swing` / `lift` / `from`; `grip()` is
-  where the giant's hand goes, `face()` the striking face, `squash` on impact). Put new
+  where the giant's hand goes, `face()` the striking face, `squash` on impact), `tamagotchi.ts` (`PixelSprite`: a
+  bitmap of palette characters drawn as blocks on any plane (right / up / normal must be right-handed), same-colour
+  runs merged, items reused so drawing allocates nothing and the same sprite can be drawn many times a frame;
+  `gap` for LCD dots, `flip`, `sx` / `sy`, `lift`; `textSprite`; the virtual pet's art: the pet's faces and adult
+  form, egg, hearts, menu icons, arrow, poop, skull, ghost, grave, burger, candy, syringe, moon). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`

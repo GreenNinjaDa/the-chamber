@@ -413,21 +413,22 @@ export const CANDY = [
   'p....ooo....p',
 ];
 export const CANDY_COLORS: Palette = {
-  p: [1, 0.45, 0.75],
+  p: [1, 0.3, 0.68],
   o: [0.55, 0.05, 0.12],
   r: [0.95, 0.12, 0.18],
   w: [1, 0.97, 0.95],
 };
+/** A classic three-tier swirl. */
 export const POOP = [
-  '....oo....',
-  '...obbo...',
+  '.....o....',
+  '....obo...',
   '...obhbo..',
-  '..obbbbo..',
+  '..oooooo..',
   '..obhbbbo.',
   '.obbbbbbo.',
-  '.obbhbbbbo',
-  'obbbbbbbbo',
+  '.oooooooo.',
   'obhbbbbbbo',
+  'obbbbbbbbo',
   '.oooooooo.',
 ];
 export const POOP_COLORS: Palette = {
