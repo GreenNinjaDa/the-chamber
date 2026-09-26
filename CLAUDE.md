@@ -101,6 +101,11 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   chases where you're heading (faster than a sprint at noon, but turning sluggishly: dodge it), and while you hide he
   burns things out in the sun (the duck melts, the beach ball pops, umbrellas, boxes and the mattress burn away) or
   lurks at the edge of your shade. At dusk his mum calls him in for dinner and the exit opens.
+- **Level 8 — Minesweeper** (`src/levels/mines/`): the floor is a 12 x 12 board of raised Windows 95 tiles (2 m,
+  28 mines) and the exit is open on the far (east) side. Stepping on a tile reveals it (zeros ripple open) or blows
+  you up; the numbers count touching mines, diagonals included. Right-click (empty-handed) or E plants a flag. The
+  smiley face on the north wall reacts, with the mine counter and clock either side. Boards are regenerated until a
+  simple logical solver (single-tile rules plus the subset rule) can get from the safe opening to the exit tile.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one

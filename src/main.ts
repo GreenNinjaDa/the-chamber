@@ -17,6 +17,7 @@ import { LavaLevel } from './levels/lava/lavaLevel';
 import { TempleLevel } from './levels/temple/templeLevel';
 import { SimonLevel } from './levels/simon/simonLevel';
 import { SunburnLevel } from './levels/sunburn/sunburnLevel';
+import { MinesLevel } from './levels/mines/minesLevel';
 import type { Level, LevelContext, TrackedTarget, WorldLabel } from './levels/level';
 import { LobbyLevel } from './levels/lobby/lobbyLevel';
 
@@ -33,6 +34,7 @@ const LEVELS: ((ctx: LevelContext) => Level)[] = [
   (ctx) => new TempleLevel(ctx),
   (ctx) => new SimonLevel(ctx),
   (ctx) => new SunburnLevel(ctx),
+  (ctx) => new MinesLevel(ctx),
 ];
 const params = new URLSearchParams(location.search);
 /** `?sandbox` opens the mechanics test room; `?level=N` skips the lobby and starts at level N. */
