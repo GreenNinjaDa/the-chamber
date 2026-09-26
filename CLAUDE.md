@@ -357,19 +357,21 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   screen lights up (and glows on the floor) and the task bar on the north wall fills. One of them (random; `?impostor=RED`
   picks it) is the impostor: it fakes tasks (the screen stays dark), sometimes follows you standing ~1 m away, and from
   10 s in, every 10-15 s, hunts someone nobody else can see it with (no crewmate within 5.5 m, shrinking as the hunt
-  drags on; you more than 8.5 m away, so kills can be watched from across the room; you only after the first kill):
-  a lunge, its head flips open into a toothy mouth, a tongue, and the victim's top half flies off, leaving the bottom
-  half with a bone. Then it hops down the nearest vent (the flap clanks open) and pops out of another. Crewmates who
-  see a vent exit or a faked task remember it. Bodies are found by crewmates walking past (4.5 m) or reported by you
-  (E); the button (E) calls a meeting (2 per attempt, 8 s cooldown). Meetings: "EMERGENCY MEETING!" / "DEAD BODY
-  REPORTED" (world frozen), everyone warps round the table, bodies vanish, 6 s of speech bubbles (dumb chatter, the
-  impostor's lies, witnesses' true "RED VENTED" / "red was faking tasks"), then 10 s to vote: stand by someone (a purple
-  ring) or on the SKIP pad and press E (or just be there when time runs out). NPCs follow your vote 68% of the time
-  (skip if you didn't vote), witnesses vote what they saw, the impostor votes with you or for you; ties go your way.
-  Vote chips pop over each candidate, then the ejected bean is flung out of a trapdoor into space. Impostor out:
-  VICTORY, cheering, the exit opens; so does filling the task bar (your tasks count double). Lose: vote out an
-  innocent and the lights go out, it walks up with its visor glowing red (a red point light) and eats you; be alone
-  with it; get down to just you and it; or be voted out yourself (you float off into space).
+  drags on; you more than 8.5 m away, so kills can be watched from across the room; you only after the first kill, and
+  then a lone you, no crewmate within 7 m, is its favourite target): a lunge, its head flips open into a toothy mouth, a
+  tongue, and the victim's top half flies off in a red spray, leaving the bottom half with a bone in a puddle. Then it
+  hops down the nearest vent (the flap clanks open) and pops out of another (only when nobody is close, like the kill).
+  Crewmates who see a vent exit or a faked task remember it. Bodies are found by crewmates walking past (4.5 m) or
+  reported by you (E); the button (E) calls a meeting (2 per attempt, 8 s cooldown). Meetings: "EMERGENCY MEETING!" /
+  "DEAD BODY REPORTED" (world frozen, red alarm light), everyone warps round the table, bodies vanish, 6 s of speech
+  bubbles seen from above (dumb chatter, the impostor's lies, witnesses' true "RED VENTED" / "red was faking tasks" /
+  "VOTE RED!!", running on into the vote), then 10 s to vote: stand by someone (a purple ring) or on the SKIP pad and
+  press E (or just be there when time runs out). NPCs follow your vote 68% of the time (skip if you didn't vote),
+  witnesses vote what they saw, the impostor votes with you or for you; ties go your way. Vote chips pop over each
+  candidate, then the ejected bean is flung out of a trapdoor into space. Impostor out: VICTORY, cheering, the exit
+  opens; so does filling the task bar (your tasks count double). Lose: eject an innocent you voted for and the lights go
+  out, it walks up with its visor glowing red (a red point light) and eats you; be alone with it; get down to just you
+  and it; or be voted out yourself (you float off into space).
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
