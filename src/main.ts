@@ -12,6 +12,7 @@ import { Player } from './game/player';
 import { settings } from './game/settings';
 import { DartsLevel } from './levels/darts/dartsLevel';
 import { CakeLevel } from './levels/cake/cakeLevel';
+import { ClawLevel } from './levels/claw/clawLevel';
 import { GrenadeLevel } from './levels/grenade/grenadeLevel';
 import { LavaLevel } from './levels/lava/lavaLevel';
 import { TempleLevel } from './levels/temple/templeLevel';
@@ -29,6 +30,7 @@ const LEVELS: ((ctx: LevelContext) => Level)[] = [
   (ctx) => new CakeLevel(ctx),
   (ctx) => new LavaLevel(ctx),
   (ctx) => new TempleLevel(ctx),
+  (ctx) => new ClawLevel(ctx),
 ];
 const params = new URLSearchParams(location.search);
 /** `?sandbox` opens the mechanics test room; `?level=N` skips the lobby and starts at level N. */
