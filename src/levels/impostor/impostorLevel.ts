@@ -38,7 +38,7 @@ const HUNT_SPEED = 3.3;
 /** The impostor's first kill comes this long after you arrive; then one every KILL_COOLDOWN. */
 const FIRST_KILL = 10;
 const KILL_COOLDOWN: [number, number] = [10, 15];
-const AFTER_MEETING_COOLDOWN: [number, number] = [9, 13];
+const AFTER_MEETING_COOLDOWN: [number, number] = [7, 10];
 const KILL_RANGE = 1.3;
 /** Nobody else (a crewmate) within this of the victim, and the player no nearer than PLAYER_WITNESS. */
 const NPC_WITNESS = 5.5;
@@ -177,6 +177,7 @@ const CHATTER = [
 const IMPOSTOR_CHATTER = [
   '{C} sus', 'i was doing tasks', 'i was in wires the whole time', 'skip', 'i saw {C} near there', '{C} was following me',
   'vote {C}', 'why is everyone looking at me', 'orange sus', 'i was with {C}', 'i was literally doing tasks', 'skip. trust me',
+  '{C} was faking tasks', "{C}'s screen was off",
 ];
 const BODY_OPENERS = ['{V} is dead', 'BODY BY {P}', '{V} is in two pieces', 'found {V} by {P}', 'uh. {V} has a bone now', '{V} dead. {P}'];
 const BUTTON_REACTIONS = ['orange why', 'who pressed it', 'this better be good', 'orange called it', 'what did orange see', 'emergency?? where'];
@@ -303,6 +304,7 @@ export class ImpostorLevel implements Level {
   private darkPlaced = false;
   private darkEjected: Npc | null = null;
   private wonAt = -1;
+  private playerEjected = false;
   private hum = new Drone(55, { wave: 'sawtooth', vol: 0.022, wobble: 0.25 });
   private riff = new Tune(MEETING_RIFF, 104, { wave: 'triangle', vol: 0.12 });
   private stars: Mat4[] = [];
@@ -463,9 +465,11 @@ export class ImpostorLevel implements Level {
   /** True if nobody is close enough to see the impostor kill `victim` (the player may be far off, watching). */
   private unwitnessed(victim: Npc | 'player') {
     const vp = victim === 'player' ? this.player.pos : victim.c.pos;
+    // The longer the hunt drags on, the bolder it gets.
+    const r = NPC_WITNESS - Math.min(2, this.huntT * 0.2);
     for (const o of this.npcs) {
       if (o.impostor || o === victim || !o.c.alive || o.c.hidden) continue;
-      if (flat(o.c.pos, vp) < NPC_WITNESS || flat(o.c.pos, this.impostor.c.pos) < NPC_WITNESS) return false;
+      if (flat(o.c.pos, vp) < r || flat(o.c.pos, this.impostor.c.pos) < r) return false;
     }
     if (victim !== 'player' && this.playerAlive() && flat(this.player.pos, vp) < PLAYER_WITNESS) return false;
     return true;
@@ -927,9 +931,9 @@ export class ImpostorLevel implements Level {
       } else if (n.sawVent && n.sawVent.c.alive) {
         v = Math.random() < 0.9 ? n.sawVent : randomVote();
       } else {
+        // Most of them go along with you (and with nothing to go on, they skip).
         const r = Math.random();
-        const follow = pv !== null && pv !== n;
-        if (follow && r < 0.68) v = pv!;
+        if (r < 0.68 && pv !== n) v = pv ?? 'skip';
         else if (r < 0.86) v = (n.sawFake && n.sawFake.c.alive && n.sawFake !== n ? n.sawFake : m.suspect && m.suspect !== n ? m.suspect : 'skip');
         else v = randomVote();
       }
@@ -1360,10 +1364,8 @@ export class ImpostorLevel implements Level {
         if (t >= DISCUSS_TIME) {
           this.phase = 'vote';
           this.phaseT = 0;
-          for (const n of this.npcs) {
-            n.bubble.text = '';
-            n.voteAt = rand(2, VOTE_TIME - 1.5);
-          }
+          // (What they said stays up a moment longer; their VOTED badges come after.)
+          for (const n of this.npcs) n.voteAt = rand(2.5, VOTE_TIME - 1.5);
           hud.show('WHO IS THE IMPOSTOR?', 'Stand next to your suspect and press E. Or stand on SKIP. No pressure.', 3.5);
           tone(note('A4'), 0.15, { wave: 'square', vol: 0.08 });
           tone(note('E5'), 0.3, { wave: 'square', vol: 0.08, at: 0.15 });
@@ -1423,7 +1425,11 @@ export class ImpostorLevel implements Level {
           if (before < 0 && m.trapdoor.t >= 0) {
             whoosh();
             if (e === 'player') {
-              this.player.kill([rand(-1, 1), 30, rand(-1, 1)], { violence: 8 });
+              // Out into space, where there's no gravity to bring you back.
+              this.player.kill([rand(-0.5, 0.5), 13, rand(-0.5, 0.5)], { violence: 6 });
+              const body = this.player.body;
+              if (body) for (const k in body.parts) body.parts[k as keyof typeof body.parts].setGravityScale(-0.04, true);
+              this.playerEjected = true;
             } else if (e) {
               e.c.eject();
               e.label.text = '';
@@ -1704,6 +1710,12 @@ export class ImpostorLevel implements Level {
     if (this.phase === 'discuss' || this.phase === 'reveal' || (this.phase === 'eject' && !m?.ejected)) {
       // Round the table: everyone in view, from over your seat.
       return { pos: [0, 4.7, SEAT_R + 4.4], target: [0, 0.9, -0.5], sharpness: 4 };
+    }
+    if (this.playerEjected) {
+      // You, drifting off into space.
+      const p = this.player.pos;
+      const r = Math.hypot(p[0], p[2]) || 1;
+      return { pos: [p[0] - (p[0] / r) * 3.2, Math.max(1.4, p[1] - 2.5), p[2] - (p[2] / r) * 3.2], target: [p[0], p[1] + 1, p[2]], sharpness: 4 };
     }
     const d = this.death;
     if (d?.killer && d.t > 0.25) {

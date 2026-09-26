@@ -195,7 +195,7 @@ export class Vent {
       out.push({ mesh: 'box', model: mul(base, translation([x, 0.03, z]), scaling([w, 0.06, d])), color: DARK_METAL, spec: 0.5 });
     }
     // The flap, hinged at the back edge.
-    const flap = mul(base, translation([0, 0.045, D / 2]), rotationX(-this.open * 1.7), translation([0, 0, -D / 2]));
+    const flap = mul(base, translation([0, 0.045, D / 2]), rotationX(this.open * 1.7), translation([0, 0, -D / 2]));
     out.push({ mesh: 'box', model: mul(flap, translation([0, 0, 0]), scaling([W - 0.06, 0.03, D - 0.06])), color: [0.38, 0.4, 0.43], spec: 0.6 });
     for (let i = 0; i < 6; i++) {
       const z = -D / 2 + 0.12 + i * ((D - 0.24) / 5);
