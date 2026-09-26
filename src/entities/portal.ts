@@ -189,7 +189,8 @@ export class ExitPortal {
       return;
     }
     if (this.openT < PANEL_SLIDE_TIME * 0.6 || player.mode !== 'control') return;
-    const nearWall = CHAMBER_HALF - player.pos[0] < 0.75;
+    const dx = CHAMBER_HALF - player.pos[0];
+    const nearWall = dx < 0.75 && dx > -0.3;
     const inside = Math.hypot(player.pos[2] - this.centre[2], player.pos[1] + 1 - this.centre[1]) < EXIT_RADIUS + 0.1;
     if (nearWall && inside) {
       if (this.refuse?.()) return;

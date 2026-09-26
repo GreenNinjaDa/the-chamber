@@ -408,7 +408,23 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   wherever you stand (a column every other row) and committing 4 rows up (a ghost shows where they'll land); what
   lands is what you climb, up to the exit (open from the start, 5 m up the east wall). Full rows clear and drop
   everything above. Crushed = GAME OVER; the stack reaching the top of the well = TOPPED OUT.
-- **Level 37 — Laser Show** (`src/levels/lasers/`; Fall Guys' Jump Club meets the Resident Evil laser hallway): the
+- **Level 37 — QWOP Olympics** (`src/levels/qwop/`): after the arrival the chamber becomes a stadium
+  (`entities/stadium.ts`): bleachers of fans rise along the north wall, a six-lane track unrolls west to east (start
+  x = -10, finish x = 10 with a tape, 5 m boards), three other finalists lie DNF in their lanes, and the scoreboard
+  strikes out 100 METRES for 20 METRES, WE BELIEVE IN YOU. Then WASD stops working: you're put on the line (lane 4,
+  hip number) as a physics puppet (`player.startPuppet`), seen side-on from the south with a QWOP-style "N metres"
+  readout; ON YOUR MARKS, GET SET, the starter's pistol (keys before it: FALSE START). Q / W swing the thighs (left
+  forward and right back, and back again), O / P bend the knees (left / right, straightening the other); keys move
+  the joint targets at a rate and they hold when let go. A torque on the chest nudges it toward a slight forward lean
+  (at most 600 N·m): standing still is safe, bad legwork isn't. Head or chest on the ground: YOU FELL (the distance,
+  a personal best / worst this session; after 3 failures the tips let slip that Q goes with O and W with P). 90 s:
+  the crowd goes home. Pelvis past the line: NEW WORLD RECORD, the tape snaps, confetti, WASD comes back and the exit
+  (east wall, in the lane) opens. The crowd shouts about kneeling, the splits, going backwards or nowhere, and cheers
+  every 5 m. Test bots: holding QO then WP for 0.7-1.3 s each (±20% timing jitter) always finished, in 17-26 s;
+  0.55 s about half the time, 0.45 s never; the wrong pairing (QP / WO) and random mashing fall within 2-15 s, and
+  Q / W alone shuffles nowhere (backwards).
+  `?qwopQuick` skips the portal and the stadium's reveal.
+- **Level 38 — Laser Show** (`src/levels/lasers/`; Fall Guys' Jump Club meets the Resident Evil laser hallway): the
   lights go down (dark red) and an emitter pylon (`entities/laser.ts`, `LaserPylon`) rises out of a floor hatch.
   A low beam (0.35 m) grows out opposite the player and sweeps round, speeding up from 5 s to 2.5 s a turn: jump it.
   Then a mast rises and a high beam (1.6 m) joins, turning the other way at a different speed: duck it (stand still and
@@ -419,7 +435,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   4.2 m/s. Any beam touching a body part (`BodySlicer`: the real part frames as slightly shrunk capsules/boxes, swept
   in 4 cm steps so fast beams can't skip a limb) slices you: `player.kill` with violence 30 (42 for the grid) at the
   cut. One red point light rides with the pylon, then with each wall. `?laserSkip=N` starts the show N s in.
-- **Level 38 — Going Down** (`src/levels/elevator/`): the chamber is an elevator car (`entities/elevator.ts`: sliding doors in
+- **Level 39 — Going Down** (`src/levels/elevator/`): the chamber is an elevator car (`entities/elevator.ts`: sliding doors in
   the east wall, brass handrails round the walls at 1 m, a yellow crosshead and grate over the top (it stops anything
   floating out) with the hoist cables up to a sheave on the roof, two amber LED floor indicators (`FloorIndicator`),
   and the shaft, drawn sliding up past the wall tops by `drawShaft(depth, speed)`: landing doors, slabs, streaking
@@ -441,7 +457,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   sarcastic remarks. Sound: dings, a muzak `Tune` (record-scratches off at the TWANG), motor hum, creak / ping /
   groan, brake screech, rushing wind, countdown beeps, the crash, thuds, a rail clink. `?quickRide` snaps the cable
   4 s after the ding.
-- **Level 39 — Pac-Man** (`src/levels/pacman/`): after the arrival the floor goes dark navy, the sun dims to a moon
+- **Level 40 — Pac-Man** (`src/levels/pacman/`): after the arrival the floor goes dark navy, the sun dims to a moon
   and a 13×13-cell maze (`maze.ts`: black blocks outlined in glowing arcade blue, 1.5 m tall so you can't jump
   onto them but the camera sees over; 2.25 m corridors; a ghost house with a pink door in the middle) rises out of
   the floor, shoving the player out of its way, while the camera shows the whole board from above (READY!). 81
@@ -455,7 +471,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   OVER, naming the ghost). All pellets eaten: the maze flashes, sinks, and the exit opens; the last 3 pellets get
   purple markers. Score and an unbeatable HIGH SCORE (3,333,360) on the north wall; no looking up while the maze
   is up (keeps the camera above the walls).
-- **Level 40 — Whack-a-Mole** (`src/levels/moles/`; deck and burrow in `cabinet.ts`, the backboard in `scoreboard.ts`):
+- **Level 41 — Whack-a-Mole** (`src/levels/moles/`; deck and burrow in `cabinet.ts`, the backboard in `scoreboard.ts`):
   you're the mole. You land on what looks like the usual floor; it boots up band by band into the top of an arcade
   cabinet (a blue deck 3 m up, wall to wall, fixed colliders, a 4 x 3 grid of yellow-ringed holes, chasing bulbs, the
   WHACK-A-MOLE! backboard on the north wall with Timmy's SCORE, a TIME and a message line, two giant mascot moles), the
@@ -550,6 +566,9 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   impostor's flip-top bite, `glow` a red visor, `kill(from)` leaves the bottom half with a bone while the top flies off,
   `eject()` tumbles it up into space, `opacity` / `highlight`), `spaceship.ts` (`TaskStation` on a chamber wall with a
   screen that lights while `lit`, `Vent` with a flap, `addMeetingTable` / `drawMeetingTable` with the EMERGENCY button),
+  `stadium.ts` (`Crowd`: bleachers along the north wall full of cheaply drawn fans that `rise` out of the floor, cheer /
+  gasp / stare by `mood` and `excitement`, `shout` world labels, and `leave`; `RunningTrack`: lanes along x on grass
+  that `unroll`; `Confetti`),
   `mole.ts` (whack-a-mole `Mole`: pink nose, whiskers, buck teeth, optional shades; `squash` flattens it, `dazed` gives
   X eyes and circling stars, `armsUp`, `walk` / `walking`, `wiggle`; `drawMole` in any frame, `drawDazedStars` over
   anyone's head), `mallet.ts` (`Mallet`: a giant's rubber mallet posed by `aim` / `swing` / `lift` / `from`; `grip()` is
@@ -612,6 +631,11 @@ Shared mechanics available to levels (via `ctx`):
   drift and the level steers) — this life only. `player.poseOverride` draws a level's own `Pose` while in control
   (clinging to something, floating), or in `swinging` mode instead of the hanging pose; null for the normal animation.
 - `player.torchArm` raises the right arm up and ahead as if holding a torch (the level draws the torch).
+- `player.startPuppet(pose)` (mode `'puppet'`): QWOP-style, the level drives the joints (`player.puppetPose`, per-joint
+  `puppetJoints` multipliers, `puppetStrength`; this life only) and nothing else holds the body up. It's kept in the
+  vertical x-y plane (`PhysBody.setPlanar`: nothing moves along z and the pelvis only turns about z, so face along
+  ±x), `pos` follows the pelvis, and nothing knocks it. `kill()` ends it limp; `stopPuppet()` gives WASD back (they
+  scramble up from however they ended up). `PhysBody.driveJoints(pose, strengths)` is the joint-motor half of `drive()`.
 - `player.resume(velocity)` puts the player back in normal control after a scripted mode; `player.partFrames()`
   gives each body part's frame (e.g. to put a torch in the right hand, `foreArmR`).
 - Rapier's character controller can't jump up alongside kinematic colliders (the jump dies at once) or up an
@@ -625,7 +649,7 @@ Shared mechanics available to levels (via `ctx`):
   (so they roll over pits the player has to jump). Loose objects on `GROUPS_DEBRIS` behave normally but boulders
   pass through them.
 - In scripted modes (`held`, `flying`, `stuck`, `splat`, `swinging`) the physical body is switched off and the pose is drawn
-  directly; in `control` and `ragdoll` the body is drawn from physics.
+  directly; in `control`, `ragdoll` and `puppet` the body is drawn from physics.
 
 ## Testing without a visible browser
 
