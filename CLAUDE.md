@@ -172,20 +172,24 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   after their own delays. Whoever's left standing is catapulted out, a chair sinks away, repeat: 4 rounds (4, 3, 2,
   1 chairs). Win the last chair and the exit opens.
 - **Going Down** (`src/levels/elevator/`): the chamber is an elevator car (`entities/elevator.ts`: sliding doors in
-  the east wall, brass handrails round the walls at 1 m, a yellow crosshead and grate over the top with the hoist
-  cables, two amber LED floor indicators (`FloorIndicator`), and the shaft, drawn sliding up past the wall tops by
-  `drawShaft(depth, speed)`: landing doors, slabs, streaking lamps, painted floor numbers). Heavy junk (piano, couch,
-  fridge, safe, vending machine, bathtub, washer, filing cabinet) stands against the walls in front of the rails, light
-  junk in the middle. After the arrival it dings (99, GOING DOWN), sinks into the shaft (daylight fades to the car's
-  strip lights) with muzak notes bouncing out of a speaker; a creak, a cable pings off, a groan, and 13 s later
-  TWANG: the lights flicker and it falls 13 s to B7 (floors whizz by, brake sparks, the indicator counts down and
-  from 6 s flashes BRACE, the lights pulse red). Everything is weightless (`physics.world.gravity` zero, a jolt up,
-  slow tumbling, light damping); so is the player (`player.gravityScale` 0, `airControl` 0): they drift, bounce
-  softly off things, WASD nudges them toward where they look, Space pushes off anything within reach (and shoves
-  loose things back), and E / left mouse near a rail grabs it (`player.poseOverride` for the grip and float poses;
-  A/D slides along it). At the bottom gravity slams back (3× for 0.6 s, everything flung down): not holding a rail
-  = SPLAT / PANCAKED; anything ≥ 40 kg still falling onto your body within 2.5 s crushes you (PIANO'D, VENDED, ...).
-  Survive and the doors grind open onto the exit ("DING. GROUND FLOOR.", the display says B7).
+  the east wall, brass handrails round the walls at 1 m, a yellow crosshead and grate over the top (it stops anything
+  floating out) with the hoist cables up to a sheave on the roof, two amber LED floor indicators (`FloorIndicator`),
+  and the shaft, drawn sliding up past the wall tops by `drawShaft(depth, speed)`: landing doors, slabs, streaking
+  lamps, painted floor numbers). Heavy junk (piano, couch, fridge, safe, vending machine, bathtub, washer, filing
+  cabinet, bookcase, oil drum) stands against the walls in front of the rails, light junk in the middle. After the
+  arrival it dings (99, GOING DOWN) and sinks into the shaft (daylight fades to the car's strip lights), muzak notes
+  bouncing out of a speaker; a creak, one cable pings off (PING?), a groan (UH...), and 13 s after the ding TWANG
+  (UH OH): the lights flicker and it falls 13 s to B7 (floors whizz by, brake sparks, GOING DOWN / EXPRESS in red,
+  then BRACE 6..1 with flashing BRACE FOR IMPACT and red pulsing light). Everything goes weightless
+  (`physics.world.gravity` zero, a jolt up of 0.9-1.9 m/s, slow tumbling, damping 0.2) and drifts slowly toward the
+  nearest wall, so it hangs over the rails; so does the player (`player.gravityScale` 0, `airControl` 0): they drift,
+  bounce softly off things, WASD nudges them toward where they look, Space pushes off anything within reach (and
+  shoves loose things back), and E / left mouse with the chest within 1.4 m of a rail grabs it (grip and float poses
+  via `player.poseOverride`; A/D slides along it). At the bottom gravity slams back (3× for 0.6 s, everything flung
+  down): not holding a rail = SPLAT / PANCAKED; anything ≥ 40 kg still falling onto your body within 2.5 s crushes
+  you (PIANO'D, VENDED, COUCH POTATO...). Bots holding a random rail spot die ~30% of the time, ones that slide away
+  from what's overhead ~never. Survive and the doors grind open onto the exit ("DING." / "Ground floor. Mind the
+  gap.", the display says B7).
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
