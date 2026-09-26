@@ -171,6 +171,11 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   lights die, "SKRRRT!") everyone dives for a free chair: you take one just by reaching its seat; the contestants react
   after their own delays. Whoever's left standing is catapulted out, a chair sinks away, repeat: 4 rounds (4, 3, 2,
   1 chairs). Win the last chair and the exit opens.
+- **Falling Blocks** (`src/levels/tetris/`): a glass-fronted well one cell deep and ten wide against the east wall,
+  seen side-on (the level's camera shot; A / D move along it). Tetrominoes fall a row at a time, steering toward
+  wherever you stand (a column every other row) and committing 4 rows up (a ghost shows where they'll land); what
+  lands is what you climb, up to the exit (open from the start, 5 m up the east wall). Full rows clear and drop
+  everything above. Crushed = GAME OVER; the stack reaching the top of the well = TOPPED OUT.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
