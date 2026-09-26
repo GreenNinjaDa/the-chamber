@@ -140,6 +140,14 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   Every 10–15 s (first after 18 s) the lights flicker (2 s of dips as a warning) and then go out 2–3 times over
   0.8 s: in the dark every gnome moves at 3× and their eyes glow red. An unwatched gnome within 0.75 m kills you:
   lights out 1.2 s, then you lie dead in a pointy red hat inside a ring of (at least 7) gnomes.
+- **Frogger** (`src/levels/frogger/`): why did the test subject cross the road? Everything but the river is a raised
+  deck (0.6 m): the sidewalk you land on (west), four 2.8 m road lanes (forklifts and a steamroller, golf carts and a
+  runaway office chair, giant robot vacuums, sports cars; `entities/vehicles.ts`), a grass median, then four lanes of
+  toxic goo (`Pattern.lava` with `param` 1) crossed on floating junk (mattresses, doors, giant rubber ducks, a
+  bathtub, pallets) to the far bank and the open exit. Everything loops through tunnel mouths in the north and south
+  walls, rafts included, which don't stop for you (`player.platformVel` carries you). Cars, carts, forklifts and the
+  steamroller kill (ROADKILL, PANCAKED); vacuums and chairs just knock you over (jump them); the goo dissolves you.
+  The strip along each lane line is clear of everything but the steamroller.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -174,7 +182,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   `pressurePlate.ts` (round button, or `{ stone: [w, d] }` for a rock slab), `uselessBox.ts`, `rock.ts` (textured stone: `boulderModel`, `chunkModel`, `slabModel`, `shardModel`, `clusterModel`; `Pattern.rock`),
   `doll.ts` (the giant doll with a swivelling head and glowing eyes, plus a `BareTree`), `contestant.ts` (scripted
   NPC in a tracksuit: walk/run, freeze, wobble/sneeze/cheer, dramatic death fall; `drawBody` takes a `BodyColors`
-  to dress the player's body as someone else), `laser.ts` (`drawBeam` / `drawBeamDot` / `drawFloorGlow`,
+  to dress the player's body as someone else), `vehicles.ts` (forklift, golf cart, robot vacuum, office chair, steamroller, sports car, and door / pallet rafts),
+  `laser.ts` (`drawBeam` / `drawBeamDot` / `drawFloorGlow`,
   `BodySlicer` to test beams against the player's body parts, `LaserPylon`), `gnome.ts` (big garden gnome:
   `spawnGnome(physics, feet, look)`, arm poses in `GNOME_POSES`, glowing eyes, and `drawGnomeHat(out, headFrame)` for
   anyone else's head). Put new
@@ -222,6 +231,8 @@ Shared mechanics available to levels (via `ctx`):
 - `DrawItem.opacity` (0-1) and `player.opacity` draw things see-through (alpha-to-coverage screen-door, still
   casting shadows).
 - `player.char` (0-1) draws the player burnt to a crisp (this life only).
+- `player.platformVel` — the velocity of whatever the player stands on (a raft, a conveyor), added to their movement;
+  levels set it every frame.
 - `player.torchArm` raises the right arm up and ahead as if holding a torch (the level draws the torch).
 - `player.resume(velocity)` puts the player back in normal control after a scripted mode; `player.partFrames()`
   gives each body part's frame (e.g. to put a torch in the right hand, `foreArmR`).

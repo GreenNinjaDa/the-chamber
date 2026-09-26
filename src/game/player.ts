@@ -187,6 +187,11 @@ export class Player {
   opacity = 1;
   /** How burnt the player looks, 0 (not at all) to 1 (charcoal); for this life only. */
   char = 0;
+  /**
+   * World velocity of whatever the player is standing on (a raft, a conveyor), added to their
+   * own movement. Levels set it every frame (it isn't cleared for them).
+   */
+  platformVel: Vec3 = [0, 0, 0];
   /** Torso fatness for this life only (1 = normal); reset() puts it back. */
   girth = 1;
   /** Multiplies walking / sprinting speed and acceleration, for this life only. */
@@ -221,6 +226,7 @@ export class Player {
     this.torchArm = false;
     this.opacity = 1;
     this.char = 0;
+    this.platformVel = [0, 0, 0];
   }
 
   /**
@@ -370,6 +376,7 @@ export class Player {
       const p = this.toLocal(sub(this.body.position('pelvis'), this.pos));
       delta = [p[0] * Math.min(1, dt * 8), delta[1], p[2] * Math.min(1, dt * 8)];
     }
+    if (this.platformVel[0] || this.platformVel[1] || this.platformVel[2]) delta = add(delta, scale(this.toLocal(this.platformVel), dt));
     this.move(delta, dt);
 
     const p = this.pos;
