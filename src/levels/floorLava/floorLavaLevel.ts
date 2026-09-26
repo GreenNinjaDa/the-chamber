@@ -5,7 +5,7 @@ import { CHAMBER_HALF } from '../../game/chamber';
 import { DUCK_BACK, DUCK_HALF, GiantDuck } from '../../entities/giantDuck';
 import { junk, spawnJunk } from '../../entities/junk';
 import {
-  armchair, beanbag, COFFEE_TABLE, drawPainting, drawRug, PIANO_BENCH, sofa, spawnFurniture, type FurnitureDef,
+  armchair, beanbag, COFFEE_TABLE, drawPainting, drawRug, FLOOR_LAMP, PIANO_BENCH, sofa, spawnFurniture, type FurnitureDef,
 } from '../../entities/livingRoom';
 import { ExitPortal, PortalArrival } from '../../entities/portal';
 import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus, type TrackedTarget, type WorldLabel } from '../level';
@@ -81,7 +81,9 @@ const ORANGE_FABRIC = [0.95, 0.42, 0.08];
 const CONTROLS = 'WASD move · Space jump · Shift sprint · Hold left click drag/carry · Right-click throw';
 const HINT = "When something is lava, don't touch it. Get onto something that isn't before the countdown ends. You can drag light furniture to make a path.";
 
-type Kind = 'sofa' | 'armchair' | 'table' | 'crate' | 'piano' | 'bench' | 'fridge' | 'washer' | 'bathtub' | 'mattress' | 'pillow' | 'beanbag' | 'bookcase';
+type Kind =
+  | 'sofa' | 'armchair' | 'table' | 'crate' | 'piano' | 'bench' | 'fridge' | 'washer' | 'bathtub' | 'mattress'
+  | 'pillow' | 'beanbag' | 'bookcase' | 'lamp' | 'plant';
 
 interface Item {
   kind: Kind;
@@ -332,6 +334,9 @@ export class FloorLavaLevel implements Level {
     this.addJunk('bathtub', 'bathtub', 11.05, -7.9, Math.PI / 2);
     this.addJunk('mattress', 'mattress', -9.9, -10.2, 0.08);
     this.addJunk('bookcase', 'bookcase', -11.72, -5.2, -Math.PI / 2);
+    this.addFurniture(FLOOR_LAMP, 'lamp', -5.25, -1.6, 0);
+    this.addJunk('potted plant', 'plant', -11.3, -8.0, 0.4);
+    this.addJunk('potted plant', 'plant', 7.3, -11.3, 2);
     // Crates: stairs up to a double stack in each south corner, and a couple lying around.
     for (const [x, z, y] of [[-11.1, 11.1, 0], [-11.1, 11.1, 1], [-11.1, 10.0, 0], [-10.0, 11.1, 0], [11.1, 11.1, 0], [11.1, 11.1, 1], [10.0, 11.1, 0], [6.8, -5.9, 0], [-7.8, -2.9, 0]]) {
       this.addJunk('crate', 'crate', x, z, (Math.random() - 0.5) * (y ? 0.3 : 0.2), 0.4 + y * 0.8);

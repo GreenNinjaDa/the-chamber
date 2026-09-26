@@ -39,6 +39,8 @@ export interface FurnitureDef {
   core?: { size: Vec3; y: number };
   /** Extra box colliders: size and centre over the floor (x, y, z in the piece's frame). */
   extras?: { size: Vec3; pos: Vec3 }[];
+  /** The main collider is an upright cylinder (diameter size[0]) rather than a box. */
+  cylinder?: boolean;
 }
 
 /**
@@ -137,6 +139,22 @@ export const PIANO_BENCH: FurnitureDef = {
   },
 };
 
+/** A standing lamp (1.85 m, light and top-heavy-looking, so it topples when bumped), with a glowing bulb. */
+export const FLOOR_LAMP: FurnitureDef = {
+  name: 'floor lamp',
+  size: [0.44, 1.85, 0.44],
+  mass: 6,
+  cylinder: true,
+  model: (out, m) => {
+    const y = (h: number) => h - 0.925;
+    const brass = [0.72, 0.55, 0.22];
+    part(out, m, 'cylinder', [0, y(0.02), 0], [0.2, 0.04, 0.2], brass, { spec: 0.8 });
+    part(out, m, 'cylinder', [0, y(0.8), 0], [0.022, 1.56, 0.022], brass, { spec: 0.8 });
+    part(out, m, 'cylinder', [0, y(1.52), 0], [0.07, 0.1, 0.07], [3, 2.4, 1.3], { pattern: 4, shadow: false });
+    part(out, m, 'cone', [0, y(1.66), 0], [0.26, 0.42, 0.26], [0.95, 0.9, 0.78], { spec: 0.1 });
+  },
+};
+
 /**
  * Adds a piece of furniture as a loose object standing on the floor at (x, z), turned by `yaw`
  * (0: front facing -z). Returns the body and all its colliders.
@@ -144,7 +162,10 @@ export const PIANO_BENCH: FurnitureDef = {
 export function spawnFurniture(physics: Physics, def: FurnitureDef, x: number, z: number, yaw = 0): { body: Body; colliders: RAPIER.Collider[] } {
   const core = def.core ?? { size: def.size, y: def.size[1] / 2 };
   const rotation: Quat = { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) };
-  const body = physics.addBox([x, core.y + 0.01, z], core.size, { mass: def.mass, rotation, model: def.model });
+  const opts = { mass: def.mass, rotation, model: def.model };
+  const body = def.cylinder
+    ? physics.addCylinder([x, core.y + 0.01, z], core.size[0] / 2, core.size[1], opts)
+    : physics.addBox([x, core.y + 0.01, z], core.size, opts);
   const colliders = [body.collider];
   for (const e of def.extras ?? []) {
     const desc = RAPIER.ColliderDesc.cuboid(e.size[0] / 2, e.size[1] / 2, e.size[2] / 2)
