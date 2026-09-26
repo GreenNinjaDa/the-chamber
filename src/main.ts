@@ -27,6 +27,7 @@ import { RedLightLevel } from './levels/redLight/redLightLevel';
 import { LaserLevel } from './levels/lasers/laserLevel';
 import { GnomeLevel } from './levels/gnomes/gnomeLevel';
 import { SnakeLevel } from './levels/snake/snakeLevel';
+import { PacmanLevel } from './levels/pacman/pacmanLevel';
 import type { Level, LevelContext, TrackedTarget, WorldLabel } from './levels/level';
 import { LobbyLevel } from './levels/lobby/lobbyLevel';
 
@@ -53,6 +54,7 @@ const LEVELS: ((ctx: LevelContext) => Level)[] = [
   (ctx) => new TetrisLevel(ctx),
   (ctx) => new DodgeballLevel(ctx),
   (ctx) => new ButtonLevel(ctx),
+  (ctx) => new PacmanLevel(ctx),
 ];
 const params = new URLSearchParams(location.search);
 /** `?sandbox` opens the mechanics test room; `?level=N` skips the lobby and starts at level N. */
