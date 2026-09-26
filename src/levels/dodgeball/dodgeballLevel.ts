@@ -69,7 +69,7 @@ interface Death {
 }
 
 export class DodgeballLevel implements Level {
-  readonly number = 16;
+  readonly number: number;
   readonly title = 'Dodgeball';
   status: LevelStatus = 'playing';
   private arrival: PortalArrival;
@@ -86,6 +86,7 @@ export class DodgeballLevel implements Level {
   private wasCarrying: Ball | null = null;
 
   constructor(private ctx: LevelContext) {
+    this.number = ctx.number;
     const { physics, hud } = ctx;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);

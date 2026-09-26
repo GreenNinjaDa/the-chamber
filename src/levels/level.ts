@@ -11,6 +11,8 @@ import type { Circle, Player } from '../game/player';
 export type LevelStatus = 'playing' | 'won' | 'lost' | 'exited';
 
 export interface LevelContext {
+  /** Where this level is in the game (1-based; 0 for the lobby), for the HUD. */
+  number: number;
   player: Player;
   camera: ThirdPersonCamera;
   hud: Hud;

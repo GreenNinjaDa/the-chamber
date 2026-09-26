@@ -95,7 +95,7 @@ interface Screen {
 }
 
 export class SimonLevel implements Level {
-  readonly number = 6;
+  readonly number: number;
   readonly title = 'Simon Says';
   status: LevelStatus = 'playing';
   private arrival: PortalArrival;
@@ -137,6 +137,7 @@ export class SimonLevel implements Level {
   private catapult: { pos: Vec3; yaw: number; t: number } | null = null;
 
   constructor(private ctx: LevelContext) {
+    this.number = ctx.number;
     const { physics, hud } = ctx;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);

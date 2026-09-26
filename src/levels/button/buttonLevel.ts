@@ -91,7 +91,7 @@ interface Death {
 }
 
 export class ButtonLevel implements Level {
-  readonly number = 17;
+  readonly number: number;
   readonly title = 'Big Red Button';
   status: LevelStatus = 'playing';
   private arrival: PortalArrival;
@@ -113,6 +113,7 @@ export class ButtonLevel implements Level {
   private whispered = -1;
 
   constructor(readonly ctx: LevelContext) {
+    this.number = ctx.number;
     const { hud } = ctx;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);

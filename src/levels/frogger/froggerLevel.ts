@@ -87,7 +87,7 @@ interface Death {
 const pick = <T>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
 
 export class FroggerLevel implements Level {
-  readonly number = 12;
+  readonly number: number;
   readonly title = 'Frogger';
   status: LevelStatus = 'playing';
   private arrival: PortalArrival;
@@ -109,6 +109,7 @@ export class FroggerLevel implements Level {
   private bathtubModel = junk('bathtub').model;
 
   constructor(private ctx: LevelContext) {
+    this.number = ctx.number;
     const { physics, hud } = ctx;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);

@@ -62,8 +62,10 @@ const sandbox = params.has('sandbox');
 let levelIndex = Math.min(LEVELS.length - 1, Math.max(0, (Number(params.get('level')) || 1) - 1));
 /** The lobby is the main menu: a chamber you walk around in, with a START portal. */
 let inLobby = !params.has('level');
-const makeLevel = (ctx: LevelContext) =>
-  sandbox ? new Sandbox(ctx) : inLobby ? new LobbyLevel(ctx, LEVELS.length) : LEVELS[levelIndex](ctx);
+const makeLevel = (ctx: LevelContext) => {
+  ctx.number = sandbox || inLobby ? 0 : levelIndex + 1;
+  return sandbox ? new Sandbox(ctx) : inLobby ? new LobbyLevel(ctx, LEVELS.length) : LEVELS[levelIndex](ctx);
+};
 
 /** Where each tracked target is on screen: a ring if visible, otherwise an edge arrow toward it. */
 function screenMarkers(targets: TrackedTarget[], view: Mat4, proj: Mat4, fov: number): ScreenMarker[] {
@@ -129,7 +131,7 @@ async function main() {
   // Chamber colliders are added after the level is created, since levels can tweak the chamber.
   const freshPhysics = () => new Physics();
 
-  const ctx: LevelContext = { player, camera, hud, input, physics: freshPhysics() };
+  const ctx: LevelContext = { number: 0, player, camera, hud, input, physics: freshPhysics() };
   player.attach(ctx.physics);
 
   let playing = false;

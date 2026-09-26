@@ -183,7 +183,7 @@ interface Death {
 }
 
 export class RedLightLevel implements Level {
-  readonly number = 6;
+  readonly number: number;
   readonly title = 'Red Light, Green Light';
   status: LevelStatus = 'playing';
   private arrival: PortalArrival;
@@ -236,6 +236,7 @@ export class RedLightLevel implements Level {
   private env: Environment = { ...DEFAULT_ENV, sunDir: [-0.45, 1.0, 0.55], sunColor: [...DEFAULT_ENV.sunColor], skyColor: [...DEFAULT_ENV.skyColor] };
 
   constructor(private ctx: LevelContext) {
+    this.number = ctx.number;
     const { physics, hud } = ctx;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);

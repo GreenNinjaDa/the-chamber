@@ -218,7 +218,7 @@ const DEATHS = {
 };
 
 export class TempleLevel implements Level {
-  readonly number = 5;
+  readonly number: number;
   readonly title = 'Raiders of the Lost Chamber';
   readonly chamber = { none: true };
   status: LevelStatus = 'playing';
@@ -264,6 +264,7 @@ export class TempleLevel implements Level {
   private env: Environment = { ...CAVE_ENV, pointLight: { pos: [0, 0, 0], color: [0, 0, 0], range: 16 } };
 
   constructor(private ctx: LevelContext) {
+    this.number = ctx.number;
     const { physics, hud, camera, player } = ctx;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);

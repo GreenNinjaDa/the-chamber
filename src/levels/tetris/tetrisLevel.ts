@@ -68,7 +68,7 @@ function rotate(cells: Shape, turns: number): Shape {
 }
 
 export class TetrisLevel implements Level {
-  readonly number = 15;
+  readonly number: number;
   readonly title = 'Falling Blocks';
   status: LevelStatus = 'playing';
   private arrival: PortalArrival;
@@ -90,6 +90,7 @@ export class TetrisLevel implements Level {
   private flash: WorldLabel = { pos: [X_FRONT - 0.5, 6, 0], text: '', size: 1.2, color: '#ffd166' };
 
   constructor(private ctx: LevelContext) {
+    this.number = ctx.number;
     const { physics, hud } = ctx;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);

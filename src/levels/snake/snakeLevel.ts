@@ -100,7 +100,7 @@ const pad = (n: number) => String(n).padStart(4, '0');
 const NO_OBSTACLES: Circle[] = [];
 
 export class SnakeLevel implements Level {
-  readonly number = 6;
+  readonly number: number;
   readonly title = 'Snake';
   status: LevelStatus = 'playing';
   private arrival: PortalArrival;
@@ -142,6 +142,7 @@ export class SnakeLevel implements Level {
   private headTarget: TrackedTarget = { pos: [0, 0, 0], radius: 1.1 };
 
   constructor(private ctx: LevelContext) {
+    this.number = ctx.number;
     const { hud, physics } = ctx;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);

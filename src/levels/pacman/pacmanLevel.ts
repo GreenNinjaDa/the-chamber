@@ -124,7 +124,7 @@ interface Popup {
 }
 
 export class PacmanLevel implements Level {
-  readonly number = 6;
+  readonly number: number;
   readonly title = 'Pac-Man';
   status: LevelStatus = 'playing';
   private arrival: PortalArrival;
@@ -170,6 +170,7 @@ export class PacmanLevel implements Level {
   private deathCam: CameraShot | null = null;
 
   constructor(private ctx: LevelContext) {
+    this.number = ctx.number;
     const { hud } = ctx;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);
