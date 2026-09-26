@@ -400,6 +400,7 @@ export class BirdsLevel implements Level {
   private endT = -1;
   private pigPop = 0;
   private revealed = false;
+  private lastStun = 0;
   private death: Death | null = null;
   private pendingDeath: { kind: 'squash'; vel: Vec3 } | null = null;
 
@@ -576,8 +577,10 @@ export class BirdsLevel implements Level {
     this.sling.update(dt);
     this.updateScore(dt);
 
-    // The pig reveal: snout and ears pop on.
+    // The pig reveal: snout and ears pop on. From then on, getting knocked over is an indignant oink.
     if (this.revealed) this.pigPop = Math.min(1, this.pigPop + dt * 2.2);
+    if (this.revealed && player.mode === 'control' && player.stun > this.lastStun + 0.05) sound.oink();
+    this.lastStun = player.stun;
     for (const b of this.blasts) b.t += dt;
     if (this.blasts.length && this.blasts[0].t > 1) this.blasts.shift();
   }
@@ -1522,7 +1525,9 @@ export class BirdsLevel implements Level {
         m = fromQuat(f.body.rb.rotation(), [t.x, t.y, t.z]);
       }
       const start = out.length;
-      drawBird(out, f.bird, m, { blink: f.blink < 0 || f.landed >= 0 && f.landed < 0.4, fuse: f.fuse >= 0 ? 1 - f.fuse / BOMB_FUSE : -1 });
+      // Eyes shut: blinking, dazed just after landing, or sulking once they've lost.
+      const shut = f.blink < 0 || (f.landed >= 0 && f.landed < 0.4) || (this.phase === 'end' && this.endT > 1);
+      drawBird(out, f.bird, m, { blink: shut, fuse: f.fuse >= 0 ? 1 - f.fuse / BOMB_FUSE : -1 });
       if (f.body.highlight) for (let i = start; i < out.length; i++) out[i].highlight = f.body.highlight;
       if (f.dashing) {
         // Speed lines.
