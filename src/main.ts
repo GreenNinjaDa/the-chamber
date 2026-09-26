@@ -44,6 +44,7 @@ import { PacmanLevel } from './levels/pacman/pacmanLevel';
 import { BowlingLevel } from './levels/bowling/bowlingLevel';
 import { FloorLavaLevel } from './levels/floorLava/floorLavaLevel';
 import { ElevatorLevel } from './levels/elevator/elevatorLevel';
+import { ImpostorLevel } from './levels/impostor/impostorLevel';
 import type { Level, LevelContext, TrackedTarget, WorldLabel } from './levels/level';
 import { LobbyLevel } from './levels/lobby/lobbyLevel';
 
@@ -86,6 +87,7 @@ const LEVELS: ((ctx: LevelContext) => Level)[] = [
   (ctx) => new HipposLevel(ctx),
   (ctx) => new FlappyLevel(ctx),
   (ctx) => new RockLevel(ctx),
+  (ctx) => new ImpostorLevel(ctx),
 ];
 const params = new URLSearchParams(location.search);
 /** `?sandbox` opens the mechanics test room; `?level=N` skips the lobby and starts at level N. */
