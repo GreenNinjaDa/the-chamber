@@ -94,6 +94,8 @@ interface MoleNpc {
   label: WorldLabel;
   labelT: number;
   circle: Circle;
+  /** Seconds left of cheering (paws in the air) for the new guy's carrot. */
+  cheer: number;
 }
 
 interface Carrot {
@@ -253,7 +255,7 @@ export class MolesLevel implements Level {
       const npc: MoleNpc = {
         m, state: 'idle', t: 0, dur: GO_AT + rand(0.2, 2.2), hole, path: [], legFrom: [...m.pos], legDone: 0, since: 0,
         ducker: false, blocked: 0, label: { pos: [0, 0, 0], text: '', size: 0.26, color: '#ffe2b8' }, labelT: 0,
-        circle: { x: m.pos[0], z: m.pos[2], r: MOLE_RADIUS },
+        circle: { x: m.pos[0], z: m.pos[2], r: MOLE_RADIUS }, cheer: 0,
       };
       this.moles.push(npc);
       this.obstacleList.push(npc.circle);
@@ -581,6 +583,10 @@ export class MolesLevel implements Level {
     this.carrots.splice(this.carrots.indexOf(carrot), 1);
     this.collected++;
     this.crunch();
+    // The moles down below are impressed.
+    for (const n of this.moles) n.cheer = rand(1.0, 1.8);
+    const fan = this.moles.find((n) => n.m.pos[1] < 0.5 && n.state !== 'dazed');
+    if (fan && this.collected < CARROTS_NEEDED) this.moleSay(fan, pick(['Nice one!', 'Share it!', 'Legend.', 'Mole of the year!', 'Do another!']), 1.4);
     const { hud } = this.ctx;
     const quips = [
       'Eh... what’s up, doc?',
@@ -687,6 +693,11 @@ export class MolesLevel implements Level {
       m.flash = Math.max(0, m.flash - dt * 3);
       m.walking = 0;
       m.armsUp = Math.max(0, m.armsUp - dt * 3);
+      n.cheer -= dt;
+      if (n.cheer > 0 && m.pos[1] < 0.5 && n.state !== 'dazed') {
+        m.armsUp = 1;
+        m.wiggle = Math.sin(m.time * 14) * 0.08;
+      }
       m.wiggle *= Math.exp(-dt * 6);
       const hc = HOLES[n.hole];
       switch (n.state) {
