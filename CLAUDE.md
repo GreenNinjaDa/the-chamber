@@ -20,7 +20,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   shrink into it over 0.5 s (`player.shrinkInto`, no control and invulnerable meanwhile) and grow back out of the
   entrance portal over 0.5 s (`player.growFrom`), drawn scaled about the portal's centre.
 - **Lobby** (`src/levels/lobby/`): the main menu is a chamber you walk around in (after the title screen, and via
-  the pause menu). Numbered floor pads pick the level the START portal leads to (step on one; gold-rimmed ones are levels
+  the pause menu). Numbered buttons on the north wall (`WallButton`) pick the level the START portal leads to (press one; gold-rimmed ones are levels
   you have got out of, `settings.beaten`, with a tally on the wall), and in the
   south-west corner two buttons change mouse speed and levers invert looking up/down and turn sound off
   (`src/game/settings.ts`, remembered in localStorage). Signs are floating world text
@@ -89,78 +89,18 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   does the player from when the first boulder starts rolling until 5 m before the last jump (over the shaft), when the
   torch goes out and they fade back in over 2 s. The map is one fixed body (not kinematic: Rapier's character
   controller won't climb slopes on kinematic colliders).
-- **Level 6 — Simon Says** (`src/levels/simon/`): the floor is the 1978 Simon toy (four coloured quarter-disc
-  pads round a hub with a button, and a big rubber duck); screens on all four walls give orders, with a timer bar. Do
-  what Simon says (jump, stand on a colour, look up, touch your toes, freeze, press the button, spin, pick up and throw
-  the duck...) in time, and never what he didn't (plain orders, "SIMEON SAYS", "SIMON SAID", "AGAIN."). Any mistake
-  and the floor panel under you is a catapult. It ends with Simon's memory game (step on the pads in the order they
-  lit, twice), then "LEAVE." (the exit refuses you, fatally) before "SIMON SAYS: LEAVE."
-- **Level 7 — Big Red Button** (`src/levels/button/`): a big red button on a pedestal, DO NOT PRESS. The level is doing nothing
+- **Level 6 — Big Red Button** (`src/levels/button/`): a big red button on a pedestal, DO NOT PRESS. The level is doing nothing
   for 45 s while it escalates: the sign pleads (PLEASE DO NOT PRESS, IT'S JUST A BUTTON...), the button hums and
   whispers ("psst", "no one will know"), follows you from 22 s, four more rise out of the floor at 30 s and follow too,
   and at 37 s three DO NOT STEP plates come up across the way to the exit (jump them). At 45 s the exit opens under a
   PRESS E TO ENTER sign (pressing E near it is also fatal). Pressing any button or stepping on a plate brings a random
   fate: an anvil or a piano from the sky, a boxing glove from the nearest wall, the trapdoor, or the self-destruct.
-- **Level 8 — Frogger** (`src/levels/frogger/`): why did the test subject cross the road? Everything but the river is a raised
-  deck (0.6 m): the sidewalk you land on (west), four 2.8 m road lanes (forklifts and a steamroller, golf carts and a
-  runaway office chair, giant robot vacuums, sports cars; `entities/vehicles.ts`), a grass median, then four lanes of
-  toxic goo (`Pattern.lava` with `param` 1) crossed on floating junk (mattresses, doors, giant rubber ducks, a
-  bathtub, pallets) to the far bank and the open exit. Everything loops through tunnel mouths in the north and south
-  walls, rafts included, which don't stop for you (`player.platformVel` carries you). Cars, carts, forklifts and the
-  steamroller kill (ROADKILL, PANCAKED); vacuums and chairs just knock you over (jump them); the goo dissolves you.
-  The strip along each lane line is clear of everything but the steamroller.
-- **Level 9 — Minesweeper** (`src/levels/mines/`): the floor is a 12 x 12 board of raised Windows 95 tiles (2 m,
+- **Level 7 — Minesweeper** (`src/levels/mines/`): the floor is a 12 x 12 board of raised Windows 95 tiles (2 m,
   28 mines) and the exit is open on the far (east) side. Stepping on a tile reveals it (zeros ripple open) or blows
   you up; the numbers count touching mines, diagonals included. Right-click (empty-handed) or E plants a flag. The
   smiley face on the north wall reacts, with the mine counter and clock either side. Boards are regenerated until a
   simple logical solver (single-tile rules plus the subset rule) can get from the safe opening to the exit tile.
-- **Level 10 — Quiz Show** (`src/levels/quiz/`): "Who Wants To Be A Test Subject?" Four coloured answer pads (A-D) on the floor,
-  laid out like the answers on the big screen on the north wall, with a timer bar. Seven questions: 2 + 2 first, five
-  from a pool of trick and callback questions (the cake, turret legs, the big red button, gnomes, "which answer is
-  wrong"), then "DO YOU WANT TO LEAVE?". When the bar runs out, every wrong pad (and the floor between them) is a
-  trapdoor. Standing on one pad for 3.5 s locks it in early ("FINAL ANSWER?"; not the pad you were already on). From
-  question 4 the pads sometimes swap places.
-- **Level 11 — Musical Chairs** (`src/levels/chairs/`): a disco (flashing dance floor, mirror ball with a colour-cycling point
-  light, a jukebox puffing notes) with a ring of folding chairs and four contestants (`entities/contestant.ts`). While
-  the music plays everyone walks round the chairs, and so must you: loiter (not going round, or leaving the band round
-  the ring) and after a shout the floor flings you out for camping (`entities/trapdoor.ts`). When it stops (the
-  lights die, "SKRRRT!") everyone dives for a free chair: you take one just by reaching its seat; the contestants react
-  after their own delays. Whoever's left standing is catapulted out, a chair sinks away, repeat: 4 rounds (4, 3, 2,
-  1 chairs). Win the last chair and the exit opens.
-- **Level 12 — Tamagotchi** (`src/levels/tamagotchi/`): you are the pet. After the arrival the walls flood candy pink
-  (a plastic egg: a rim round the top, a keychain loop, printed pixel hearts and stars), the north wall becomes the
-  LCD (`entities/tamagotchi.ts` `PixelSprite`s: six menu icons FOOD LIGHT PLAY MEDICINE BATHROOM DISCIPLINE, the
-  play field, HUNGRY / HAPPY hearts, AGE, WT) and big A / B / C buttons push out of the south wall. An egg wobbles
-  and hatches into a pixel you that follows you about the screen. Timmy (the giant, peeking over the south wall now
-  and then with a bored line) presses A to walk the highlight along the icons (sometimes all the way round), B to
-  pick one, C when it's done; one action at a time, 1-3.5 s apart: FEED (a MEAL / SNACK submenu, then a spinning
-  voxel burger or a candy drops from the sky with a shadow, purple marker, a BONK if it lands on your head; E near
-  it eats: meal +2.5 HUNGRY +1 LB, candy +1.5 HAPPY +0.5 HUNGRY +2 LB; full: "no thanks"); PLAY (3 rounds: a giant
-  LCD-pixel slab with an arrow underneath hovers over one half of the floor, which flashes red for 2.4 / 2.1 / 1.8 s,
-  then slams: on that half (or within 0.3 m of the dashed line) = SQUASHED, dodged = +0.8 HAPPY, a clean sweep
-  +0.6 and -1 LB); BATHROOM (after you've pooped: every 24-30 s a swirl plops out behind you, with stink lines and
-  flies; stepping in one makes you sick, a skull over your head, hearts drain 1.6x) sends a wave 0.62 m high (to
-  jump; hit = FLUSHED) from a wall across the floor, carrying the poops away; LIGHT (8 s dark with a lullaby: a
-  glowing bed appears 6-11 m away; standing still on it sits you down asleep, HAPPY stops draining and 3 s of sleep
-  is +1; awake after 1.6 s drains 0.32/s); DISCIPLINE ("NO!" flashes, then its letters fly out of the screen and
-  slide at where you're going, 12 m/s: a hit knocks you over, -0.75 HAPPY, then 1.2 s before another can); MEDICINE
-  (a giant syringe chases you for 7.5 s; its jab knocks you and cures you for 0.5 HAPPY, or, the one time Timmy
-  gives a healthy pet a shot for fun, just costs 0.75: "OW! I WASN'T EVEN SICK"). Hearts drain (HUNGRY 1/14 s,
-  HAPPY 1/14 s, +35% by the end); Timmy feeds a hungry pet (≤ 2) and plays with a sad one (≤ 1.6) first, gets
-  round to the flush, a night and a scolding sooner or later, and starts nothing that would outlast its life. Either row at zero: YOUR TAMAGOTCHI HAS DIED (the
-  LCD shows a ghost and a grave, a gravestone rises by your body and your see-through ghost floats up with a halo
-  and wings). 80 s of life: WHAT? It evolves (flashing), into A SLIGHTLY OLDER TEST SUBJECT with a moustache;
-  Timmy is bored ("MUM! can I get a PHONE?"), drops it (whistle, crash, cracked LCD) and the exit opens. Weight
-  over 8 LB slows you 6% a pound (`speedScale`, `girth`). Test bots (eat what they need, dodge, jump, sleep): 3/3
-  wins; never eating starves at ~40 s, standing still is squashed in the first PLAY.
-- **Level 13 — Hungry Hungry Hippos** (`src/levels/hippos/`): you're a marble. The floor is a plastic dome (a huge static ball
-  collider, 2 m high in the middle) that slopes down to four giant toy hippos (`entities/hippo.ts`), one poking out of a
-  hole in each wall, and 26 marbles pour in (16 more at 15 s). The slope drifts you outward (`player.platformVel`). Each hippo
-  picks the lane (aimable right round to the corners) with the most marbles, or you, lights it up on the floor for
-  0.85 s while it rears back, then shoots its neck out and CHOMPS everything in the lane: marbles, or you (swallowed,
-  chewed, burped). When the marbles are gone the winner is announced, the others doze off and the east (yellow) one
-  yawns with the exit portal in its mouth.
-- **Level 14 — Gnome Alone** (`src/levels/gnomes/`): Weeping Angels, but garden gnomes (`entities/gnome.ts`, 0.95 m,
+- **Level 8 — Gnome Alone** (`src/levels/gnomes/`): Weeping Angels, but garden gnomes (`entities/gnome.ts`, 0.95 m,
   8 kg, posable arms). A 20 m loading bar on the north wall fills only while you watch it (its centre within 20° of
   the view, unblocked; 37 s of watching in all) with a joke script: stuck at 99%, then "INSTALLING UPDATE 1 OF 2"
   drains it to 0 and it refills faster; at 100% the exit opens. Gnomes move only while unseen (camera frustum plus a
@@ -170,95 +110,13 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   Every 10–15 s (first after 18 s) the lights flicker (2 s of dips as a warning) and then go out 2–3 times over
   0.8 s: in the dark every gnome moves at 3× and their eyes glow red. An unwatched gnome within 0.75 m kills you:
   lights out 1.2 s, then you lie dead in a pointy red hat inside a ring of (at least 7) gnomes.
-- **Level 15 — Flappy** (`src/levels/flappy/`): after the arrival the camera swings to a side view (a `cameraShot` from
-  the south) and the wall says FLAP. Space flaps (the player stays in `control` mode, pinned to the lane, with
-  `gravityScale` 1.25, `airControl` 0 and a flapping `poseOverride`; plus a beak). Green pipes with a 5 m gap slide out
-  of the east wall; touching one, or the floor, is death. Ten pipes and you drop to the floor and walk to the exit.
-- **Level 16 — Red Light, Green Light** (`src/levels/redLight/`): a 7 m doll (`entities/doll.ts`) stands by the east
-  wall at (9.5, -5), back to the room, chanting MUGUNGHWA... KKOCHI... PIEOTSSEUMNIDA! word by word over her head at
-  varying tempos (green lights of 3.2 s, getting shorter; one fake-out where her head starts to turn and doesn't).
-  Then her head whips round 180° (0.5 s, down to 0.35 s later), her eyes glow red and the room goes slightly red:
-  moving (actual displacement over 0.3 m/s, or jumping) from 0.45 s after the turn (+0.5 s / +0.2 s in the first two
-  red lights; stopping from a sprint takes ~0.42 s) while she has clear rays from her eyes to two of your head, chest
-  and pelvis (`SEEN_PARTS`) gets you lasered (two red beams) and flung, violence 22. Moving right behind something tall
-  (fridge, vending machine, bookcase, the stacked crates; the piano and couch are too low from 6 m up) is safe. You arrive at (-9.5, 0) facing east; cross the
-  red tape at x = 7 and the exit (z = 5) opens while her head does a slow 360. A 60 s clock on the north wall: at 0
-  she lasers everyone still short of the line. Six scripted contestants in green tracksuits (`entities/contestant.ts`,
-  the player's body via `drawBody` colours, numbers floating overhead) run on green and freeze on red; 324 keeps
-  running into the first red light, 101 wobbles and steps (3rd), 212 panics and runs back (4th), 218 sneezes (5th),
-  067 makes it and cheers, and old 001 shuffles, stops bothering to freeze from the 5th red light and is never shot.
-- **Level 17 — Duck Hunt** (`src/levels/duckhunt/`): you're the duck. Grass, five bushes and a tree; the hunter is out past the
-  south wall. A big white crosshair chases your chest with lag and a shake (4.2 / 5.2 / 6.2 m/s by round); when it
-  has sat within ~0.6 m of you long enough (or it gets impatient, 3.2 s) it fires: the screen flashes white (fog) and
-  a shot traced from the south wall at the crosshair hits you (BAGGED; the dog pops up: "GOT ONE!") or the first bush
-  or tree in the way (shredded, gone) or nothing (the dog pops up laughing). Three rounds of three shells; then the
-  hunter gives up, the dog shrugs, the exit opens.
-- **Level 18 — Tactical Espionage** (`src/levels/stealth/`): a Metal Gear parody. Three guards (`entities/guard.ts`) patrol
-  between stacks of crates, each with a 90° vision cone (7.5 m) painted on the floor, yellow, then amber when
-  suspicious, red when alerted. In a cone with a clear line from their eyes for 0.4 s: "!" and they run at you
-  (5.2 m/s; within 1 m = GAME OVER); break line of sight for 3 s and they search, then give up ("Must've been the
-  wind."). Cardboard boxes: E gets you in one (and out again); you move at 45%, invisible, and a box that keeps still
-  is ignored, while one that moves in view gets a "?" (1.1 s to spot). Walk over the keycard in the far corner to
-  open the exit.
-- **Level 19 — Chess** (`src/levels/chess/`): the floor is an 8 x 8 board of 3 m squares; you're a white pawn at the
-  south end ("WHITE TO MOVE" until you step off your square) and Black's whole army (`entities/chess.ts`, giant
-  primitive pieces, solid via `obstacles()` plus `GROUPS_RAGDOLL_ONLY` colliders for a flung corpse) stands at the north
-  end. Black moves by the rules on a clock (one piece a turn, two from 4 s, three from 22 s), each move shown as a
-  red square 0.95 s before the piece lifts off; whatever is on that square when it lands is captured ("CHECK." on
-  the wall when it's yours). The AI aims at your square or where you're heading, closes in otherwise, and once you're
-  in its half keeps the back row home and plugs its holes. Reach an empty square of the far row to promote (a crown);
-  the king topples over (BLACK RESIGNS), the pieces sink away and the exit opens.
-- **Level 20 — Dodgeball** (`src/levels/dodgeball/`): four sentry turrets (`entities/turret.ts`: white egg on a tripod, one red
+- **Level 9 — Dodgeball** (`src/levels/dodgeball/`): four sentry turrets (`entities/turret.ts`: white egg on a tripod, one red
   eye, 22 kg physics bodies you can also pick up) wake one after another ("Hello?"), paint you with a red laser when
   they can see you, and after a 0.9 s charge fire a red rubber dodgeball at where you're going. Three hits (tested
   along each ball's path) and you're out through a trapdoor. Balls pile up everywhere: carry one, aim, right-click
   to throw it back; a fast ball hitting a turret knocks it over (with a helping shove), and tipped past ~50° it's
   down for good ("I don't blame you."). All four down: the exit opens.
-- **Level 21 — Plinko** (`src/levels/plinko/`; The Price Is Right): the east wall is a giant pegboard (8 staggered rows,
-  2.6 m apart) and you're the chip. The portal drops you on a railed shelf along its top ("COME ON DOWN!"); standing
-  0.5 s on one of its seven hatches drops you in above that column. Falling is scripted (`flying`, tumbling): 2D bounces
-  off pegs, dividers and the sides in the board's plane, a random kick off dead-centre hits, plinks, and A / D steer a
-  little, with a side-on camera. Seven slots: TRAP, 100, 500, EXIT, 500, 100, TRAP. EXIT has the exit portal right behind
-  it; cash is added to the total and a spring throws you back up to the shelf for another go; a trapdoor catapults you
-  out (THE PRICE IS WRONG). After three cash landings, NEW RULES: every slot but EXIT is a trapdoor.
-- **Level 22 — Rock Star** (`src/levels/rock/`; a Guitar Hero parody): the floor is a five-lane note highway, the camera
-  looks down it from behind you, and 44 coloured gems (a fixed chart at 120 bpm: single notes, sustains, two-lane chords,
-  a solo that needs a sprint) slide toward the strike line by your feet. Be in a gem's lane as it crosses (a chord: on the
-  line between its lanes) and the note plays (the lead only sounds when you hit; drums and bass run on song time). Misses
-  drain the rock meter on the north wall; the crowd down both sides cheers, bobs or boos with it. Empty it and you're
-  booed off (tomatoes, then the stage catapults you); finish the song and the exit opens for the encore.
-- **Level 23 — The Claw** (`src/levels/claw/`): you're a prize in a claw machine, a closed cabinet (dark felt
-  floor, a glass front, starry backdrops, chasing marquee bulbs, a ceiling of fluorescent tubes that casts no
-  shadows). 48 plush toys (`entities/plush.ts`: three-eyed aliens, teddies, giant ducks, beach balls; light, bouncy,
-  settled into heaps before you arrive) slow you down when you wade through them. The exit is the prize chute in
-  the north-east corner (too tall to climb, a clear guard on top) with a portal at the bottom; E on its PUSH flap
-  gets a lecture. An unseen kid has three credits (display over the glass: CREDITS / TIME): each one the claw
-  (`entities/claw.ts`, on a gantry, swinging on its cable) wanders, decides (an alien, or more often each credit the
-  spot you're on), hovers till the clock runs out (a light pool marks the spot; from the 2nd credit he sometimes
-  changes his mind with 2.6 s to go), drops (a direct hit on the head knocks you), closes on whatever is nearest
-  its axis, rises, jiggles (grabbed toys usually slip; the first one usually makes it), and carries what's left to
-  the chute. Hold E or left mouse near it while it's down to hang off a prong (`player.mode = 'swinging'`; WASD
-  kicks it into a little swing) and it takes you to the chute; let go above ~4.5 m and you splat
-  (landing speed; ~3 m just knocks you down). Grabbed without holding on, you always slip at the jiggle. Out of
-  credits, the lights go out and every alien turns to stare at you, eyes glowing. The aliens chant ("Ooooh...
-  the claaaw!") as world labels.
-- **Level 24 — Snake** (`src/levels/snake/`): you are the apple. After the arrival the floor boots up row by row
-  into an old phone LCD (pale olive, 16 x 16 grid of 1.5 m cells), "NOKLA — Connecting people." appears on the north
-  wall, a panel there slides open and the phone-game snake (`entities/snake.ts`) comes out: dark pixel blocks 1.35 m
-  wide and 1.6 m tall (too tall to jump), each a static collider moved one cell per step (60 ms slide), head with
-  cube eyes (pupils follow its target) and a flicking forked tongue. Starts 5 long at 0.32 s/step, speeds up to
-  0.2 s over 80 s (always slower than sprinting), grows one block every 7 steps. AI: greedy toward the target cell
-  (Manhattan, prefers straight on; you with a 0.25 s lead, or the apple if that's nearer), never reverses, never steps
-  into a wall or itself (the leaving tail cell is free), 10% blunders; it looks ahead for dead ends (time-aware flood
-  fill, pockets under 10 cells) always for its first 20 s, then 70% of steps, but only 10% with its target within
-  4 cells (tunnel vision: lure it close to make it coil; test bots circling it at ~5 m crash it about half the time,
-  after ~30-45 s). No safe move = crash: lurch, the classic blink, blocks pop away from the head in pixel crumbs,
-  pixel-block "GAME OVER" (`entities/pixelText.ts`) plus a quip on the north wall, exit opens. An apple
-  (`entities/apple.ts`, 1 kg, carry / throw it as a decoy; `?noApple` leaves it out) pops up on a free cell; eaten = +3 blocks, a new one 3 s
-  later. Caught (it enters your cell, you're right in front of its mouth, or its head pushes into you) = swallowed
-  whole (shrink into its mouth, gulp, +3 blocks, a bulge runs down to the tail), then GAME OVER with the snake's
-  length as SCORE. The score also shows in pixel digits on the north wall.
-- **Level 25 — Whack-a-Mole** (`src/levels/moles/`; deck and burrow in `cabinet.ts`, the backboard in `scoreboard.ts`):
+- **Level 10 — Whack-a-Mole** (`src/levels/moles/`; deck and burrow in `cabinet.ts`, the backboard in `scoreboard.ts`):
   you're the mole. You land on what looks like the usual floor; it boots up band by band into the top of an arcade
   cabinet (a blue deck 3 m up, wall to wall, fixed colliders, a 4 x 3 grid of yellow-ringed holes, chasing bulbs, the
   WHACK-A-MOLE! backboard on the north wall with Timmy's SCORE, a TIME and a message line, two giant mascot moles), the
@@ -280,110 +138,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   "MOOOM! THE MOLE CHEATED!", a six-slam tantrum, he sinks away sulking, and the exit opens in the burrow's east wall by
   your carrot pile. `?moleCarrots=N` starts with N carrots. Test bots: popping blind and grabbing with E 0.3 s later
   wins about 2/3 of the time (deaths on the last carrots); waiting for a wind-up on a mole first wins every time (~35 s).
-- **Level 26 — Angry Birds** (`src/levels/birds/`): you are the pig. You land just east of a fortress
-  (`entities/blocks.ts`: wood planks and posts, glass, stone, TNT crates; a west wall, two three-storey towers, the
-  pig's house with TNT in the living room, loose planks and blocks to build with). A giant slingshot rises behind
-  the west wall (the view turns to it) and six birds pop up onto the wall top (`entities/birds.ts`); then "YOU ARE
-  THE PIG." and your head goes green with a snout, ears and beady eyes. One bird at a time hops into the pouch
-  (name and quip over the slingshot), which pulls back along the aim (creak) for 2.2 s, holds still 0.55 s (aim
-  locked) and lets go (twang): arcs over the wall at half gravity, ~2 s, aimed at your chest with a growing lead,
-  leaving white puffs until the next shot. Red (no lead), the Blues (split in three halfway, ±0.24 rad), Chuck
-  (stops dead mid-air with a "!" for 0.35 s, then zooms at 27 m/s at where you were when he stopped), Bomb (2.2 s
-  fuse after landing, then stays put; blast with cover), Red again (full lead, lobs over cover), Terence (1.6 m,
-  420 kg, through everything, then rolls a few metres). Birds are deadly in flight (faster than 6 m/s, swept against
-  every body part; Terence also while rolling): POPPED in green smoke; once they've hit anything they're just
-  physical (they knock you, tumble, knock blocks over), so any cover in the way saves you. Blocks take damage from
-  sudden speed changes and from the impulse through their contacts (tunables in `MATERIALS`; not from being
-  carried or thrown), darken, and break into splinters / shards / chunks and dust; TNT goes off on a hard knock
-  (chains); a fast stone block on your head or chest is SQUASHED; blasts use grenade-style cover. Everything broken
-  scores the birds points (popups; "BIRDS: 12,450" and three stars on the north wall; a popped pig is 5,000).
-  Survive all six (~60 s): the slingshot wilts, LEVEL FAILED (for the birds), the pig laughs, the exit opens.
-  `?birdShot=N` starts with the Nth bird.
-- **Level 27 — Magnifying Glass** (`src/levels/sunburn/`): the giant is back, with a magnifying glass, and you're the
-  ant. A day passes in ~64 s: the sun (`Environment.sunDir`, light colours) rises in the east, lingers overhead and
-  sets in the west, so the shade moves: along the east wall in the morning, nothing but umbrellas at noon, the west
-  wall in the afternoon. The burning spot is a real ray down the sun's direction from the lens to his aim point: it
-  lands on the first thing in its way (smoke), and 1 s of it on your body sets you on fire (`player.char`). He
-  chases where you're heading (faster than a sprint at noon, but turning sluggishly: dodge it), and while you hide he
-  burns things out in the sun (the duck melts, the beach ball pops, umbrellas, boxes and the mattress burn away) or
-  lurks at the edge of your shade. At dusk his mum calls him in for dinner and the exit opens.
-- **Level 28 — Dominoes** (`src/levels/dominoes/`): a world-record attempt: 22 giant ivory dominoes (2.6 m, 60 kg physics
-  boxes with pips) in an S across the chamber, one missing, its gap marked by a chalk outline exactly your size. The
-  giant's finger flicks the first. Stand in the gap and the one before it knocks you flat, you carry the chain on,
-  and the last domino hits the button that opens the exit. Anywhere else in a falling domino's path: FLATTENED. Not
-  in the gap when the chain gets there: it stops, and the finger flicks you instead (FLICKED). If anything else
-  stalls the chain for 3.5 s, the giant nudges it on.
-- **Level 29 — Microwave** (`src/levels/microwave/`): the chamber is the inside of one. A 45 s cook (a green display and keypad on
-  the north wall): the floor is a glass turntable that carries you round (`player.platformVel`; loose things ride it
-  too), and standing-wave hot spots on a hex grid glow on it without turning, bigger on HIGH power from 20 s: 1.4 s
-  in them cooks you (COOKED, `player.char`). Popcorn kernels pop from 12 s (knocking you about), and the fork left
-  on the plate sparks from 18 s and arcs every 1-2.5 s, zapping anyone within 4.2 m of its tines (ZAPPED). DING: the
-  door (exit) opens.
-- **Level 30 — Katamari** (`src/levels/katamari/`): the chamber is littered with stuff: ~100 tiny things in heaps
-  (`entities/trinkets.ts`), most of the junk, three teddies, and the big pieces against the walls. After the arrival
-  a rainbow beam drops a tiny green prince and a 0.62 m sticky ball (`entities/katamari.ts`) into the NW corner, the
-  King (`entities/king.ts`, a giant crowned head) rises over the north wall, and the board under him says MAKE IT 5
-  METRES. USE ANYTHING. ANYTHING. (size readout, a bar with a red YOU tick at 3.4 m, a 90 s clock). His lines are
-  pinned across the top of the screen (world labels placed in front of the camera). The ball rolls up anything whose
-  biggest extent is at most half its diameter (d² grows by 0.8 × its two biggest extents multiplied, twice that for
-  things you carried or threw in: "OH, A VOLUNTEER."): the prince heads for the best thing nearby (bigger
-  preferred), stops now and then to admire his ball, and it speeds up as it grows (1.6 + 0.9 d m/s). Too-big things
-  bonk, and get shoved along rather than launched. At 3.4 m you count as stuff (1.7 m): the readout and bar go red, a
-  sting, a "!" over it for 1.4 s, then it hunts you (2.6 + 1.15 d, at most 7 m/s against a sprint's 8.5; it
-  swerves at 60% of its acceleration, so circling works; a red marker flags it within 9 m), detours for anything big
-  right in front of it, and every 6 s the King drops in something big it can eat (every third straight into its
-  path, the rest marked by a beam away from where you're running). Touch it and you're ROLLED UP: stuck on it,
-  flailing, while the camera watches from the side. 5 m: it floats up into the sky and becomes a star (the King
-  weeps), and the exit opens. Out of time: "UNACCEPTABLE.", beams from his eyes, ROYALLY ZAPPED. Test bots: only
-  fleeing runs out of time (the prince alone reaches 3.4 m at 70-85 s); feeding it gets there at 40-55 s, and then
-  running laps round the middle is never caught, while leading it through the deliveries wins at 60-85 s.
-  `?katTime=N` sets the clock, `?katSize=D` the starting diameter.
-- **Level 31 — Piñata** (`src/levels/pinata/`): Timmy's 8th birthday (the magnifying-glass giant, `giant.blindfold`: a
-  blindfold and a party hat) and he has a baseball bat. He swings at the loudest noise he heard in the last 1.2 s
-  (wind-up 0.5 s with a shadow on the floor, smash, 2 m kill radius; bored after 7 s of quiet: a wild swing).
-  Walking is silent; sprinting, landing a jump, things crashing down (thrown or knocked) and popping balloons are
-  not, and every noise shows as a ring. Balloons drift toward you and pop when they touch you (or when anything
-  flies through them); more keep coming. After 60 s he finds the real piñata (candy everywhere), it's CAKE TIME,
-  and the exit opens.
-- **Level 32 — Among Us** (`src/levels/impostor/`): the chamber is a spaceship cafeteria open to space (a steel deck,
-  stars): a round table with the big red EMERGENCY button (`entities/spaceship.ts`), eight task stations round the walls
-  (wiring, dials, card swipe, garbage chute, data terminals) and four floor vents. Six bean crewmates
-  (`entities/crewmate.ts`, colour-name labels; red always comes) waddle between stations doing tasks: the station's
-  screen lights up (and glows on the floor) and the task bar on the north wall fills. One of them (random; `?impostor=RED`
-  picks it) is the impostor: it fakes tasks (the screen stays dark), sometimes follows you standing ~1 m away, and from
-  10 s in, every 10-15 s, hunts someone nobody else can see it with (no crewmate within 5.5 m, shrinking as the hunt
-  drags on; you more than 8.5 m away, so kills can be watched from across the room; you only after the first kill, and
-  then a lone you, no crewmate within 7 m, is its favourite target): a lunge, its head flips open into a toothy mouth, a
-  tongue, and the victim's top half flies off in a red spray, leaving the bottom half with a bone in a puddle. Then it
-  hops down the nearest vent (the flap clanks open) and pops out of another (only when nobody is close, like the kill).
-  Crewmates who see a vent exit or a faked task remember it. Bodies are found by crewmates walking past (4.5 m) or
-  reported by you (E); the button (E) calls a meeting (2 per attempt, 8 s cooldown). Meetings: "EMERGENCY MEETING!" /
-  "DEAD BODY REPORTED" (world frozen, red alarm light), everyone warps round the table, bodies vanish, 6 s of speech
-  bubbles seen from above (dumb chatter, the impostor's lies, witnesses' true "RED VENTED" / "red was faking tasks" /
-  "VOTE RED!!", running on into the vote), then 10 s to vote: stand by someone (a purple ring) or on the SKIP pad and
-  press E (or just be there when time runs out). NPCs follow your vote 68% of the time (skip if you didn't vote),
-  witnesses vote what they saw, the impostor votes with you or for you; ties go your way. Vote chips pop over each
-  candidate, then the ejected bean is flung out of a trapdoor into space. Impostor out: VICTORY, cheering, the exit
-  opens; so does filling the task bar (your tasks count double). Lose: eject an innocent you voted for and the lights go
-  out, it walks up with its visor glowing red (a red point light) and eats you; be alone with it; get down to just you
-  and it; or be voted out yourself (you float off into space).
-- **Level 33 — Hex-A-Gone** (`src/levels/hexagone/`; Fall Guys' disappearing floor): no test chamber but an 18 m white shaft
-  (`chamber: { none: true }`, same 24 x 24 footprint) with three floors of candy hex tiles (`entities/hexFloor.ts`,
-  corner radius 0.95 m, 295 per floor, tops at 13.5 / 9 / 4.5 m: pink, yellow, blue) over glowing goo (1.2 m, with a
-  green point light). You land on the top floor with six contestants; a 3-2-1-GO on the LED board on the north wall
-  (with an "N LEFT" count; "NO LOITERING" on the south wall), then any tile anyone stands on flashes and drops 0.5 s
-  later (the player arms whatever their capsule rests on, so standing still lasts 0.5-1 s; hops only eat the tile
-  you land on). Falling through lands you on the floor below; the goo dissolves you (DISSOLVED). Contestants: old 001
-  shuffles and drops through all three floors in the first seconds, 067 is good and hops a lot, 218 sprints and
-  panics, 324 is slow and jumps short, 101 stops to cheer whenever someone goes out (and falls through), 456 is
-  steady; they steer toward intact floor, avoid each other and gaps they can't jump, and splash into the goo with an
-  OUT! label (most are out by 25-45 s). Last one standing, or still up when the 60 s clock runs out, wins: the floor
-  stops dropping, your floor grows back in a ripple and the exit opens in the east wall at its height (it moves if
-  you still fall to another floor). The level places the camera itself (`cameraShot`): the usual over-the-shoulder
-  view, kept under the floor overhead and above the one underfoot wherever there are tiles (after a fall it follows
-  you down through your hole); dissolved, it looks down at the splash. `?hexTime=N` sets the round length, `?hexSolo`
-  leaves the contestants out.
-- **Level 34 — The Pool** (`src/levels/pool/`; The Sims' pool-ladder prank): its own room (`none`: the walls, and a
+- **Level 11 — The Pool** (`src/levels/pool/`; The Sims' pool-ladder prank): its own room (`none`: the walls, and a
   deck round an 18 x 16 pool, 4.2 m deep, the water 1.7 m under the deck). Once the Sim is up after the arrival a
   green plumbob pops over their head ("Sul sul!"), a needs panel lights up on the north wall (ENERGY, FUN "Very high",
   HYGIENE, SOCIAL "The cursor is your friend", BLADDER "Don't. Just don't."), and the camera swings up into a
@@ -402,42 +157,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   scribble*", "Drowned. Classic.") and it's SIM DIED. Way out: a crate (or the couch) pushed against the side and
   jumped from (a pallet or the air mattress alone is too low; a crate on the pallet works in two jumps). Out on
   the deck, the cursor flies to the exit, "DELETE DOOR?", hesitates... "...nah." and the exit opens.
-- **Level 35 — The Floor Is Lava** (`src/levels/floorLava/`): the kids' game, taken literally, in a living room (red and blue
-  sofas, blue and mustard armchairs, coffee table, beanbags, a blue rug, piano and bench, fridge, washing machine,
-  bathtub, mattress, bookcase, crates, pillows; `entities/livingRoom.ts` plus junk). A host on four wall TVs announces
-  rules ("RULE #n"), each with a 3-2-1 countdown (the digit also big on the HUD with the rule under it); meanwhile
-  whatever is about to turn blinks molten, faster and faster (the floor: its panel seams glow), then it's lava
-  (`Pattern.lava` param 2 on things; the floor goes tile by tile in a quick ripple; the room glows warm). Standing on
-  lava (9 rays down round the feet; any safe surface under you wins) for 0.25 s in all burns you up (`player.char`,
-  smoke, flames); every new touch costs at least 0.05 s, so hopping across only goes so far. Rules: the floor (the
-  rug is floor); the couches (armchairs aren't; a pillow on a couch isn't a couch); the floor and the crates; the
-  ceiling (there isn't one); everything blue, and the floor; the floor and whatever you're standing on; the floor,
-  rising to 1 m (a 5 s count; high ground: the piano, the fridge from the washing machine, the crate stairs in the
-  south corners).
-  Finale: "EVERYTHING IS LAVA EXCEPT..." a giant rubber duck (`entities/giantDuck.ts`) drops out of the sky (purple
-  marker; landing on you is QUACKED), 5 s to get on it; everything else melts and sinks into lava rising to 0.55 m,
-  "THE DUCK IS A BOAT NOW." and it sails you to the exit ("THE EXIT IS NOT LAVA. PROBABLY."). ~95 s in all.
-  `?lavaStep=N` starts at step N of the script (8 = the duck).
-- **Level 36 — Pinball** (`src/levels/pinball/`): you are the ball. The chamber is a pinball table (`entities/pinball.ts`):
-  one fixed slab sloping 10° down to the south (surface 2 m up at the drain edge, z = 9.9, ~5.9 m at the north wall),
-  a glossy navy playfield with a sunburst, stars and lamp inserts, cabinet side art and GI bulbs on the walls, a
-  backglass on the north wall (orange dot-matrix display with score and messages, E X I T lamps, "SPACE CADAVER") and a
-  coin door on the front. The room lights go down as the machine boots (INSERT COIN → coin → PLAYER 1 → BALL 1).
-  The portal drops you into the shooter lane (east, behind a clear wall); resting on the plunger pulls it back (a camera
-  looks back down the lane) and it fires you up the lane, round the top-right arc and tumbling into the three pop
-  bumpers (a scripted `flying` path, then `player.emerge`). Standing still slides you downhill (`player.platformVel`:
-  2 m/s, 3 in the air, 0.9 while getting up; `speedScale` 0.88 on the polished playfield). Pop bumpers and slingshots
-  kick you (knocks) and the steel balls (1.3 m chrome, 110 kg, real physics); two auto flippers flip whenever you or a
-  ball is on one toward its tip (and twitch now and then), batting balls for real (kinematic) and launching you up the
-  table (8-16 m/s by where they hit). Between the flippers and down the outlanes is the drain: a pit, DRAINED /
-  OUTLANE (death screens end in GAME OVER. INSERT COIN.). Balls knock you from 2.5 m/s; from 14 (straight off a flipper)
-  they kill, STEEL BALL RUN (fast balls glow and streak). Four drop targets, knocked down in order, spell E-X-I-T
-  (right-low, top-left, left-low, top-centre; blinking arrows and the display's SHOOT X point at the next): E brings an
-  EXTRA BALL, X MULTIBALL, T the JACKPOT light show, one more ball and the exit (east wall, top right). Drained balls
-  get BALL SAVED back into the lane; the plunger fires every ball in the lane at once, but holds while you're in it;
-  a ball sitting still 3 s gets a BALL SEARCH kick. Every jump nudges the table: DANGER after ~6 quick hops, TILT after
-  ~9 (flippers, bumpers and lights dead for 6 s; drain meanwhile = TILT). Hum, music, chimes, BONGs, knocker.
-- **Level 37 — Jenga** (`src/levels/jenga/`): you land on a square of wood in the floor: the top of a giant Jenga tower
+- **Level 12 — Jenga** (`src/levels/jenga/`): you land on a square of wood in the floor: the top of a giant Jenga tower
   (`entities/jenga.ts`: 10 layers of three 4.5 x 0.8 x 1.5 m wood-grain blocks, alternating, base at (4, -4)) that
   rises out of it to 8 m (invisible walls keep you on while it rises; `player.carry` brings you and your body along).
   Timmy leans in over the south wall; Lean-o-meters pop up on the north and south walls (a top-down dial, up = away from
@@ -460,42 +180,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   Test bots (~74 s): balancing from the bias (with or without the prediction, even a lazy 0.7 s-late one) always
   won; standing in the middle and only dodging the blocks toppled after 3-6 pulls. `?jengaSkip=N` does N (tidy) pulls
   before you arrive (9: straight to the finale).
-- **Level 38 — Bowling** (`src/levels/bowling/`; map in `lane.ts`): its own map (`none`), with the chamber's footprint so
-  the camera keeps its usual chamber confinement: a honey-wood lane
-  (boards, arrows, dots, pin spots), sunken gutters (2.7 m wide, 0.7 m deep) along the east and west walls, a dark pit
-  across the north end, a scoreboard on the north wall (and a small one over the hatch) with sarcastic verdicts
-  ("STRIKE! (NOT YOU)", "7-10 SPLIT", "MARK IT ZERO", "TURKEY!"...). You arrive among ten 2 m pins (27 kg): you're the
-  eleventh. A launcher behind a hatch in the south wall fires 1.25 m kinematic balls at you (contact kills, violence
-  20; pins fly for real and can knock you over): 1) straight at where you were, 2) a hook down a line 4 m to the
-  side that curves at you from 11 m out (run away from the curve), 3) two at once that close in either side of you
-  (stand dead centre), 4) a 6 m giant dropped from the sky that steers at you (only a gutter is safe; it pops and
-  flies off like a balloon at the back wall). Lane balls never enter gutters, but whoever is in a gutter when a
-  ball is fired gets a gutter ball down it. After each frame a hazard-striped sweep bar drops in front of the deck
-  and pushes everything into the pit (jump it; swept = "CLEARED"), then ten pins come down on strings onto their
-  spots (standing on one = "PINNED"). After the giant, the last ball is fired 0.8 s after the exit (east wall, in
-  the gutter halfway down the lane) opens, and more keep coming until you leave.
-- **Level 39 — Falling Blocks** (`src/levels/tetris/`): a glass-fronted well one cell deep and ten wide against the east wall,
-  seen side-on (the level's camera shot; A / D move along it). Tetrominoes fall a row at a time, steering toward
-  wherever you stand (a column every other row) and committing 4 rows up (a ghost shows where they'll land); what
-  lands is what you climb, up to the exit (open from the start, 5 m up the east wall). Full rows clear and drop
-  everything above. Crushed = GAME OVER; the stack reaching the top of the well = TOPPED OUT.
-- **Level 40 — QWOP Olympics** (`src/levels/qwop/`): after the arrival the chamber becomes a stadium
-  (`entities/stadium.ts`): bleachers of fans rise along the north wall, a six-lane track unrolls west to east (start
-  x = -10, finish x = 10 with a tape, 5 m boards), three other finalists lie DNF in their lanes, and the scoreboard
-  strikes out 100 METRES for 20 METRES, WE BELIEVE IN YOU. Then WASD stops working: you're put on the line (lane 4,
-  hip number) as a physics puppet (`player.startPuppet`), seen side-on from the south with a QWOP-style "N metres"
-  readout; ON YOUR MARKS, GET SET, the starter's pistol (keys before it: FALSE START). Q / W swing the thighs (left
-  forward and right back, and back again), O / P bend the knees (left / right, straightening the other); keys move
-  the joint targets at a rate and they hold when let go. A torque on the chest nudges it toward a slight forward lean
-  (at most 600 N·m): standing still is safe, bad legwork isn't. Head or chest on the ground: YOU FELL (the distance,
-  a personal best / worst this session; after 3 failures the tips let slip that Q goes with O and W with P). 90 s:
-  the crowd goes home. Pelvis past the line: NEW WORLD RECORD, the tape snaps, confetti, WASD comes back and the exit
-  (east wall, in the lane) opens. The crowd shouts about kneeling, the splits, going backwards or nowhere, and cheers
-  every 5 m. Test bots: holding QO then WP for 0.7-1.3 s each (±20% timing jitter) always finished, in 17-26 s;
-  0.55 s about half the time, 0.45 s never; the wrong pairing (QP / WO) and random mashing fall within 2-15 s, and
-  Q / W alone shuffles nowhere (backwards).
-  `?qwopQuick` skips the portal and the stadium's reveal.
-- **Level 41 — Laser Show** (`src/levels/lasers/`; Fall Guys' Jump Club meets the Resident Evil laser hallway): the
+- **Level 13 — Laser Show** (`src/levels/lasers/`; Fall Guys' Jump Club meets the Resident Evil laser hallway): the
   lights go down (dark red) and an emitter pylon (`entities/laser.ts`, `LaserPylon`) rises out of a floor hatch.
   A low beam (0.35 m) grows out opposite the player and sweeps round, speeding up from 5 s to 2.5 s a turn: jump it.
   Then a mast rises and a high beam (1.6 m) joins, turning the other way at a different speed: duck it (stand still and
@@ -506,42 +191,6 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   4.2 m/s. Any beam touching a body part (`BodySlicer`: the real part frames as slightly shrunk capsules/boxes, swept
   in 4 cm steps so fast beams can't skip a limb) slices you: `player.kill` with violence 30 (42 for the grid) at the
   cut. One red point light rides with the pylon, then with each wall. `?laserSkip=N` starts the show N s in.
-- **Level 42 — Going Down** (`src/levels/elevator/`): the chamber is an elevator car (`entities/elevator.ts`: sliding doors in
-  the east wall, brass handrails round the walls at 1 m, a yellow crosshead and grate over the top (it stops anything
-  floating out) with the hoist cables up to a sheave on the roof, two amber LED floor indicators (`FloorIndicator`),
-  and the shaft, drawn sliding up past the wall tops by `drawShaft(depth, speed)`: landing doors, slabs, streaking
-  lamps, painted floor numbers). Heavy junk (piano, couch, fridge, safe, vending machine, bathtub, washer, filing
-  cabinet, bookcase, oil drum) stands against the walls in front of the rails, light junk in the middle. After the
-  arrival it dings (99, GOING DOWN) and sinks into the shaft (daylight fades to the car's strip lights), muzak notes
-  bouncing out of a speaker; a creak, one cable pings off (PING?), a groan (UH...), and 13 s after the ding TWANG
-  (UH OH): the lights flicker and it falls 13 s to B7 (floors whizz by, brake sparks, GOING DOWN / EXPRESS in red,
-  then BRACE 6..1 with flashing BRACE FOR IMPACT and red pulsing light). Everything goes weightless
-  (`physics.world.gravity` zero, a jolt up of 0.9-1.9 m/s, slow tumbling, damping 0.2) and drifts slowly toward the
-  nearest wall, so it hangs over the rails; so does the player (`player.gravityScale` 0, `airControl` 0): they drift,
-  bounce softly off things, WASD nudges them toward where they look, Space pushes off anything within reach (and
-  shoves loose things back), and E / left mouse with the chest within 1.4 m of a rail grabs it (grip and float poses
-  via `player.poseOverride`; A/D slides along it). At the bottom gravity slams back (3× for 0.6 s, everything flung
-  down): not holding a rail = SPLAT / PANCAKED; anything ≥ 40 kg still falling onto your body within 2.5 s crushes
-  you (PIANO'D, VENDED, COUCH POTATO...). Bots holding a random rail spot die ~30% of the time, ones that slide away
-  from what's overhead ~never. Survive and the doors grind open onto the exit ("DING." / "Ground floor. Mind the
-  gap.", the display says B7). A button panel by the doors has an EMERGENCY STOP (`CarPanel`) that only makes
-  sarcastic remarks. Sound: dings, a muzak `Tune` (record-scratches off at the TWANG), motor hum, creak / ping /
-  groan, brake screech, rushing wind, countdown beeps, the crash, thuds, a rail clink. `?quickRide` snaps the cable
-  4 s after the ding.
-- **Level 43 — Pac-Man** (`src/levels/pacman/`): after the arrival the floor goes dark navy, the sun dims to a moon
-  and a 13×13-cell maze (`maze.ts`: black blocks outlined in glowing arcade blue, 1.5 m tall so you can't jump
-  onto them but the camera sees over; 2.25 m corridors; a ghost house with a pink door in the middle) rises out of
-  the floor, shoving the player out of its way, while the camera shows the whole board from above (READY!). 81
-  pellets and 4 blinking power pellets float at waist height; the player glows warm (the level's point light).
-  Four ghosts (`entities/ghost.ts`, `ghosts.ts`) leave the house one by one (0 / 2.5 / 6 / 10 s) and roam cell by
-  cell at 4 m/s with the arcade brains (Blinky chases, Pinky aims 4 cells ahead, Inky pincers through Blinky,
-  Clyde gets shy within 5 cells), alternating scatter / chase; Blinky speeds up with 20 and 8 pellets left. A power
-  pellet makes them blue, wobbly and random for 7 s (flashing the last 2): touch one to eat it (200 / 400 / 800 /
-  1600; its eyes zip home and it revives). A cherry (100) turns up under the house after 25 and 60 pellets.
-  Touching a ghost otherwise: the world freezes, the ghosts vanish, the player spins, shrinks and pops (GAME
-  OVER, naming the ghost). All pellets eaten: the maze flashes, sinks, and the exit opens; the last 3 pellets get
-  purple markers. Score and an unbeatable HIGH SCORE (3,333,360) on the north wall; no looking up while the maze
-  is up (keeps the camera above the walls).
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -573,61 +222,28 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   and `PhysBody`, the active ragdoll that follows the animation with joint motors and per-part pose matching)
 - `src/entities/` — things that can appear in more than one level (or the lobby / sandbox), each with its model:
   `junk.ts` (28 pieces of household junk; `spawnJunk(physics, junk('fridge'), pos)`), `grenade.ts` (pineapple
-  model), `giant.ts` (`blindfold` adds a blindfold and a party hat; `armOpacity` draws the reaching arm see-through), `dart.ts`, `portal.ts` (entrance / exit portals), `props.ts` (Lever, Button), `cake.ts`, `companions.ts`,
+  model), `giant.ts` (`blindfold` adds a blindfold and a party hat; `armOpacity` draws the reaching arm see-through), `dart.ts`, `portal.ts` (entrance / exit portals), `props.ts` (Lever, Button, `WallButton`: a square button on a wall with a raised pixel label, `lit` / `rim`), `cake.ts`, `companions.ts`,
   `pressurePlate.ts` (round button, or `{ stone: [w, d] }` for a rock slab), `uselessBox.ts`, `rock.ts` (textured stone: `boulderModel`, `chunkModel`, `slabModel`, `shardModel`, `clusterModel`; `Pattern.rock`),
-  `doll.ts` (the giant doll with a swivelling head and glowing eyes, plus a `BareTree`), `contestant.ts` (scripted
-  NPC in a tracksuit: walk/run, freeze, wobble/sneeze/cheer, dramatic death fall; `drawBody` takes a `BodyColors`
-  to dress the player's body as someone else), `turret.ts` (`drawTurret`: the sentry turret model), `guard.ts` (patrolling guard in a uniform and helmet: set `vel`, it walks / runs), `trapdoor.ts` (`drawTrapdoor`: the floor panel that snaps up like a catapult), `vehicles.ts` (forklift, golf cart, robot vacuum, office chair, steamroller, sports car, and door / pallet rafts),
-  `laser.ts` (`drawBeam` / `drawBeamDot` / `drawFloorGlow`,
+  `turret.ts` (`drawTurret`: the sentry turret model), `trapdoor.ts` (`drawTrapdoor`: the floor panel that snaps up like a catapult), `laser.ts` (`drawBeam` / `drawBeamDot` / `drawFloorGlow`,
   `BodySlicer` to test beams against the player's body parts, `LaserPylon`), `gnome.ts` (big garden gnome:
   `spawnGnome(physics, feet, look)`, arm poses in `GNOME_POSES`, glowing eyes, and `drawGnomeHat(out, headFrame)` for
-  anyone else's head), `snake.ts` (grid snake: movement, AI, colliders, model), `pixelText.ts` (5x7
+  anyone else's head), `pixelText.ts` (5x7
   dot-matrix text built from blocks, letters, digits and `! ? : . , -`; `pattern: Pattern.emissive` makes glowing LEDs;
-  `textBitmap(text)` gives the glyph rows for other pixel renderers), `apple.ts`, `ghost.ts` (arcade ghost: `drawGhost`, normal / scared / flashing / eyes only), `plush.ts` (plush toys: `spawnPlush(physics, 'alien', pos, look)`), `claw.ts` (claw-machine claw and gantry: `driveTo`, hub height `y`, prong `angle`, `distanceTo` for grabbing it), `bowling.ts` (2 m bowling pins: `spawnPin`, `pinSpots`, `uprightness`; `drawBowlingBall` with finger holes), `hexFloor.ts` (`HexFloor`: a floor of hexagonal tiles, each a
-  static collider, that flash and drop once touched; `support` / `touch` / `freeze` / `regrowFrom`; drawn with the
-  chamfered `'hextile'` mesh from renderer.ts), `livingRoom.ts` (sofa / armchair in any colour, coffee table,
-  beanbag, piano bench: `spawnFurniture`, sofas and armchairs with seat / back / arm colliders so you stand on the
-  cushions; `drawRug`, `drawPainting`), `giantDuck.ts` (a 4 m rubber duck you can stand on: a fixed body the level
-  moves with `moveTo`, which carries a rider along), `elevator.ts` (the chamber as an elevator car: doors, handrails,
-  LED floor indicator `FloorIndicator`, button panel `CarPanel`, crosshead and grate, the scrolling shaft). `chess.ts` (chess pieces, a crown), `hippo.ts` (a toy hippo head on an extending neck),
-  `blocks.ts` (Angry Birds building kit: `spawnBlock(physics, 'wood' | 'glass' | 'stone' | 'tnt', centre, size)`,
-  per-material damage tunables in `MATERIALS`; the level deals the damage), `birds.ts` (`drawBird` for Red, Blue,
-  Chuck, Bomb, Terence with angry brows; the giant `Slingshot` with `pullTo` / `release` / `rise` / `sag`;
-  `drawPigFace(out, headFrame, pop)` puts a snout, ears and eyes on any head; `drawStar` for score boards),
-  `pinball.ts` (`TableFrame`: a sloped table surface to build on (`y(z)`, `point`, `frame`, `quat`, `addBox`);
+  `textBitmap(text)` gives the glyph rows for other pixel renderers), `pinball.ts` (`TableFrame`: a sloped table surface to build on (`y(z)`, `point`, `frame`, `quat`, `addBox`);
   `Flipper` (kinematic, swings about the table normal; `step(h)` from a physics substep hook, `relative` for hits),
   `PopBumper`, `Slingshot`, `DropTarget` (letter on its face, sinks when `drop()`ped), `spawnSteelBall`, `drawPlunger`,
   `drawStar` / `drawChevron` / `triangleModel` (any triangle from the 'wedge' mesh), `DotMatrix` (orange pixel-text
   display), `pinSfx` (bumper chimes, flipper, knocker, jackpot, tilt...)),
-  `trinkets.ts` (`TRINKETS`: ~25 tiny household things as `JunkDef`s for `spawnJunk`: cans, mugs, books, shoes,
-  pencils, dice, donuts, a rubber chicken...), `katamari.ts` (`Katamari`: a sticky dynamic ball; `absorb(physics,
-  body)` takes a body out of the world and sticks it on the surface where it touched, turning with the ball;
-  `setRadius`; the prince who pushes it, drawn with `drawPrince`; `dimsOf(body)` gives any body's extents), `king.ts`
-  (`King`: a giant crowned head with a moustache that rises over a wall; `talk`, `tears`, `glow`, `lookAt`, `eye()`
-  for beams),
   `pool.ts` (`Water`: a rectangle of water that floats loose objects from sample points: buoyancy `capacity` in kg,
   drag, bobbing damped near critical, optional `righting`; `setLoad` for someone standing on a float, `splashes` to
   show; pool toys `spawnPoolFloat` (ring, noodle, air mattress, pallet), `spawnFloatingCouch`, `drawPoolLadder`,
   `drawLounger`, `drawParasol`), `sims.ts` (The Sims: `drawPlumbob` in a mood colour, `CursorHand` (the giant
   build-mode glove: `flyTo`, `follow`, `pinch`), `drawBubble` (camera-facing speech / thought bubble; the text is
   a world label), `NeedsPanel`, `drawGrimReaper`),
-  `crewmate.ts` (bean crewmate
-  in `CREW_COLORS`: set `vel` and it waddles; `lift` hops / sinks down a vent, `mouth` / `tongue` / `tongueTo` the
-  impostor's flip-top bite, `glow` a red visor, `kill(from)` leaves the bottom half with a bone while the top flies off,
-  `eject()` tumbles it up into space, `opacity` / `highlight`), `spaceship.ts` (`TaskStation` on a chamber wall with a
-  screen that lights while `lit`, `Vent` with a flap, `addMeetingTable` / `drawMeetingTable` with the EMERGENCY button),
-  `stadium.ts` (`Crowd`: bleachers along the north wall full of cheaply drawn fans that `rise` out of the floor, cheer /
-  gasp / stare by `mood` and `excitement`, `shout` world labels, and `leave`; `RunningTrack`: lanes along x on grass
-  that `unroll`; `Confetti`),
   `mole.ts` (whack-a-mole `Mole`: pink nose, whiskers, buck teeth, optional shades; `squash` flattens it, `dazed` gives
   X eyes and circling stars, `armsUp`, `walk` / `walking`, `wiggle`; `drawMole` in any frame, `drawDazedStars` over
   anyone's head), `mallet.ts` (`Mallet`: a giant's rubber mallet posed by `aim` / `swing` / `lift` / `from`; `grip()` is
-  where the giant's hand goes, `face()` the striking face, `squash` on impact), `tamagotchi.ts` (`PixelSprite`: a
-  bitmap of palette characters drawn as blocks on any plane (right / up / normal must be right-handed), same-colour
-  runs merged, items reused so drawing allocates nothing and the same sprite can be drawn many times a frame;
-  `gap` for LCD dots, `flip`, `sx` / `sy`, `lift`; `textSprite`; the virtual pet's art: the pet's faces and adult
-  form, egg, hearts, menu icons, arrow, poop, skull, ghost, grave, burger, candy, syringe, moon),
-  `jenga.ts` (`JengaTower`: layers of
+  where the giant's hand goes, `face()` the striking face, `squash` on impact), `jenga.ts` (`JengaTower`: layers of
   three blocks as fixed colliders moved with a scripted lean `phi` that springs toward `target()` (`bias()` from missing
   and stacked blocks plus an outside `load`, amplified by `gamma()`), `kick` for jolts, `tip` to push it over about its
   bottom east edge, `frames` per layer, `lay` / `unlay` blocks (a carried one has a world `free` frame; `slide` / `out`
@@ -703,7 +319,7 @@ Shared mechanics available to levels (via `ctx`):
   gives each body part's frame (e.g. to put a torch in the right hand, `foreArmR`).
 - Rapier's character controller can't jump up alongside kinematic colliders (the jump dies at once) or up an
   overhang (counts as bumping your head): for something moving that the player should climb onto, use a fixed body
-  and teleport it every frame, and move whoever stands on it yourself (`GiantDuck.moveTo`).
+  and teleport it every frame, and move whoever stands on it yourself.
 - `Pattern.lava` with `param` 2 draws a thing turned molten (hotter than a pool, and varying with height too);
   `param` 3 is see-through pool water (give it an `opacity`; it gets more opaque at grazing angles). A negative
   `Pattern.panels` param draws underwater tiles of that size with rippling caustics.

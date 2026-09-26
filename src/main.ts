@@ -13,46 +13,16 @@ import { Player } from './game/player';
 import { markBeaten, settings } from './game/settings';
 import { DartsLevel } from './levels/darts/dartsLevel';
 import { CakeLevel } from './levels/cake/cakeLevel';
-import { ClawLevel } from './levels/claw/clawLevel';
 import { GrenadeLevel } from './levels/grenade/grenadeLevel';
 import { LavaLevel } from './levels/lava/lavaLevel';
 import { TempleLevel } from './levels/temple/templeLevel';
-import { SimonLevel } from './levels/simon/simonLevel';
-import { SunburnLevel } from './levels/sunburn/sunburnLevel';
 import { MinesLevel } from './levels/mines/minesLevel';
-import { FroggerLevel } from './levels/frogger/froggerLevel';
-import { ChairsLevel } from './levels/chairs/chairsLevel';
-import { HexagoneLevel } from './levels/hexagone/hexagoneLevel';
-import { TetrisLevel } from './levels/tetris/tetrisLevel';
 import { DodgeballLevel } from './levels/dodgeball/dodgeballLevel';
 import { ButtonLevel } from './levels/button/buttonLevel';
-import { MicrowaveLevel } from './levels/microwave/microwaveLevel';
-import { QuizLevel } from './levels/quiz/quizLevel';
-import { DuckHuntLevel } from './levels/duckhunt/duckHuntLevel';
-import { PinataLevel } from './levels/pinata/pinataLevel';
-import { DominoesLevel } from './levels/dominoes/dominoesLevel';
-import { StealthLevel } from './levels/stealth/stealthLevel';
-import { RedLightLevel } from './levels/redLight/redLightLevel';
 import { LaserLevel } from './levels/lasers/laserLevel';
 import { GnomeLevel } from './levels/gnomes/gnomeLevel';
-import { SnakeLevel } from './levels/snake/snakeLevel';
-import { RockLevel } from './levels/rock/rockLevel';
-import { FlappyLevel } from './levels/flappy/flappyLevel';
-import { HipposLevel } from './levels/hippos/hipposLevel';
-import { ChessLevel } from './levels/chess/chessLevel';
-import { PacmanLevel } from './levels/pacman/pacmanLevel';
-import { BowlingLevel } from './levels/bowling/bowlingLevel';
-import { FloorLavaLevel } from './levels/floorLava/floorLavaLevel';
-import { ElevatorLevel } from './levels/elevator/elevatorLevel';
-import { BirdsLevel } from './levels/birds/birdsLevel';
-import { PlinkoLevel } from './levels/plinko/plinkoLevel';
-import { PinballLevel } from './levels/pinball/pinballLevel';
-import { KatamariLevel } from './levels/katamari/katamariLevel';
 import { PoolLevel } from './levels/pool/poolLevel';
-import { ImpostorLevel } from './levels/impostor/impostorLevel';
-import { QwopLevel } from './levels/qwop/qwopLevel';
 import { MolesLevel } from './levels/moles/molesLevel';
-import { TamagotchiLevel } from './levels/tamagotchi/tamagotchiLevel';
 import { JengaLevel } from './levels/jenga/jengaLevel';
 import type { Level, LevelContext, TrackedTarget, WorldLabel } from './levels/level';
 import { LobbyLevel } from './levels/lobby/lobbyLevel';
@@ -68,44 +38,14 @@ const LEVELS: [string, (ctx: LevelContext) => Level][] = [
   ['cake', (ctx) => new CakeLevel(ctx)],
   ['lava', (ctx) => new LavaLevel(ctx)],
   ['temple', (ctx) => new TempleLevel(ctx)],
-  ['simon', (ctx) => new SimonLevel(ctx)],
   ['button', (ctx) => new ButtonLevel(ctx)],
-  ['frogger', (ctx) => new FroggerLevel(ctx)],
   ['mines', (ctx) => new MinesLevel(ctx)],
-  ['quiz', (ctx) => new QuizLevel(ctx)],
-  ['chairs', (ctx) => new ChairsLevel(ctx)],
-  ['tamagotchi', (ctx) => new TamagotchiLevel(ctx)],
-  ['hippos', (ctx) => new HipposLevel(ctx)],
   ['gnome', (ctx) => new GnomeLevel(ctx)],
-  ['flappy', (ctx) => new FlappyLevel(ctx)],
-  ['redlight', (ctx) => new RedLightLevel(ctx)],
-  ['duckhunt', (ctx) => new DuckHuntLevel(ctx)],
-  ['stealth', (ctx) => new StealthLevel(ctx)],
-  ['chess', (ctx) => new ChessLevel(ctx)],
   ['dodgeball', (ctx) => new DodgeballLevel(ctx)],
-  ['plinko', (ctx) => new PlinkoLevel(ctx)],
-  ['rock', (ctx) => new RockLevel(ctx)],
-  ['claw', (ctx) => new ClawLevel(ctx)],
-  ['snake', (ctx) => new SnakeLevel(ctx)],
   ['moles', (ctx) => new MolesLevel(ctx)],
-  ['birds', (ctx) => new BirdsLevel(ctx)],
-  ['sunburn', (ctx) => new SunburnLevel(ctx)],
-  ['dominoes', (ctx) => new DominoesLevel(ctx)],
-  ['microwave', (ctx) => new MicrowaveLevel(ctx)],
-  ['katamari', (ctx) => new KatamariLevel(ctx)],
-  ['pinata', (ctx) => new PinataLevel(ctx)],
-  ['impostor', (ctx) => new ImpostorLevel(ctx)],
-  ['hexagone', (ctx) => new HexagoneLevel(ctx)],
   ['pool', (ctx) => new PoolLevel(ctx)],
-  ['floorlava', (ctx) => new FloorLavaLevel(ctx)],
-  ['pinball', (ctx) => new PinballLevel(ctx)],
   ['jenga', (ctx) => new JengaLevel(ctx)],
-  ['bowling', (ctx) => new BowlingLevel(ctx)],
-  ['tetris', (ctx) => new TetrisLevel(ctx)],
-  ['qwop', (ctx) => new QwopLevel(ctx)],
   ['laser', (ctx) => new LaserLevel(ctx)],
-  ['elevator', (ctx) => new ElevatorLevel(ctx)],
-  ['pacman', (ctx) => new PacmanLevel(ctx)],
 ];
 const params = new URLSearchParams(location.search);
 /** `?sandbox` opens the mechanics test room; `?level=N` skips the lobby and starts at level N. */
