@@ -71,8 +71,10 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   dark sloping stone tunnel lit by a torch in the player's hand. A boulder drops from a ceiling shaft between the
   player and the exit portal and chases them (rubber-banded: sprinting stays ahead, walking gets caught) over four
   spiked pits (the wide one has a vine: jump into it and it swings you across). At the dead end the wall sinks to
-  reveal a second boulder and the whole temple flips upside down (the map rotates 180° about a horizontal axis
-  through the player, so the player's physics never goes upside down). The new boulder chases them back; the first
+  reveal a second boulder and the whole temple slowly rolls over about the tunnel's axis: a quarter turn onto the
+  side wall (a 1.5 s pause standing there), then another onto the ceiling. The map rotates, never the player's physics;
+  the map body is fixed (the character controller won't climb slopes on kinematic colliders) and only goes
+  kinematic while turning. The new boulder chases them back; the first
   rolls ahead and drops down its shaft, now a pit, crossed on a second vine to reach the portal. Boulders kill on
   contact. The map is built flat in "track" space on one kinematic body; the level matrix tilts and flips it.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
