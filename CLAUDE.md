@@ -329,18 +329,19 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   King (`entities/king.ts`, a giant crowned head) rises over the north wall, and the board under him says MAKE IT 5
   METRES. USE ANYTHING. ANYTHING. (size readout, a bar with a red YOU tick at 3.4 m, a 90 s clock). His lines are
   pinned across the top of the screen (world labels placed in front of the camera). The ball rolls up anything whose
-  biggest extent is at most half its diameter (d² grows by 0.9 × its two biggest extents multiplied, 1.6× that for
+  biggest extent is at most half its diameter (d² grows by 0.8 × its two biggest extents multiplied, twice that for
   things you carried or threw in: "OH, A VOLUNTEER."): the prince heads for the best thing nearby (bigger
   preferred), stops now and then to admire his ball, and it speeds up as it grows (1.6 + 0.9 d m/s). Too-big things
   bonk, and get shoved along rather than launched. At 3.4 m you count as stuff (1.7 m): the readout and bar go red, a
-  sting, a "!" over it for 1.4 s, then it hunts you (2.6 + 1.25 d, at most 7.3 m/s against a sprint's 8.5; it
+  sting, a "!" over it for 1.4 s, then it hunts you (2.6 + 1.15 d, at most 7 m/s against a sprint's 8.5; it
   swerves at 60% of its acceleration, so circling works; a red marker flags it within 9 m), detours for anything big
   right in front of it, and every 6 s the King drops in something big it can eat (every third straight into its
   path, the rest marked by a beam away from where you're running). Touch it and you're ROLLED UP: stuck on it,
   flailing, while the camera watches from the side. 5 m: it floats up into the sky and becomes a star (the King
-  weeps), and the exit opens. Out of time: "UNACCEPTABLE.", beams from his eyes, ROYALLY ZAPPED. Test bots: fleeing
-  alone mostly runs out of time (the prince reaches 3.4 m at 60-70 s), feeding it and leading it through the big
-  stuff wins at 65-80 s. `?katTime=N` sets the clock, `?katSize=D` the starting diameter.
+  weeps), and the exit opens. Out of time: "UNACCEPTABLE.", beams from his eyes, ROYALLY ZAPPED. Test bots: only
+  fleeing runs out of time (the prince alone reaches 3.4 m at 70-85 s); feeding it gets there at 40-55 s, and then
+  running laps round the middle is never caught, while leading it through the deliveries wins at 60-85 s.
+  `?katTime=N` sets the clock, `?katSize=D` the starting diameter.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one

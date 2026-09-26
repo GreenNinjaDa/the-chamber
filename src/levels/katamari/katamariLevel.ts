@@ -37,16 +37,16 @@ const PICK = 0.5;
 /** The player counts as this big: the ball can roll them up from PLAYER_SIZE / PICK (3.4 m). */
 const PLAYER_SIZE = 1.7;
 /** Growth: diameter² grows by GROW × (the thing's two biggest extents multiplied). */
-const GROW = 0.9;
+const GROW = 0.8;
 /** Things the player carried or threw in grow it this many times as much. */
-const FED_BONUS = 1.6;
+const FED_BONUS = 2;
 /** Top speed (m/s) while gathering: BASE + PER_M × diameter, at most SPEED_MAX (a sprint is 8.5 m/s). */
 const SPEED_BASE = 1.6;
 const SPEED_PER_M = 0.9;
-const SPEED_MAX = 7.3;
+const SPEED_MAX = 7.0;
 /** ...and while hunting you (a walk is 5 m/s). */
 const HUNT_BASE = 2.6;
-const HUNT_PER_M = 1.25;
+const HUNT_PER_M = 1.15;
 /** Every so often (s) the prince stops to admire his ball for a moment (s). */
 const DAWDLE_EVERY: [number, number] = [5, 9];
 const DAWDLE_FOR = 1.1;
