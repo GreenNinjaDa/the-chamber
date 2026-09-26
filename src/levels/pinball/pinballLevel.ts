@@ -479,6 +479,25 @@ export class PinballLevel implements Level {
         d.push({ mesh: 'sphere', model: mul(t.frame(x + side * 0.14, z, 0, 0.3), scaling([0.1, 0.1, 0.1])), color: this.giColor, pattern: Pattern.emissive, shadow: false });
       }
     }
+    // Backglass art either side of the display: a ringed planet, a grinning skull, and stars.
+    const glassZ = -H + 0.13;
+    const planet: Vec3 = [-9.3, 8.25, glassZ];
+    d.push({ mesh: 'sphere', model: mul(translation(planet), scaling([0.85, 0.85, 0.2])), color: [1.1, 0.25, 0.9], pattern: Pattern.emissive, shadow: false });
+    d.push({ mesh: 'sphere', model: mul(translation([planet[0] - 0.25, planet[1] + 0.3, glassZ + 0.05]), scaling([0.25, 0.18, 0.2])), color: [1.8, 0.7, 1.6], pattern: Pattern.emissive, shadow: false });
+    d.push({ mesh: 'tube', model: mul(translation([planet[0], planet[1], glassZ + 0.1]), rotationZ(0.35), rotationX(Math.PI / 2 - 0.25), scaling([1.45, 0.05, 1.45])), color: [1.6, 1.2, 0.2], pattern: Pattern.emissive, shadow: false });
+    const skull: Vec3 = [9.3, 8.45, glassZ];
+    const bone = [1.9, 1.85, 1.6], hole = [0.04, 0.0, 0.06];
+    d.push({ mesh: 'sphere', model: mul(translation(skull), scaling([0.75, 0.7, 0.15])), color: bone, pattern: Pattern.emissive, shadow: false });
+    d.push({ mesh: 'box', model: mul(translation([skull[0], skull[1] - 0.72, glassZ]), scaling([0.75, 0.4, 0.12])), color: bone, pattern: Pattern.emissive, shadow: false });
+    for (const sx of [-0.28, 0.28]) {
+      d.push({ mesh: 'sphere', model: mul(translation([skull[0] + sx, skull[1] - 0.05, glassZ + 0.14]), scaling([0.19, 0.22, 0.03])), color: hole, pattern: Pattern.emissive, shadow: false });
+    }
+    d.push({ mesh: 'box', model: mul(translation([skull[0], skull[1] - 0.3, glassZ + 0.14]), rotationZ(Math.PI / 4), scaling([0.12, 0.12, 0.03])), color: hole, pattern: Pattern.emissive, shadow: false });
+    for (let i = -2; i <= 2; i++) {
+      d.push({ mesh: 'box', model: mul(translation([skull[0] + i * 0.13, skull[1] - 0.75, glassZ + 0.08]), scaling([0.025, 0.3, 0.03])), color: hole, pattern: Pattern.emissive, shadow: false });
+    }
+    const glassStars: [number, number, number][] = [[-10.6, 9.4, 0.22], [-7.9, 7.3, 0.16], [-8.1, 9.5, 0.12], [10.6, 7.4, 0.2], [7.9, 9.4, 0.17], [8.1, 7.2, 0.12], [-10.7, 7.2, 0.14], [10.7, 9.5, 0.13]];
+    for (const [x, y, r] of glassStars) drawStar(d, mul(translation([x, y, glassZ + 0.02]), rotationX(Math.PI / 2)), r, [2.2, 2.0, 1.2], 0.02, { pattern: Pattern.emissive });
     // The same band across the front of the machine (the south wall, behind the drain).
     const top = 4.8;
     d.push({ mesh: 'box', model: mul(translation([0, top / 2, H - 0.02]), scaling([H * 2, top, 0.04])), color: [0.07, 0.02, 0.13], spec: 0.5 });
