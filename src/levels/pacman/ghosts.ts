@@ -10,7 +10,7 @@ import { CELL, cellX, cellZ, COLS, EXIT_CELL, HOUSE_INSIDE, ROWS, toCellX, toCel
  *   Pinky (pink)    four cells ahead of the player
  *   Inky (cyan)     the cell two ahead of the player, mirrored through Blinky: a pincer
  *   Clyde (orange)  the player, until he gets close; then he loses his nerve and heads for his corner
- * Scatter phases send each one to its own corner for a few seconds. Scared ghosts wander at random.
+ * Scatter phases send each one to its own corner for a few seconds. Scared ghosts run away (mostly).
  */
 
 export type GhostName = keyof typeof GHOST_COLORS;
@@ -20,13 +20,15 @@ type State = 'house' | 'leaving' | 'maze' | 'eyes' | 'entering' | 'reviving';
 /** m/s. Walking is 5 and sprinting 8.5. */
 export const GHOST_SPEED = 4.0;
 const SCARED_SPEED = 2.4;
+/** How often a scared ghost takes the turn away from the player (otherwise any turn). */
+const SCARED_FLEE = 0.75;
 const EYES_SPEED = 10;
 const HOUSE_SPEED = 2.4;
 /** Blinky speeds up ("Cruise Elroy") when this few pellets are left, and again at the second count. */
 const ELROY_PELLETS = [20, 8];
-const ELROY_SPEED = [4.5, 5.0];
+const ELROY_SPEED = [4.4, 4.8];
 /** Scatter / chase phases (s), alternating, starting with scatter; the last one lasts forever. */
-const SCHEDULE = [6, 20, 6, 20, 5, Infinity];
+const SCHEDULE = [7, 18, 7, 18, 6, Infinity];
 /** Seconds after the start that each ghost leaves the house. */
 const RELEASE: Record<GhostName, number> = { blinky: 0, pinky: 2.5, inky: 6, clyde: 10 };
 /** Clyde gives up the chase this close to the player (cells). */
@@ -143,7 +145,7 @@ export class Ghost {
               this.di = 0;
               this.dj = -1;
               this.prog = 0;
-              this.choose(crew.targetFor(this), false);
+              this.choose(crew.targetFor(this), this.scared);
             } else {
               this.state = 'reviving';
               this.reviveT = 0;
@@ -187,8 +189,11 @@ export class Ghost {
     }
   }
 
-  /** At a cell centre: the turn (never back) that gets closest to the target; scared ones pick at random. */
-  private choose(target: [number, number], random: boolean) {
+  /**
+   * At a cell centre: the turn (never back) that gets closest to the target. Scared ones (`flee`)
+   * mostly take the turn that gets furthest from it (the player), and sometimes just any turn.
+   */
+  private choose(target: [number, number], flee: boolean) {
     const options: [number, number][] = [];
     for (const d of DIRS) {
       if (d[0] === -this.di && d[1] === -this.dj) continue;
@@ -200,15 +205,16 @@ export class Ghost {
       return;
     }
     let pick = options[0];
-    if (random) {
+    if (flee && Math.random() > SCARED_FLEE) {
       pick = options[Math.floor(Math.random() * options.length)];
     } else {
+      const sign = flee ? -1 : 1;
       let best = Infinity;
       for (const d of options) {
         const dx = this.ci + d[0] - target[0], dz = this.cj + d[1] - target[1];
-        const dist = dx * dx + dz * dz;
-        if (dist < best - 1e-6) {
-          best = dist;
+        const score = sign * (dx * dx + dz * dz);
+        if (score < best - 1e-6) {
+          best = score;
           pick = d;
         }
       }
@@ -310,6 +316,7 @@ export class GhostCrew {
     if (g.state === 'eyes') return [EXIT_CELL.i, EXIT_CELL.j];
     const q = this.quarry;
     const px = toCellX(q.x), pz = toCellZ(q.z);
+    if (g.scared) return [px, pz]; // what it runs from
     const elroy = g.name === 'blinky' && this.pelletsLeft <= ELROY_PELLETS[0];
     if (this.scatter && !elroy) return g.corner;
     switch (g.name) {

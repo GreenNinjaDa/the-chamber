@@ -7,7 +7,7 @@ import { GHOST_COLORS, GHOST_RADIUS } from '../../entities/ghost';
 import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus, type TrackedTarget, type WorldLabel } from '../level';
 import { GhostCrew, type Ghost, type GhostName, type Quarry } from './ghosts';
 import {
-  addMazeColliders, cellX, cellZ, drawMaze, EXIT_CELL, MAZE_WALL_HEIGHT, PELLET_SPOTS, pushOutOfWalls, START_CELL,
+  addMazeColliders, BONUS_CELL, cellX, cellZ, drawMaze, MAZE_WALL_HEIGHT, PELLET_SPOTS, pushOutOfWalls, START_CELL,
 } from './maze';
 
 /*
@@ -43,7 +43,7 @@ const CHERRY_AT = [25, 60];
 const CHERRY_TIME = 9.5;
 const CHERRY_SCORE = 100;
 const CHERRY_EAT_RADIUS = 0.9;
-const CHERRY_POS: Vec3 = [cellX(6), 0, cellZ(8)];
+const CHERRY_POS: Vec3 = [cellX(BONUS_CELL.i), 0, cellZ(BONUS_CELL.j)];
 const CHERRY_RED = [2.0, 0.07, 0.05];
 const CHERRY_SHINE = [2.5, 2.2, 2.2];
 const CHERRY_STEM = [0.55, 0.3, 0.08];
@@ -156,7 +156,7 @@ export class PacmanLevel implements Level {
   private scoreLabel: WorldLabel = { pos: [-6.5, 6.4, -CHAMBER_HALF + 0.05], text: '', size: 0.75, color: '#ffffff' };
   private highTitle: WorldLabel = { pos: [2.5, 7.4, -CHAMBER_HALF + 0.05], text: '', size: 0.75, color: '#ffffff' };
   private highLabel: WorldLabel = { pos: [2.5, 6.4, -CHAMBER_HALF + 0.05], text: '', size: 0.75, color: '#ffffff' };
-  private ready: WorldLabel = { pos: [cellX(EXIT_CELL.i), 1.0, cellZ(8)], text: '', size: 0.8, color: '#ffe600' };
+  private ready: WorldLabel = { pos: [cellX(BONUS_CELL.i), 1.0, cellZ(BONUS_CELL.j)], text: '', size: 0.8, color: '#ffe600' };
   private popups: Popup[] = [];
   private labelList: WorldLabel[];
   private targets: TrackedTarget[] = [];
@@ -249,7 +249,7 @@ export class PacmanLevel implements Level {
         if (this.pelletsLeft === 0 && this.phase === 'play') this.cleared();
         break;
       case 'dying':
-        this.updateDeath(dt);
+        this.updateDeath();
         break;
       case 'clear':
         this.updateClear();
@@ -378,7 +378,7 @@ export class PacmanLevel implements Level {
   }
 
   /** The arcade death: freeze, the ghosts vanish, and the player spins, shrinks away and pops. */
-  private updateDeath(dt: number) {
+  private updateDeath() {
     const { player } = this.ctx;
     const t = this.phaseT;
     if (t < DEATH_FREEZE) return;
@@ -414,7 +414,6 @@ export class PacmanLevel implements Level {
       this.bursts.push({ pos: this.shrinkPivot, t: 0, color: PELLET_COLOR, kind: 'sparkle' });
       this.ctx.camera.addShake(0.2);
     }
-    void dt;
   }
 
   private cleared() {

@@ -36,6 +36,8 @@ export const MAZE_WALL_HEIGHT = 1.5;
 export const HOUSE = { i0: 5, i1: 7, j0: 5, j1: 7 };
 export const DOOR_CELL = { i: 6, j: 5 };
 export const EXIT_CELL = { i: 6, j: 4 };
+/** The corridor cell under the house, where READY! shows and the bonus fruit turns up. */
+export const BONUS_CELL = { i: 6, j: 8 };
 const HOUSE_WALL = 0.3;
 const DOOR_HALF_WIDTH = 0.75;
 
