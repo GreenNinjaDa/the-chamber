@@ -273,7 +273,6 @@ export class ImpostorLevel implements Level {
   private npcs: Npc[] = [];
   private impostor!: Npc;
   private stations: TaskStation[] = [];
-  private stationUsers = new Map<TaskStation, number>();
   private vents: Vent[] = [];
   private ventClose: number[] = [];
   private corpses: Corpse[] = [];
@@ -303,7 +302,6 @@ export class ImpostorLevel implements Level {
   private darkReason: 'wrongVote' | 'numbers' = 'numbers';
   private darkPlaced = false;
   private darkEjected: Npc | null = null;
-  private wonAt = -1;
   private playerEjected = false;
   private hum = new Drone(55, { wave: 'sawtooth', vol: 0.022, wobble: 0.25 });
   private riff = new Tune(MEETING_RIFF, 104, { wave: 'triangle', vol: 0.12 });
@@ -1012,7 +1010,6 @@ export class ImpostorLevel implements Level {
     const { hud } = this.ctx;
     this.phase = 'won';
     this.phaseT = 0;
-    this.wonAt = this.time;
     this.lunge = null;
     const imp = this.impostor;
     if (how === 'vote') {

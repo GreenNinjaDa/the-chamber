@@ -350,6 +350,26 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   line between its lanes) and the note plays (the lead only sounds when you hit; drums and bass run on song time). Misses
   drain the rock meter on the north wall; the crowd down both sides cheers, bobs or boos with it. Empty it and you're
   booed off (tomatoes, then the stage catapults you); finish the song and the exit opens for the encore.
+- **Level 34 — Among Us** (`src/levels/impostor/`): the chamber is a spaceship cafeteria open to space (a steel deck,
+  stars): a round table with the big red EMERGENCY button (`entities/spaceship.ts`), eight task stations round the walls
+  (wiring, dials, card swipe, garbage chute, data terminals) and four floor vents. Six bean crewmates
+  (`entities/crewmate.ts`, colour-name labels; red always comes) waddle between stations doing tasks: the station's
+  screen lights up (and glows on the floor) and the task bar on the north wall fills. One of them (random; `?impostor=RED`
+  picks it) is the impostor: it fakes tasks (the screen stays dark), sometimes follows you standing ~1 m away, and from
+  10 s in, every 10-15 s, hunts someone nobody else can see it with (no crewmate within 5.5 m, shrinking as the hunt
+  drags on; you more than 8.5 m away, so kills can be watched from across the room; you only after the first kill):
+  a lunge, its head flips open into a toothy mouth, a tongue, and the victim's top half flies off, leaving the bottom
+  half with a bone. Then it hops down the nearest vent (the flap clanks open) and pops out of another. Crewmates who
+  see a vent exit or a faked task remember it. Bodies are found by crewmates walking past (4.5 m) or reported by you
+  (E); the button (E) calls a meeting (2 per attempt, 8 s cooldown). Meetings: "EMERGENCY MEETING!" / "DEAD BODY
+  REPORTED" (world frozen), everyone warps round the table, bodies vanish, 6 s of speech bubbles (dumb chatter, the
+  impostor's lies, witnesses' true "RED VENTED" / "red was faking tasks"), then 10 s to vote: stand by someone (a purple
+  ring) or on the SKIP pad and press E (or just be there when time runs out). NPCs follow your vote 68% of the time
+  (skip if you didn't vote), witnesses vote what they saw, the impostor votes with you or for you; ties go your way.
+  Vote chips pop over each candidate, then the ejected bean is flung out of a trapdoor into space. Impostor out:
+  VICTORY, cheering, the exit opens; so does filling the task bar (your tasks count double). Lose: vote out an
+  innocent and the lights go out, it walks up with its visor glowing red (a red point light) and eats you; be alone
+  with it; get down to just you and it; or be voted out yourself (you float off into space).
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -396,7 +416,11 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   beanbag, piano bench: `spawnFurniture`, sofas and armchairs with seat / back / arm colliders so you stand on the
   cushions; `drawRug`, `drawPainting`), `giantDuck.ts` (a 4 m rubber duck you can stand on: a fixed body the level
   moves with `moveTo`, which carries a rider along), `elevator.ts` (the chamber as an elevator car: doors, handrails,
-  LED floor indicator `FloorIndicator`, button panel `CarPanel`, crosshead and grate, the scrolling shaft). `chess.ts` (chess pieces, a crown), `hippo.ts` (a toy hippo head on an extending neck). Put new
+  LED floor indicator `FloorIndicator`, button panel `CarPanel`, crosshead and grate, the scrolling shaft). `chess.ts` (chess pieces, a crown), `hippo.ts` (a toy hippo head on an extending neck), `crewmate.ts` (bean crewmate
+  in `CREW_COLORS`: set `vel` and it waddles; `lift` hops / sinks down a vent, `mouth` / `tongue` / `tongueTo` the
+  impostor's flip-top bite, `glow` a red visor, `kill(from)` leaves the bottom half with a bone while the top flies off,
+  `eject()` tumbles it up into space, `opacity` / `highlight`), `spaceship.ts` (`TaskStation` on a chamber wall with a
+  screen that lights while `lit`, `Vent` with a flap, `addMeetingTable` / `drawMeetingTable` with the EMERGENCY button). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
