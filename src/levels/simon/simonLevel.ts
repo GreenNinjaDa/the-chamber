@@ -1,10 +1,11 @@
-import { add, basis, clamp, mul, rotationX, rotationY, scale, scaling, translation, type Vec3 } from '../../engine/math';
+import { add, basis, clamp, mul, scale, scaling, translation, type Vec3 } from '../../engine/math';
 import type { Body } from '../../engine/physics';
 import { Pattern, type DrawItem } from '../../engine/renderer';
 import { CHAMBER_HALF } from '../../game/chamber';
 import { junk } from '../../entities/junk';
 import { ExitPortal, PortalArrival } from '../../entities/portal';
 import { Button } from '../../entities/props';
+import { drawTrapdoor } from '../../entities/trapdoor';
 import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus, type TrackedTarget, type WorldLabel } from '../level';
 
 /*
@@ -488,18 +489,7 @@ export class SimonLevel implements Level {
 
     // The trapdoor that flung the player: a floor plate snapped up on its hinge, over a dark hole.
     const c = this.catapult;
-    if (c) {
-      const angle = 1.15 * clamp(c.t / 0.1, 0, 1);
-      const base = mul(translation(c.pos), rotationY(c.yaw));
-      out.push({ mesh: 'box', model: mul(base, translation([0, 0.004, 0]), scaling([1.5, 0.01, 1.5])), color: [0.01, 0.01, 0.01] });
-      out.push({
-        mesh: 'bevelbox',
-        model: mul(base, translation([0, 0, -0.75]), rotationX(-angle), translation([0, -0.04, 0.75]), scaling([1.5, 0.08, 1.5])),
-        color: [0.45, 0.47, 0.5],
-        spec: 0.6,
-      });
-      out.push({ mesh: 'cylinder', model: mul(base, translation([0, 0.1, -0.2]), rotationX(-angle * 0.5), translation([0, 0.3, 0]), scaling([0.06, 0.7, 0.06])), color: [0.2, 0.2, 0.22] });
-    }
+    if (c) drawTrapdoor(out, c.pos, c.yaw, c.t);
   }
 
   labels(): WorldLabel[] {

@@ -49,6 +49,12 @@ export const REST_POSE: Pose = {
   elbowL: 0.15, elbowR: 0.15, hipL: 0, hipR: 0, kneeL: -0.05, kneeR: -0.05,
 };
 
+/** Sitting on a chair (seat about 0.45 m up): hips dropped, thighs level, shins down, hands on the knees. */
+export const SIT_POSE: Pose = {
+  crouch: 0.52, lean: 0.08, headPitch: 0, shoulderL: 0.45, shoulderR: 0.45, armOut: 0.12, elbowL: 0.7, elbowR: 0.7,
+  hipL: 1.45, hipR: 1.45, kneeL: -1.4, kneeR: -1.4,
+};
+
 // Skeleton, in the standing player's local space (feet at the origin, facing -z).
 const PELVIS_Y = 0.98;
 const WAIST: Vec3 = [0, 0.1, 0]; //    on the pelvis

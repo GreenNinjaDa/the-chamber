@@ -164,6 +164,13 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   later. Caught (it enters your cell, you're right in front of its mouth, or its head pushes into you) = swallowed
   whole (shrink into its mouth, gulp, +3 blocks, a bulge runs down to the tail), then GAME OVER with the snake's
   length as SCORE. The score also shows in pixel digits on the north wall.
+- **Musical Chairs** (`src/levels/chairs/`): a disco (flashing dance floor, mirror ball with a colour-cycling point
+  light, a jukebox puffing notes) with a ring of folding chairs and four contestants (`entities/contestant.ts`). While
+  the music plays everyone walks round the chairs, and so must you: loiter (not going round, or leaving the band round
+  the ring) and after a shout the floor flings you out for camping (`entities/trapdoor.ts`). When it stops (the
+  lights die, "SKRRRT!") everyone dives for a free chair: you take one just by reaching its seat; the contestants react
+  after their own delays. Whoever's left standing is catapulted out, a chair sinks away, repeat: 4 rounds (4, 3, 2,
+  1 chairs). Win the last chair and the exit opens.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -198,7 +205,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   `pressurePlate.ts` (round button, or `{ stone: [w, d] }` for a rock slab), `uselessBox.ts`, `rock.ts` (textured stone: `boulderModel`, `chunkModel`, `slabModel`, `shardModel`, `clusterModel`; `Pattern.rock`),
   `doll.ts` (the giant doll with a swivelling head and glowing eyes, plus a `BareTree`), `contestant.ts` (scripted
   NPC in a tracksuit: walk/run, freeze, wobble/sneeze/cheer, dramatic death fall; `drawBody` takes a `BodyColors`
-  to dress the player's body as someone else), `vehicles.ts` (forklift, golf cart, robot vacuum, office chair, steamroller, sports car, and door / pallet rafts),
+  to dress the player's body as someone else), `trapdoor.ts` (`drawTrapdoor`: the floor panel that snaps up like a catapult), `vehicles.ts` (forklift, golf cart, robot vacuum, office chair, steamroller, sports car, and door / pallet rafts),
   `laser.ts` (`drawBeam` / `drawBeamDot` / `drawFloorGlow`,
   `BodySlicer` to test beams against the player's body parts, `LaserPylon`), `gnome.ts` (big garden gnome:
   `spawnGnome(physics, feet, look)`, arm poses in `GNOME_POSES`, glowing eyes, and `drawGnomeHat(out, headFrame)` for
@@ -250,6 +257,7 @@ Shared mechanics available to levels (via `ctx`):
 - `player.char` (0-1) draws the player burnt to a crisp (this life only).
 - `player.platformVel` — the velocity of whatever the player stands on (a raft, a conveyor), added to their movement;
   levels set it every frame.
+- `player.sitting` draws the sitting pose (`SIT_POSE` in body.ts; the level keeps them on the seat).
 - `player.torchArm` raises the right arm up and ahead as if holding a torch (the level draws the torch).
 - `player.resume(velocity)` puts the player back in normal control after a scripted mode; `player.partFrames()`
   gives each body part's frame (e.g. to put a torch in the right hand, `foreArmR`).

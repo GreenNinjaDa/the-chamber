@@ -6,7 +6,7 @@ import {
 } from '../engine/math';
 import { GROUPS_PLAYER_CAPSULE, GROUPS_QUERY_WORLD, RAPIER, type Body, type Physics } from '../engine/physics';
 import type { DrawItem } from '../engine/renderer';
-import { crouchLegs, drawBody, PART_NAMES, PhysBody, poseFrames, REST_POSE, standingRoot, type Frames, type PartName, type Pose } from './body';
+import { crouchLegs, drawBody, PART_NAMES, PhysBody, poseFrames, REST_POSE, SIT_POSE, standingRoot, type Frames, type PartName, type Pose } from './body';
 
 /**
  * control: walking around under player control (pos = feet); the physical body follows the
@@ -181,6 +181,8 @@ export class Player {
   up: Vec3 = [0, 1, 0];
   /** Hanging on to something overhead (a vine): arms up. The level does the holding. */
   hanging = false;
+  /** Sitting down (on a chair the level provides): the sitting pose. The level keeps them in place. */
+  sitting = false;
   /** Holding a torch up and ahead in the right hand (the level draws the torch). */
   torchArm = false;
   /** How solid the player is drawn (1 = solid; less is see-through). */
@@ -223,6 +225,7 @@ export class Player {
     this.gravity = identity();
     this.up = [0, 1, 0];
     this.hanging = false;
+    this.sitting = false;
     this.torchArm = false;
     this.opacity = 1;
     this.char = 0;
@@ -715,6 +718,7 @@ export class Player {
     switch (this.mode) {
       case 'control': {
         if (this.hanging) return hangingPose(t);
+        if (this.sitting) return SIT_POSE;
         if (!this.onGround) {
           return {
             lean: -0.1 + this.aimBend * 0.5, twist: this.aimTwist, headPitch: 0.1, shoulderL: -0.5, shoulderR: -0.5, armOut: 0.5, elbowL: 0.7, elbowR: 0.7,

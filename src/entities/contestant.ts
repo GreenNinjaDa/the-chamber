@@ -1,6 +1,6 @@
 import { approachAngle, clamp, mul, rotationX, rotationY, scaling, translation, type Mat4, type Vec3 } from '../engine/math';
 import type { DrawItem } from '../engine/renderer';
-import { drawBody, poseFrames, type BodyColors, type Pose } from '../game/body';
+import { drawBody, poseFrames, SIT_POSE, type BodyColors, type Pose } from '../game/body';
 
 /*
  * A fellow test subject in a green tracksuit: the player's body model, scripted (no physics).
@@ -30,7 +30,7 @@ export interface ContestantLook {
   old?: boolean;
 }
 
-export type ContestantAction = 'none' | 'wobble' | 'sneeze' | 'cheer';
+export type ContestantAction = 'none' | 'wobble' | 'sneeze' | 'cheer' | 'sit';
 
 export class Contestant {
   pos: Vec3;
@@ -193,6 +193,8 @@ export class Contestant {
           elbowL: 0.3, elbowR: 0.3, hipL: 0, hipR: 0, kneeL: -0.1, kneeR: -0.1,
         }, k);
       }
+      case 'sit':
+        return blend(walk, SIT_POSE, clamp(at / 0.15, 0, 1));
       default:
         return walk;
     }
@@ -228,7 +230,7 @@ function blend(a: Pose, b: Pose, k: number): Pose {
   return {
     lean: l(a.lean, b.lean), headPitch: l(a.headPitch, b.headPitch), shoulderL: l(a.shoulderL, b.shoulderL), shoulderR: l(a.shoulderR, b.shoulderR),
     armOut: l(a.armOut, b.armOut), elbowL: l(a.elbowL, b.elbowL), elbowR: l(a.elbowR, b.elbowR), hipL: l(a.hipL, b.hipL), hipR: l(a.hipR, b.hipR),
-    kneeL: l(a.kneeL, b.kneeL), kneeR: l(a.kneeR, b.kneeR),
+    kneeL: l(a.kneeL, b.kneeL), kneeR: l(a.kneeR, b.kneeR), crouch: l(a.crouch ?? 0, b.crouch ?? 0),
   };
 }
 
