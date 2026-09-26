@@ -17,6 +17,8 @@ const HOLE_RIM = [0.85, 0.06, 0.04];
 export interface ChamberOptions {
   /** A round hole through the north wall, centred at (x, y) on the wall, with this radius (m). */
   hole?: { x: number; y: number; radius: number };
+  /** The light comes from below (e.g. lava): the floor and ground mustn't shadow everything above them. */
+  litFromBelow?: boolean;
 }
 
 interface WallBox {
@@ -68,6 +70,7 @@ export function drawChamber(out: DrawItem[], opts: ChamberOptions = {}) {
       pattern: Pattern.panels,
       param: b.panel,
       spec: 0.15,
+      shadow: opts.litFromBelow && b.pos[1] < 0 ? false : undefined,
     });
   }
   const hole = opts.hole;

@@ -39,6 +39,11 @@ export interface DrawItem {
 
 export interface Environment {
   sunDir: Vec3;
+  /**
+   * Set when the "sun" is really a glowing surface below (lava): its height. Light then shines up
+   * from it (point sunDir downward), fades with height above it, and casts very soft shadows.
+   */
+  lightFromBelow?: number;
   sunColor: Vec3;
   skyColor: Vec3;
   groundColor: Vec3;
@@ -285,12 +290,13 @@ export class Renderer {
     device.queue.writeBuffer(this.objBuffer, 0, od, 0, n * OBJ_FLOATS);
 
     const sunDir = normalize(env.sunDir);
-    const lightView = lookAt(add(SHADOW_CENTER, scale(sunDir, 220)), SHADOW_CENTER, [0, 1, 0]);
+    const lightUp: Vec3 = Math.abs(sunDir[1]) > 0.95 ? [0, 0, 1] : [0, 1, 0];
+    const lightView = lookAt(add(SHADOW_CENTER, scale(sunDir, 220)), SHADOW_CENTER, lightUp);
     const lightProj = ortho(-SHADOW_EXTENT, SHADOW_EXTENT, -SHADOW_EXTENT, SHADOW_EXTENT, 1, 480);
     const f = this.frameData;
     f.set(multiply(cam.proj, cam.view), 0);
     f.set(multiply(lightProj, lightView), 16);
-    f.set([...sunDir, 0], 32);
+    f.set([...sunDir, env.lightFromBelow ?? -1e4], 32);
     f.set([...env.sunColor, 0], 36);
     f.set([...env.skyColor, 0], 40);
     f.set([...env.groundColor, 0], 44);

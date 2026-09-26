@@ -59,12 +59,18 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   real cube, 25 kg) lie around;
   the exit is open only while one (or the player) is on the floor button (`entities/pressurePlate.ts`); take it off and the
   panel slides shut again.
-- **Level 4 — Useless Box** (`src/levels/lava/`): lava fills the chamber and rises slowly. You arrive on a small
-  ledge by the exit (east wall, 3 m up); 11 rock pillars snake through the whole pit to a tiny island in the far
-  corner with a useless box (`entities/uselessBox.ts`). Its switch opens the exit, but after a delay the box opens
-  its lid, reaches out and flips it back off; the delay is 1 s, then 2 s, 3 s... The player can't switch it off
-  (E does nothing). Keep flipping until the box waits long enough to jump all the way back.
-- Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall.
+- **Level 4 — Useless Box** (`src/levels/lava/`): a roofed chamber full of rising lava (the only light). You
+  arrive on a small ledge by the exit (east wall, 3 m up); 10 rock pillars snake through the pit to a ledge in the
+  far corner with a big useless box (`entities/uselessBox.ts`, 1.8x). Its lever is a physics handle on a hinge:
+  grab it (hold left click) and push it back to switch it on, which opens the exit. It then locks; after a delay
+  the box opens its lid, reaches out and shoves it back off. The delay is 1 s, then 2 s, 3 s... but each flip has
+  a 50% chance of only 0.2 s. Hazards: a wrecking ball swings across the long jump between the 4th and 5th rocks
+  (a hit to the head or chest knocks you into the lava), and the 3rd rock from the end sinks 1.8 m and back over
+  10 s, carrying you. Lava death is a plain collapse.
+- Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
+  or `litFromBelow` (the floor casts no shadows). `Environment.lightFromBelow` (renderer.ts) turns the sun into a
+  glowing surface at that height: it lights like a plane below (down-facing surfaces fully, walls half), fades
+  with height above it, and casts very soft shadows.
 
 ## Commands
 

@@ -1,7 +1,7 @@
 struct Frame {
   viewProj: mat4x4f,
   lightViewProj: mat4x4f,
-  sunDir: vec4f,      // xyz: direction toward the sun
+  sunDir: vec4f,      // xyz: direction toward the sun; w: height of a glowing surface lighting from below (-1e4: none)
   sunColor: vec4f,
   skyColor: vec4f,
   groundColor: vec4f,
@@ -25,6 +25,8 @@ struct Object {
 
 // Pattern ids (keep in sync with Pattern in renderer.ts).
 const PAT_PANELS = 1;
+/** Half-width (m) of the sun's shadow map; must match SHADOW_EXTENT in renderer.ts. */
+const SHADOW_EXTENT = 88.0;
 const PAT_DARTBOARD = 2;
 const PAT_BLOB = 3;
 const PAT_EMISSIVE = 4;
@@ -70,6 +72,9 @@ fn shadowFactor(worldPos: vec3f, n: vec3f) -> f32 {
   if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0 || ndc.z > 1.0) {
     return 1.0;
   }
+  if (frame.sunDir.w > -1000.0) {
+    return areaShadow(uv, ndc.z, max(worldPos.y - frame.sunDir.w, 0.0));
+  }
   let texel = 1.0 / f32(textureDimensions(shadowMap).x);
   var sum = 0.0;
   for (var y = -1; y <= 1; y++) {
@@ -79,6 +84,22 @@ fn shadowFactor(worldPos: vec3f, n: vec3f) -> f32 {
     }
   }
   return sum / 9.0;
+}
+
+// Lit from a whole glowing surface rather than a point: sample the shadow map over a wide disc
+// that grows with height above the surface, so things far above an occluder only get a soft,
+// faint darkening instead of a crisp silhouette.
+fn areaShadow(uv: vec2f, depth: f32, above: f32) -> f32 {
+  let radius = (0.2 + above * 0.05) / (2.0 * SHADOW_EXTENT); // metres -> shadow-map uv
+  var sum = 0.0;
+  for (var k = 0; k < 32; k++) {
+    let fk = f32(k);
+    let r = sqrt((fk + 0.5) / 32.0) * radius;
+    let a = fk * 2.39996; // golden angle: an even spread over the disc
+    sum += textureSampleCompareLevel(shadowMap, shadowSampler, uv + vec2f(cos(a), sin(a)) * r, depth - 0.0003);
+  }
+  // Only ever a gentle shading: the rest of the glowing surface still lights around the occluder.
+  return mix(1.0, sum / 32.0, 0.5);
 }
 
 // Test-chamber panels: a world-space grid with dark seams.
@@ -219,8 +240,20 @@ fn fs(in: VsOut) -> @location(0) vec4f {
     ndl = (ndl + 0.35) / 1.35; // soft wrap lighting
   }
   ndl = max(ndl, 0.0);
-  let sh = shadowFactor(in.worldPos, n);
-  let hemi = mix(frame.groundColor.rgb, frame.skyColor.rgb, n.y * 0.5 + 0.5);
+  if (frame.sunDir.w > -1000.0) {
+    // A glowing plane below, not a beam: facing down gets it all, walls half, facing up none.
+    ndl = (1.0 - n.y) * 0.5;
+  }
+  var sh = shadowFactor(in.worldPos, n);
+  var groundLight = frame.groundColor.rgb;
+  if (frame.sunDir.w > -1000.0) {
+    // Lit from a glowing surface below: brightest near it, fading with height above it.
+    let above = max(in.worldPos.y - frame.sunDir.w, 0.0);
+    let falloff = 1.0 / (1.0 + above * above * 0.05);
+    sh *= falloff;
+    groundLight *= falloff;
+  }
+  let hemi = mix(groundLight, frame.skyColor.rgb, n.y * 0.5 + 0.5);
   let v = normalize(camPos - in.worldPos);
   let h = normalize(l + v);
   let spec = pow(max(dot(n, h), 0.0), 48.0) * obj.params.z * step(0.0, dot(n, l));
