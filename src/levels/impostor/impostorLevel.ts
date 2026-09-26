@@ -1104,7 +1104,7 @@ export class ImpostorLevel implements Level {
     if (this.phase === 'play' || this.phase === 'won') this.hum.start();
     else this.hum.stop();
 
-    // Lights: out in the dark ending, flickering red during a call.
+    // Lights: out in the dark ending (dimly back on once it's over).
     const wantLight = this.phase === 'dark' ? 0.035 : this.phase === 'over' && this.darkPlaced ? 0.16 : 1;
     this.light += (wantLight - this.light) * (1 - Math.exp(-dt * (wantLight < this.light ? 5 : 1.5)));
 
@@ -1710,6 +1710,13 @@ export class ImpostorLevel implements Level {
       const v = this.impostor.c.visor();
       pl.pos = [v[0], v[1] + 0.2, v[2]];
       pl.color = [3.5 * glow, 0.15 * glow, 0.1 * glow];
+      pl.range = 7;
+    } else if (this.phase === 'call') {
+      // The alarm: the room pulses red.
+      const p = 0.5 + 0.5 * Math.sin(this.time * 11);
+      pl.pos = [0, 3, 0];
+      pl.color = [5 * p, 0.25 * p, 0.15 * p];
+      pl.range = 20;
     } else pl.color = [0, 0, 0];
     return env;
   }
@@ -1731,7 +1738,7 @@ export class ImpostorLevel implements Level {
       // Watch them go: from across the table, then rising after them into space.
       const e = m.ejected.c;
       const r = Math.hypot(e.pos[0], e.pos[2]) || 1;
-      const pos: Vec3 = [(-e.pos[0] / r) * 3, Math.max(1.4, e.pos[1] - 3.5), (-e.pos[2] / r) * 3];
+      const pos: Vec3 = [(-e.pos[0] / r) * 5.2, Math.max(2.3, e.pos[1] - 3.5), (-e.pos[2] / r) * 5.2];
       return { pos, target: [e.pos[0], e.pos[1] + 0.8, e.pos[2]], sharpness: 4 };
     }
     if (this.phase === 'discuss' || this.phase === 'reveal' || (this.phase === 'eject' && !m?.ejected)) {
