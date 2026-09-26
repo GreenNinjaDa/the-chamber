@@ -31,6 +31,12 @@ const LAYERS = 10;
 const PULLS = 9;
 /** It topples past this lean of the top (rad). */
 const PHI_MAX = 0.14;
+/**
+ * Timmy never pulls a block that leaves the tower leaning more than this share of the limit with
+ * nobody on it: CAP_START at first, CAP_PER_PULL more each pull.
+ */
+const CAP_START = 0.55;
+const CAP_PER_PULL = 0.1;
 /** Your weight: lean (rad, before the tower's wobbliness amplifies it) per metre off-centre. */
 const PLAYER_BIAS_PER_M = 0.022;
 /** Landing a jump on top shoves the sway by this much (rad/s) per metre off-centre per m/s of landing speed. */
@@ -60,17 +66,29 @@ const PACE_MIN = 0.72;
 /** The held block hovers this high above where it'll go. */
 const HOVER_HEIGHT = 3;
 /** The exit (east wall) and the ledge in front of it, which slide out for the finale. */
-const EXIT_Z = BASE[2] + 4.2;
+const EXIT_Z = BASE[2] + 5;
 const LEDGE_Y = 6.5;
 const LEDGE_DEPTH = 1.6;
-const LEDGE_Z: [number, number] = [BASE[2] + 1.3, BASE[2] + 6.2];
-/** The finale: it breaks up into real blocks at this tip (rad). */
+const LEDGE_Z: [number, number] = [BASE[2] + 1.9, BASE[2] + 7.2];
+/**
+ * The finale (s after it starts): the ledge slides out, Timmy pushes the tower over to PUSH_TIP
+ * over PUSH_TIME, then it falls on its own (angular acceleration FALL_ACCEL sin tip) and breaks
+ * up into real blocks at TIP_BREAK (rad).
+ */
+const LEDGE_AT = 0.8;
+const PUSH_AT = 1.8;
+const PUSH_TIME = 1.5;
+const PUSH_TIP = 0.1;
+const FALL_ACCEL = 2.6;
 const TIP_BREAK = 0.45;
 /** Falling this far below the original top means you've fallen off. */
 const FALL_DEPTH = 2.2;
 const DEATH_SCREEN_DELAY = 2;
 /** Collision groups for the finale's falling blocks: they don't hit the player's body (who should be on the ledge). */
 const GROUPS_MISS_PLAYER = (0x0001 << 16) | (0xffff & ~0x0002 & ~0x0004);
+
+/** The second Lean-o-meter, on the south wall, is off to the west, clear of Timmy's arm. */
+const SOUTH_METER_X = -2;
 
 const WALL = [0.86, 0.87, 0.88];
 const DUST = [0.83, 0.74, 0.6];
@@ -156,6 +174,9 @@ export class JengaLevel implements Level {
   private escaped = false;
   /** Where the lean is heading once the block Timmy's pulling is out (shown on the meter), or null. */
   private predicted: [number, number] | null = null;
+  /** The Lean-o-meter pops up (0-1) once the tower is up. */
+  private meterOn = 0;
+  private timmyOnly: WorldLabel[];
 
   constructor(private ctx: LevelContext) {
     this.number = ctx.number;
@@ -188,13 +209,16 @@ export class JengaLevel implements Level {
     this.labelList = [
       { pos: [BASE[0], 9.6, -CHAMBER_HALF + 0.3], text: 'LEAN-O-METER', size: 0.75, color: '#ffffff' },
       { pos: [BASE[0], 4.9, -CHAMBER_HALF + 0.3], text: '(red means timber)', size: 0.5, color: '#ffd166' },
+      { pos: [SOUTH_METER_X, 9.6, CHAMBER_HALF - 0.3], text: 'LEAN-O-METER', size: 0.75, color: '#ffffff' },
+      { pos: [SOUTH_METER_X, 4.9, CHAMBER_HALF - 0.3], text: '(still red means timber)', size: 0.5, color: '#ffd166' },
       this.timmyLabel,
     ];
+    this.timmyOnly = [this.timmyLabel];
 
     // Dev: ?jengaSkip=N does N pulls up front (N = 9 goes straight to the finale).
     const skip = Math.min(PULLS, Number(new URLSearchParams(location.search).get('jengaSkip')) || 0);
     for (let i = 0; i < skip; i++) {
-      const b = this.pickBlock();
+      const b = this.pickBlock(true);
       if (!b) break;
       const slot = this.pickSlot(null);
       this.tower.unlay(b);
@@ -223,7 +247,7 @@ export class JengaLevel implements Level {
    * (that would just fall), rather one that tips the tower toward where you're standing, and never
    * one that leaves it leaning more than you could balance by standing on the other side.
    */
-  private pickBlock(): JengaBlock | null {
+  private pickBlock(tidy = false): JengaBlock | null {
     const tower = this.tower;
     const top = tower.topLayer();
     const maxLayer = Math.min(top - 3, tower.layers.length - 1);
@@ -250,15 +274,19 @@ export class JengaLevel implements Level {
         const gamma = tower.gamma();
         b.out = 0;
         const amp = 1 / (1 - gamma);
-        const cap = (PHI_MAX * 0.9) / amp + PLAYER_BIAS_PER_M * 1.0;
+        // How far it may lean with nobody balancing it: gentle to start with, then more than you
+        // can stand in the middle and survive (from about the 4th pull), up to needing you well out
+        // on the other side.
+        const cap = (PHI_MAX * (CAP_START + CAP_PER_PULL * this.pullsDone)) / amp;
         const mag = Math.hypot(after[0], after[1]);
         if (!fallback || mag < fallback.mag) fallback = { b, mag };
         if (mag > cap) continue;
         const change: Vec3 = [after[0] - before[0], 0, after[1] - before[1]];
         const cl = Math.hypot(change[0], change[2]);
         const evil = meDir && cl > 1e-4 ? (change[0] * meDir[0] + change[2] * meDir[2]) / cl : 0;
-        // Spread the damage around a bit: layers already missing blocks are less tempting.
-        const score = Math.random() + 0.6 * evil - 0.25 * tower.missing(k);
+        // It leans more and more (a kid never picks the safe one), spread round the layers.
+        const grow = (mag - Math.hypot(before[0], before[1])) / 0.034;
+        const score = tidy ? -mag : Math.random() + 0.6 * evil + 0.5 * grow - 0.25 * tower.missing(k);
         if (!best || score > best.score) best = { b, score };
       }
     }
@@ -361,6 +389,14 @@ export class JengaLevel implements Level {
       }
     }
 
+    // Once it's up, the Lean-o-meter pops up on the north wall.
+    if (t > RISE_DELAY + RISE_TIME + 0.4 && this.meterOn < 1) {
+      if (this.meterOn === 0) {
+        tone(660, 0.12, { wave: 'square', vol: 0.08 });
+        tone(990, 0.2, { wave: 'square', vol: 0.08, at: 0.1 });
+      }
+      this.meterOn = Math.min(1, this.meterOn + dt / 0.35);
+    }
     // Timmy leans in over the south wall.
     this.giant.root[1] = lerp(-80, 0, easeInOut(clamp((t - GIANT_AT) / GIANT_RISE, 0, 1)));
     if (t >= GIANT_AT && t - dt < GIANT_AT) this.say('JENGA!!', 2.5);
@@ -384,7 +420,7 @@ export class JengaLevel implements Level {
 
     // Timmy's turn.
     if (t >= this.nextPullAt && !this.pull && this.pullsDone < PULLS && !tower.collapsed && this.finaleT < 0) this.startPull();
-    if (this.pull) this.updatePull(dt);
+    if (this.pull && !tower.collapsed) this.updatePull(dt);
     if (this.pullsDone >= PULLS && !this.pull && this.finaleT < 0 && t >= this.nextPullAt && !tower.collapsed) this.startFinale();
     if (this.finaleT >= 0) this.updateFinale(dt);
 
@@ -701,28 +737,28 @@ export class JengaLevel implements Level {
     const tower = this.tower;
     const f = (this.finaleT += dt);
     this.giant.headShake = f < 1.3 ? 1 - f / 1.3 : 0;
-    // The ledge and the exit.
-    if (f >= 0.6) {
-      if (this.ledgeOut === 0) this.exit.openNow();
-      this.ledgeOut = Math.min(1, this.ledgeOut + dt / 0.8);
+    // A ledge slides out of the east wall (the exit behind it only opens when the tower hits).
+    if (f >= LEDGE_AT) {
+      if (this.ledgeOut === 0) sfx.slide();
+      this.ledgeOut = Math.min(1, this.ledgeOut + dt / 0.7);
       const x = CHAMBER_HALF + LEDGE_DEPTH / 2 + 0.05 - (LEDGE_DEPTH + 0.05) * easeInOut(this.ledgeOut);
       this.ledge.setTranslation({ x, y: LEDGE_Y - 0.2, z: (LEDGE_Z[0] + LEDGE_Z[1]) / 2 });
     }
     // The shove: a steady push, then it goes on its own.
-    if (f >= 1.9 && f - dt < 1.9) this.say('TIMBER!!!', 3);
+    if (f >= PUSH_AT && f - dt < PUSH_AT) this.say('TIMBER!!!', 3);
     if (!tower.collapsed) {
-      if (f < 1.9) {
+      if (f < PUSH_AT) {
         this.tipVel = 0;
-      } else if (f < 3.5) {
-        const target = 0.1 * easeInOut((f - 1.9) / 1.6);
+      } else if (f < PUSH_AT + PUSH_TIME) {
+        const target = PUSH_TIP * easeInOut((f - PUSH_AT) / PUSH_TIME);
         this.tipVel = (target - tower.tip) / Math.max(dt, 1e-3);
         tower.tip = target;
       } else {
-        this.tipVel += 2.4 * Math.sin(tower.tip + 0.03) * dt;
+        this.tipVel += FALL_ACCEL * Math.sin(tower.tip + 0.03) * dt;
         tower.tip += this.tipVel * dt;
       }
       // Creak, then groan as it goes.
-      if (f > 1.9 && Math.random() < dt * 6) this.creak(0.7 + tower.tip);
+      if (f > PUSH_AT && Math.random() < dt * 6) this.creak(0.7 + tower.tip);
       if (tower.tip >= TIP_BREAK) this.breakUp();
     }
     // Made it to the ledge?
@@ -737,9 +773,14 @@ export class JengaLevel implements Level {
     const { player, camera } = this.ctx;
     const tower = this.tower;
     const onIt = !this.escaped && player.mode === 'control' && !this.death;
-    tower.collapse([0, 0, -this.tipVel], tower.pivot(), onIt ? undefined : GROUPS_MISS_PLAYER);
+    // It snaps as it hits: faster than it was falling, and coming apart.
+    this.pull = null;
+    this.predicted = null;
+    tower.collapse([0, 0, -this.tipVel * 1.8], tower.pivot(), onIt ? undefined : GROUPS_MISS_PLAYER, 1.6);
     this.crash();
     camera.addShake(1);
+    // The crash knocks the exit panel open.
+    this.exit.openNow();
     if (onIt) {
       const r = sub(player.pos, tower.pivot());
       player.kill([r[1] * this.tipVel * 0.9, -r[0] * this.tipVel * 0.3, 0], { violence: 14 });
@@ -763,7 +804,9 @@ export class JengaLevel implements Level {
     const dir: Vec3 = [phi[0] / l, 0, phi[1] / l];
     const spin: Vec3 = [dir[2] * 0.9, 0, -dir[0] * 0.9];
     const about: Vec3 = add(tower.base, scale(dir, BLOCK_L / 2));
-    tower.collapse(spin, about);
+    this.pull = null;
+    this.predicted = null;
+    tower.collapse(spin, about, undefined, 1.2);
     this.crash();
     camera.addShake(0.8);
     if (player.mode === 'control' && !this.death) {
@@ -812,19 +855,20 @@ export class JengaLevel implements Level {
       }
     } else if (this.finaleT >= 0 && !tower.collapsed) {
       // Pointing at the west face, near the top, and pushing.
-      goal = tower.point(tower.topLayer(), [-BLOCK_L / 2 - 1.6, 0, 0]);
+      goal = tower.point(Math.max(0, tower.topLayer() - 2), [-BLOCK_L / 2 - 1.6, 0, 0]);
       goal[1] += 1.5;
       sharp = 6;
       curl = 1.3;
     } else {
-      goal = [BASE[0] - 1 + Math.sin(this.giant.time * 0.8) * 1.5, top + 8 + Math.sin(this.giant.time * 1.3), BASE[2] + 9];
+      const rest = tower.collapsed ? 19 : top + 8;
+      goal = [BASE[0] - 1 + Math.sin(this.giant.time * 0.8) * 1.5, rest + Math.sin(this.giant.time * 1.3), BASE[2] + 9];
       sharp = 2;
     }
     this.hand = add(this.hand, scale(sub(goal, this.hand), 1 - Math.exp(-dt * sharp)));
     this.giant.rightCurl += (curl - this.giant.rightCurl) * (1 - Math.exp(-dt * 8));
     this.finger += ((this.finaleT >= 0 && !tower.collapsed ? 1 : 0) - this.finger) * (1 - Math.exp(-dt * 5));
     // His arm is as wide as the tower: see-through while it's down beside it, so it doesn't hide everything.
-    const reaching = p && (p.stage === 'aim' || p.stage === 'pull' || (p.stage === 'lift' && p.t < 0.7));
+    const reaching = (p && (p.stage === 'aim' || p.stage === 'pull' || (p.stage === 'lift' && p.t < 0.7))) || (this.finaleT >= 0 && !tower.collapsed);
     this.giant.armOpacity += ((reaching ? 0.55 : 1) - this.giant.armOpacity) * (1 - Math.exp(-dt * 6));
     if (this.giant.armOpacity > 0.97) this.giant.armOpacity = 1;
     const look = p ? (p.block.free ?? p.block.frame) : null;
@@ -866,7 +910,7 @@ export class JengaLevel implements Level {
     for (let i = 0; i < 24; i++) {
       const k = Math.floor(Math.random() * this.tower.frames.length);
       const pos = this.tower.point(k, [(Math.random() - 0.5) * 4, 0, (Math.random() - 0.5) * 4]);
-      this.puffs.push({ pos, vel: [(Math.random() - 0.5) * 3, Math.random(), (Math.random() - 0.5) * 3], age: 0, life: 1.6, size: 0.5 + Math.random() * 0.5 });
+      this.puffs.push({ pos, vel: [(Math.random() - 0.5) * 3, Math.random(), (Math.random() - 0.5) * 3], age: 0, life: 1.6, size: 0.35 + Math.random() * 0.4 });
     }
   }
 
@@ -914,21 +958,29 @@ export class JengaLevel implements Level {
       out.push({ mesh: 'box', model: mul(translation([x, LEDGE_Y - 0.2, (LEDGE_Z[0] + LEDGE_Z[1]) / 2]), scaling([LEDGE_DEPTH, 0.4, LEDGE_Z[1] - LEDGE_Z[0]])), color: WALL, pattern: Pattern.panels, param: 2, spec: 0.15 });
     }
 
-    this.drawMeter(out);
+    this.drawMeter(out, -1);
+    this.drawMeter(out, 1);
 
     for (const q of this.puffs) {
       const k = q.age / q.life;
       const s = q.size * (1 + k * 2.2);
-      out.push({ mesh: 'sphere', model: mul(translation(q.pos), scaling([s, s * 0.8, s])), color: DUST, opacity: 0.55 * (1 - k), shadow: false });
+      out.push({ mesh: 'sphere', model: mul(translation(q.pos), scaling([s, s * 0.8, s])), color: DUST, opacity: 0.45 * (1 - k) * (1 - k), shadow: false });
     }
   }
 
-  /** The Lean-o-meter on the north wall: a top-down dial of the lean, green / amber / red. */
-  private drawMeter(out: DrawItem[]) {
+  /**
+   * A Lean-o-meter: a top-down dial of the lean, green / amber / red, with a blinking ring where
+   * the lean is heading while Timmy pulls a block. `side` -1: on the north wall, 1: on the south
+   * wall (turned round, so up on it is always away from you).
+   */
+  private drawMeter(out: DrawItem[], side: 1 | -1) {
     const R = 1.9;
-    const c: Vec3 = [BASE[0], 7.2, -CHAMBER_HALF + 0.02];
+    if (this.meterOn <= 0) return;
+    const c: Vec3 = [side === 1 ? SOUTH_METER_X : BASE[0], 7.2, side * (CHAMBER_HALF - 0.02)];
+    const pop = this.meterOn < 1 ? 1 + Math.sin(this.meterOn * Math.PI) * 0.25 : 1;
+    const base = mul(translation(c), rotationX(side === 1 ? Math.PI : 0), scaling([this.meterOn * pop, this.meterOn * pop, 1]));
     const face = (r: number, dz: number, color: number[], emissive = false) =>
-      out.push({ mesh: 'cylinder', model: mul(translation(add(c, [0, 0, dz])), rotationX(Math.PI / 2), scaling([r, 0.04, r])), color, pattern: emissive ? Pattern.emissive : Pattern.plain, shadow: false });
+      out.push({ mesh: 'cylinder', model: mul(base, translation([0, 0, dz]), rotationX(Math.PI / 2), scaling([r, 0.04, r])), color, pattern: emissive ? Pattern.emissive : Pattern.plain, shadow: false });
     const danger = this.tower.collapsed ? 1 : clamp(this.tower.leanAmount() / PHI_MAX, 0, 1.2);
     const flash = danger > 0.8 ? 0.6 + 0.4 * Math.sin(this.giant.time * 18) : 1;
     face(R + 0.25, 0.02, [0.12, 0.12, 0.14]);
@@ -936,8 +988,8 @@ export class JengaLevel implements Level {
     face(R * 0.8, 0.08, [1.0, 0.62, 0.1], true);
     face(R * 0.55, 0.11, [0.2, 0.75, 0.3], true);
     // Crosshairs.
-    out.push({ mesh: 'box', model: mul(translation(add(c, [0, 0, 0.14])), scaling([R * 2, 0.04, 0.01])), color: [0.05, 0.05, 0.05], shadow: false });
-    out.push({ mesh: 'box', model: mul(translation(add(c, [0, 0, 0.14])), scaling([0.04, R * 2, 0.01])), color: [0.05, 0.05, 0.05], shadow: false });
+    out.push({ mesh: 'box', model: mul(base, translation([0, 0, 0.14]), scaling([R * 2, 0.04, 0.01])), color: [0.05, 0.05, 0.05], shadow: false });
+    out.push({ mesh: 'box', model: mul(base, translation([0, 0, 0.14]), scaling([0.04, R * 2, 0.01])), color: [0.05, 0.05, 0.05], shadow: false });
     // The lean: east is right, north is up.
     const phi = this.tower.phi;
     const k = R / PHI_MAX;
@@ -947,8 +999,8 @@ export class JengaLevel implements Level {
       dx *= (R * 1.05) / len;
       dy *= (R * 1.05) / len;
     }
-    out.push({ mesh: 'cylinder', model: segment(add(c, [0, 0, 0.16]), add(c, [dx, dy, 0.16]), 0.05), color: [0.05, 0.05, 0.05], shadow: false });
-    out.push({ mesh: 'sphere', model: mul(translation(add(c, [dx, dy, 0.2])), scaling([0.24, 0.24, 0.12])), color: [1.4, 1.4, 1.4], pattern: Pattern.emissive, shadow: false });
+    if (Math.hypot(dx, dy) > 0.02) out.push({ mesh: 'cylinder', model: mul(base, segment([0, 0, 0.16], [dx, dy, 0.16], 0.05)), color: [0.05, 0.05, 0.05], shadow: false });
+    out.push({ mesh: 'sphere', model: mul(base, translation([dx, dy, 0.2]), scaling([0.24, 0.24, 0.12])), color: [1.4, 1.4, 1.4], pattern: Pattern.emissive, shadow: false });
     // The prediction while Timmy pulls a block: a blinking ring where it's heading.
     const pr = this.predicted;
     if (pr && Math.sin(this.giant.time * 16) > -0.3) {
@@ -958,17 +1010,20 @@ export class JengaLevel implements Level {
         px *= (R * 1.1) / pl;
         py *= (R * 1.1) / pl;
       }
-      out.push({ mesh: 'tube', model: mul(translation(add(c, [px, py, 0.2])), rotationX(Math.PI / 2), scaling([0.36, 0.06, 0.36])), color: [1.6, 1.6, 1.6], pattern: Pattern.emissive, shadow: false });
+      out.push({ mesh: 'tube', model: mul(base, translation([px, py, 0.2]), rotationX(Math.PI / 2), scaling([0.36, 0.06, 0.36])), color: [1.6, 1.6, 1.6], pattern: Pattern.emissive, shadow: false });
     }
   }
 
   labels(): WorldLabel[] {
-    return this.labelList;
+    return this.meterOn > 0.6 ? this.labelList : this.timmyOnly;
   }
 
   trackedTargets(): TrackedTarget[] {
     const exit = this.exit.target();
-    return exit ? [exit] : [];
+    if (exit) return [exit];
+    // Before the crash opens the exit: the ledge is the place to be.
+    if (this.ledgeOut > 0.5 && !this.death && !this.escaped) return [{ pos: [CHAMBER_HALF - LEDGE_DEPTH / 2, LEDGE_Y + 0.4, EXIT_Z], radius: 1, color: 'purple' }];
+    return [];
   }
 
   environment() {

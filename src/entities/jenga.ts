@@ -26,7 +26,7 @@ export const SLOT_OFFSETS = [-BLOCK_W, 0, BLOCK_W];
 export const WOOD = [0.56, 0.36, 0.19];
 
 /** Lean from a side block missing (rad per metre the layer's support centre moves). */
-const BIAS_PER_M = 0.028 / 0.75;
+const BIAS_PER_M = 0.034 / 0.75;
 /** Lean from blocks stacked on top off-centre (rad per metre of their offset). */
 const PLACE_BIAS_PER_M = 0.008;
 /** How wobbly: `gamma` 0 is stiff, toward 1 it amplifies every lean (1 / (1 - gamma)). */
@@ -37,7 +37,7 @@ const GAMMA_PER_THIN = 0.05;
 const GAMMA_MAX = 0.55;
 /** Sway: natural frequency (rad/s, when stiff) and damping ratio. */
 const OMEGA = 2.4;
-const DAMPING = 0.28;
+const DAMPING = 0.38;
 /** How much each layer bends: a baseline, more per missing block, and the base rocking on the floor. */
 const BEND_BASE = 0.35;
 const BEND_PER_MISSING = 1.0;
@@ -315,32 +315,40 @@ export class JengaTower {
   }
 
   /**
-   * Turns every block still in the tower into a real physics box, moving as if the whole tower
-   * were turning at `spin` (rad/s, world) about `about`. `groups` sets their collision groups.
+   * Turns every block into a real physics box (the tower's, and one being carried, which is just
+   * let go of), moving as if the whole tower were turning at `spin` (rad/s, world) about `about`,
+   * plus a random `scatter` (m/s, rad/s; more the higher up) so it comes apart. `groups` sets their
+   * collision groups.
    */
-  collapse(spin: Vec3, about: Vec3, groups?: number) {
+  collapse(spin: Vec3, about: Vec3, groups?: number, scatter = 0.4) {
     if (this.collapsed) return;
     this.collapsed = true;
+    const height = Math.max(1, this.layers.length * BLOCK_H);
     for (const b of this.blocks) {
-      if (b.layer < 0) continue; // not in the tower (the one in his hand stays there)
-      const m = this.blockFrame(b);
+      const inTower = b.layer >= 0;
+      const m = inTower ? this.blockFrame(b) : b.free ?? b.frame;
       const pos: Vec3 = [m[12], m[13], m[14]];
       this.physics.world.removeRigidBody(b.rb);
       const seed = b.seed;
       const body = this.physics.addBox(pos, [BLOCK_W, BLOCK_H * 0.97, BLOCK_L], {
         mass: 140,
         rotation: toQuat(m),
-        friction: 0.55,
+        friction: 0.45,
         restitution: 0.08,
         grabbable: false,
         model: (out, bm) => drawBlock(out, bm, seed),
       });
       if (groups !== undefined) body.collider.setCollisionGroups(groups);
-      const v = cross(spin, sub(pos, about));
-      body.rb.setLinvel({ x: v[0] + (Math.random() - 0.5) * 0.6, y: v[1], z: v[2] + (Math.random() - 0.5) * 0.6 }, true);
-      body.rb.setAngvel({ x: spin[0] + (Math.random() - 0.5) * 0.8, y: (Math.random() - 0.5) * 0.8, z: spin[2] + (Math.random() - 0.5) * 0.8 }, true);
+      if (inTower) {
+        const v = cross(spin, sub(pos, about));
+        const s = scatter * Math.min(1, (pos[1] - this.base[1]) / height + 0.2);
+        const r = () => (Math.random() - 0.5) * 2 * s;
+        body.rb.setLinvel({ x: v[0] + r(), y: v[1] + Math.abs(r()) * 0.5, z: v[2] + r() }, true);
+        body.rb.setAngvel({ x: spin[0] + r(), y: r(), z: spin[2] + r() }, true);
+        this.layers[b.layer][b.slot] = null;
+      }
       b.body = body;
-      if (b.layer >= 0) this.layers[b.layer][b.slot] = null;
+      b.free = null;
     }
   }
 
