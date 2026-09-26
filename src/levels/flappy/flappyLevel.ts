@@ -102,7 +102,8 @@ export class FlappyLevel implements Level {
 
     switch (this.phase) {
       case 'intro':
-        if (this.arrival.done) {
+        // (Once you're back on your feet from the portal.)
+        if (this.arrival.done && !this.ctx.player.gettingUp) {
           this.phase = 'ready';
           this.wallLabel.text = 'FLAP.';
           this.scoreLabel.text = '0';
@@ -158,7 +159,7 @@ export class FlappyLevel implements Level {
             break;
           }
         }
-        this.pipes = this.pipes.filter((p) => p.x > -CHAMBER_HALF - PIPE_R - 1);
+        if (this.pipes.length && this.pipes[0].x < -CHAMBER_HALF - PIPE_R - 1) this.pipes.shift();
         // The ground.
         if (!this.death && player.onGround && this.t - this.flapT > 0.2) this.crash('ground');
         // Through them all.

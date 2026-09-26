@@ -30,6 +30,8 @@ const BEAT = 0.5;
 const LEAD_IN = 4;
 /** A chord counts if you're this close (m) to the line between its two lanes. */
 const CHORD_REACH = 1.0;
+/** You count as on time from this long before a gem crosses the line to this long after (s). */
+const JUDGE_WINDOW = 0.1;
 const DEATH_SCREEN_DELAY = 2.2;
 
 const LANE_COLORS = [[0.2, 0.9, 0.25], [0.95, 0.15, 0.15], [1.0, 0.85, 0.1], [0.2, 0.45, 1.0], [1.0, 0.5, 0.1]];
@@ -100,7 +102,7 @@ export class RockLevel implements Level {
   private death: Death | null = null;
   private fans: Fan[] = [];
   private tomatoes: { pos: Vec3; vel: Vec3; age: number; splat: number }[] = [];
-  private trapdoor: { pos: Vec3; t: number } | null = null;
+  private trapdoor: { pos: Vec3; t: number; yaw: number } | null = null;
   private meterLabel: WorldLabel = { pos: [0, 8.9, -CHAMBER_HALF + 0.3], text: 'ROCK METER', size: 0.5, color: '#ffffff' };
   private streakLabel: WorldLabel = { pos: [0, 5.6, -CHAMBER_HALF + 0.3], text: '', size: 0.7, color: '#ffd166' };
   private labelList: WorldLabel[] = [this.meterLabel, this.streakLabel];
@@ -152,7 +154,7 @@ export class RockLevel implements Level {
     if (!Number.isNaN(this.songT) && !this.over) {
       this.songT += dt;
       // Facing down the highway: A / D always move across the lanes.
-      camera.yaw = 0;
+      if (this.failed < 0 && !this.death) camera.yaw = 0;
       this.playBeat();
       if (alive && this.failed < 0) this.judge();
       if (this.songT > SONG_END * BEAT && this.failed < 0 && alive) this.finish();
@@ -184,10 +186,11 @@ export class RockLevel implements Level {
     const { player } = this.ctx;
     const x = player.pos[0];
     for (const g of this.gems) {
-      if (g.result || this.songT < this.crossAt(g)) continue;
+      if (g.result || this.songT < this.crossAt(g) - JUDGE_WINDOW) continue;
       let hit: boolean;
       if (g.lanes.length === 1) hit = laneOf(x) === g.lanes[0];
       else hit = Math.abs(x - (laneX(g.lanes[0]) + laneX(g.lanes[1])) / 2) < CHORD_REACH;
+      if (!hit && this.songT < this.crossAt(g) + JUDGE_WINDOW) continue;
       g.result = hit ? 'hit' : 'miss';
       if (hit) {
         this.hits++;
@@ -240,9 +243,10 @@ export class RockLevel implements Level {
       this.tomatoes.push({ pos: from, vel: [(to[0] - from[0]) / time, (to[1] - from[1]) / time + 10 * time / 2, (to[2] - from[2]) / time], age: 0, splat: -1 });
     }
     if (before < 1.6 && this.failed >= 1.6 && player.mode === 'control' && !this.death) {
-      this.trapdoor = { pos: [player.pos[0], 0, player.pos[2]], t: 0 };
-      const yaw = Math.random() * Math.PI * 2;
-      player.kill([Math.sin(yaw) * 4, 22, Math.cos(yaw) * 4], { violence: 12 });
+      // Flung up and back toward the middle of the room (never out over the walls).
+      const yaw = Math.atan2(-player.pos[0], -player.pos[2] - 2) + (Math.random() - 0.5) * 0.8;
+      this.trapdoor = { pos: [player.pos[0], 0.045, player.pos[2]], t: 0, yaw };
+      player.kill([Math.sin(yaw) * 3, 15, Math.cos(yaw) * 3], { violence: 12 });
       camera.addShake(0.6);
       this.death = {
         t: 0,
@@ -268,6 +272,7 @@ export class RockLevel implements Level {
       t.pos = [t.pos[0] + t.vel[0] * dt, t.pos[1] + t.vel[1] * dt, t.pos[2] + t.vel[2] * dt];
       if (t.age > 0.7 || t.pos[1] < 0.1) {
         t.splat = 0;
+        t.pos[1] = 0.06;
         noise(0.08, { freq: 900, to: 200, vol: 0.2 });
       }
     }
@@ -341,7 +346,7 @@ export class RockLevel implements Level {
       if (t.splat >= 0) out.push({ mesh: 'sphere', model: mul(translation(t.pos), scaling([0.3, 0.06, 0.3])), color: [0.8, 0.08, 0.05], shadow: false });
       else out.push({ mesh: 'sphere', model: mul(translation(t.pos), scaling([0.16, 0.15, 0.16])), color: [0.85, 0.1, 0.05], spec: 0.8 });
     }
-    if (this.trapdoor) drawTrapdoor(out, this.trapdoor.pos, 0.3, this.trapdoor.t);
+    if (this.trapdoor) drawTrapdoor(out, this.trapdoor.pos, this.trapdoor.yaw, this.trapdoor.t);
     // Your guitar, slung across your chest.
     const { player } = this.ctx;
     if (player.mode === 'control' && started) {
