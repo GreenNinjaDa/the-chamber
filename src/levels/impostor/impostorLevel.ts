@@ -183,7 +183,7 @@ const BUTTON_REACTIONS = ['orange why', 'who pressed it', 'this better be good',
 const REPORT_REACTIONS = ['where', 'rip {V}', 'noooo {V}', 'orange found {V}?', 'who was near {P}?', 'self report?'];
 const VENT_WITNESS = ['I SAW {X} VENT!!', '{X} VENTED', '{X} came out of a VENT', 'VENT. {X}. I SAW IT.'];
 const FAKE_WITNESS = ['{X} was faking tasks', "{X}'s screen was off", '{X} did {S} with the screen off??', '{X} just stood at {S}'];
-const DEATH_HINT = "Watch the others: the impostor fakes tasks (its screen stays dark), follows people too closely, vents, and only kills when nobody is close enough to see. Report bodies (E), call meetings with the red button (E), then vote by standing next to someone and pressing E. Don't be alone with it.";
+const DEATH_HINT = "The impostor fakes tasks (its screen stays dark), follows people too closely and uses the vents. Report bodies (E) or press the red button (E), then vote: stand next to someone and press E.";
 
 /** A body you can report by pressing E on it. */
 class CorpseUsable implements Usable {
@@ -280,6 +280,7 @@ export class ImpostorLevel implements Level {
   private phaseT = 0;
   private time = 0;
   private started = false;
+  private startedAt = 0;
   private cool = FIRST_KILL;
   private huntT = 0;
   private victim: Npc | 'player' | null = null;
@@ -315,6 +316,8 @@ export class ImpostorLevel implements Level {
   private wallSub: WorldLabel = { pos: [0, 4.7, -CHAMBER_HALF + 0.2], text: '', size: 0.4, color: '#ffffff' };
   private skipLabel: WorldLabel = { pos: [SKIP_POS[0], 1.1, SKIP_POS[2]], text: 'SKIP VOTE', size: 0.3, color: '#dddddd' };
   private obstacleList: Circle[] = [];
+  private targetList: TrackedTarget[] = [];
+  private voteTarget: TrackedTarget = { pos: [0, 0, 0], radius: 0.75, color: 'purple' };
   private env: Environment = {
     ...DEFAULT_ENV,
     sunDir: [0.3, 1, 0.45],
@@ -359,8 +362,8 @@ export class ImpostorLevel implements Level {
       const npc: Npc = {
         c, impostor: false, mode: 'idle', modeT: rand(0, 1.5), target: [...seat], speed: 0, station: null, lastStation: null, taskDur: 0,
         seat, seatYaw: a,
-        label: { pos: [0, 0, 0], text: colors[i].name, size: 0.24, color: colors[i].css },
-        bubble: { pos: [0, 0, 0], text: '', size: 0.26, color: '#ffffff' },
+        label: { pos: [0, 0, 0], text: colors[i].name, size: 0.26, color: colors[i].css },
+        bubble: { pos: [0, 0, 0], text: '', size: 0.34, color: '#ffffff' },
         bubbleT: 0, sawVent: null, sawFake: null, voteAt: 0, vote: null,
       };
       this.npcs.push(npc);
@@ -940,8 +943,8 @@ export class ImpostorLevel implements Level {
       // Along the ring (tangent), so the row faces the middle of the table.
       const r = Math.hypot(base[0], base[2]) || 1;
       const tx = -base[2] / r, tz = base[0] / r;
-      const off = (col - 1.5) * 0.3;
-      return [base[0] + tx * off, base[1] + row * 0.3, base[2] + tz * off];
+      const off = (col - 1.5) * 0.4;
+      return [base[0] + tx * off, base[1] + row * 0.4, base[2] + tz * off];
     };
     let i = 0;
     const add1 = (v: Vote | null, color: number[]) => {
@@ -981,6 +984,11 @@ export class ImpostorLevel implements Level {
     }
     this.playerTask = { station: st, t: 0 };
     sfx.click();
+  }
+
+  /** Where you stand to do a station's task. */
+  private stationFront(s: TaskStation): Vec3 {
+    return s.stand;
   }
 
   private cancelPlayerTask() {
@@ -1035,6 +1043,7 @@ export class ImpostorLevel implements Level {
     this.darkEjected = ejected;
     this.darkPlaced = false;
     this.cancelPlayerTask();
+    this.ctx.hud.hide();
     powerDown();
   }
 
@@ -1065,6 +1074,7 @@ export class ImpostorLevel implements Level {
     if (this.exit.entered && this.status === 'playing') this.status = 'exited';
     if (!this.started && this.arrival.done) {
       this.started = true;
+      this.startedAt = this.time;
       hud.show('CREWMATE', 'There is 1 impostor among us.\n(It is not you. We checked.)', 3.2);
       roleSting();
     }
@@ -1119,8 +1129,7 @@ export class ImpostorLevel implements Level {
     const pt = this.playerTask;
     if (pt) {
       const st = pt.station;
-      const front: Vec3 = [st.anchor[0] + st.normal[0] * 0.8, 0, st.anchor[2] + st.normal[2] * 0.8];
-      if (!this.playerAlive() || flat(player.pos, front) > 2.6) this.cancelPlayerTask();
+      if (!this.playerAlive() || flat(player.pos, this.stationFront(st)) > 2.4) this.cancelPlayerTask();
       else {
         pt.t += dt;
         st.lit = 1;
@@ -1146,8 +1155,13 @@ export class ImpostorLevel implements Level {
     for (const cp of this.corpses) cp.age += dt;
     if (this.phase === 'play' && this.started) {
       if (this.playerAlive() && input.wasPressed('KeyE')) {
+        // E near a body reports it; E in front of a station does the task (the crosshair works too).
         const near = this.corpses.find((cp) => flat(cp.pos, player.pos) < PLAYER_REPORT_RANGE);
         if (near) this.report('player', near);
+        else {
+          const st = this.stations.find((s) => flat(this.stationFront(s), player.pos) < 1.7);
+          if (st) this.startPlayerTask(st);
+        }
       }
       if (this.phase === 'play' && !this.pendingReport) {
         for (const cp of this.corpses) {
@@ -1480,9 +1494,11 @@ export class ImpostorLevel implements Level {
     if (!this.darkPlaced && t > 0.9) {
       // Right in front of you, visor glowing.
       this.darkPlaced = true;
+      // (A little to the right: the camera looks over your right shoulder.)
       const f: Vec3 = [-Math.sin(camera.yaw), 0, -Math.cos(camera.yaw)];
+      const rt: Vec3 = [Math.cos(camera.yaw), 0, -Math.sin(camera.yaw)];
       const lim = CHAMBER_HALF - 1;
-      let p: Vec3 = [clamp(player.pos[0] + f[0] * 2.6, -lim, lim), 0, clamp(player.pos[2] + f[2] * 2.6, -lim, lim)];
+      let p: Vec3 = [clamp(player.pos[0] + f[0] * 2.8 + rt[0] * 0.8, -lim, lim), 0, clamp(player.pos[2] + f[2] * 2.8 + rt[2] * 0.8, -lim, lim)];
       if (Math.hypot(p[0], p[2]) < TABLE_RADIUS + 0.6) p = [player.pos[0] - f[0] * 1.6, 0, player.pos[2] - f[2] * 1.6];
       c.pos = p;
       c.hidden = false;
@@ -1523,7 +1539,7 @@ export class ImpostorLevel implements Level {
       `You were alone with ${name}. ${name} was the impostor. Rookie mistake.`,
       `${name} was the impostor. Nobody saw a thing. That was the idea.`,
       `${name} stood a bit close, then a lot closer. ${name} was the impostor.`,
-    ]), 'It only kills when nobody else is near enough to see: stick with the group. ' + DEATH_HINT, imp);
+    ]), 'It only kills when nobody else is close enough to see, so stick with the others. ' + DEATH_HINT, imp);
   }
 
   // --- Draw ------------------------------------------------------------------------------------
@@ -1551,6 +1567,15 @@ export class ImpostorLevel implements Level {
       color: voting ? [1.6, 1.6, 1.7] : [0.3, 0.32, 0.35],
       pattern: voting ? Pattern.emissive : undefined,
     });
+    // Crewmates right in front of the camera (someone standing much too close) go see-through.
+    const cam = this.ctx.camera.pos;
+    for (const n of this.npcs) {
+      const c = n.c;
+      const d = Math.hypot(c.pos[0] - cam[0], c.pos[1] + 0.8 - cam[1], c.pos[2] - cam[2]);
+      c.opacity = c.alive ? clamp((d - 0.9) / 1.0, 0.3, 1) : 1;
+      c.highlight = 0;
+    }
+    for (const cp of this.corpses) cp.npc.c.highlight = cp.usable.highlight;
     for (const n of this.npcs) n.c.draw(out);
     // The task bar on the north wall.
     const z = -CHAMBER_HALF;
@@ -1575,7 +1600,7 @@ export class ImpostorLevel implements Level {
       if (this.phase === 'reveal' || this.phase === 'eject') {
         for (const ch of m.chips) {
           if (ch.t > 0) continue;
-          out.push({ mesh: 'sphere', model: mul(translation(ch.at), scaling([0.12, 0.12, 0.12])), color: ch.color, spec: 0.6, shadow: false });
+          out.push({ mesh: 'sphere', model: mul(translation(ch.at), scaling([0.17, 0.17, 0.17])), color: ch.color, spec: 0.6, shadow: false });
         }
       }
       if (m.trapdoor && m.trapdoor.t >= 0) drawTrapdoor(out, m.trapdoor.pos, 0, m.trapdoor.t);
@@ -1590,18 +1615,18 @@ export class ImpostorLevel implements Level {
       const c = n.c;
       if (c.state === 'ejected' || c.hidden) continue;
       if (c.alive && (!dark || n === this.impostor)) {
-        n.label.pos = [c.pos[0], c.pos[1] + 1.78 + c.lift, c.pos[2]];
+        n.label.pos = [c.pos[0], c.pos[1] + 1.72 + c.lift, c.pos[2]];
         list.push(n.label);
         if (n.bubble.text) {
-          n.bubble.pos = [c.pos[0], c.pos[1] + 2.18 + c.lift, c.pos[2]];
+          n.bubble.pos = [c.pos[0], c.pos[1] + 2.25 + c.lift, c.pos[2]];
           list.push(n.bubble);
         }
       }
     }
     if (dark) return list;
-    if (this.playerAlive()) {
+    // Who you are, for the first few seconds (you're the tall one).
+    if (this.playerAlive() && this.started && this.time - this.startedAt < 6) {
       this.youLabel.pos = [this.player.pos[0], this.player.pos[1] + 2.25, this.player.pos[2]];
-      this.youLabel.text = this.meeting?.locked ? 'YOU (VOTED)' : 'YOU';
       list.push(this.youLabel);
     }
     for (const l of this.stationLabels) list.push(l);
@@ -1621,7 +1646,21 @@ export class ImpostorLevel implements Level {
 
   trackedTargets(): TrackedTarget[] {
     const exit = this.exit.target();
-    return exit ? [exit] : [];
+    const list = this.targetList;
+    list.length = 0;
+    if (exit) list.push(exit);
+    // Voting: a ring round whoever you'd vote for.
+    const m = this.meeting;
+    if (m && this.phase === 'vote' && this.playerAlive()) {
+      const v = m.locked ? m.playerVote : this.voteCandidate();
+      if (v && v !== 'player') {
+        const t = this.voteTarget;
+        t.pos = v === 'skip' ? [SKIP_POS[0], 0.4, SKIP_POS[2]] : [v.c.pos[0], 0.85, v.c.pos[2]];
+        t.radius = v === 'skip' ? SKIP_R : 0.75;
+        list.push(t);
+      }
+    }
+    return list;
   }
 
   environment(): Environment {
@@ -1629,8 +1668,8 @@ export class ImpostorLevel implements Level {
     const env = this.env;
     const amb = Math.max(k, 0.05);
     env.sunColor = [1.75 * k, 1.72 * k, 1.7 * k];
-    env.skyColor = [0.1 * amb, 0.12 * amb, 0.22 * amb];
-    env.groundColor = [0.2 * amb, 0.2 * amb, 0.22 * amb];
+    env.skyColor = [0.035 * amb, 0.042 * amb, 0.085 * amb];
+    env.groundColor = [0.3 * amb, 0.3 * amb, 0.33 * amb];
     env.fogColor = [0.02 * amb, 0.025 * amb, 0.06 * amb];
     const glow = this.impostor.c.glow;
     const pl = env.pointLight!;
@@ -1656,11 +1695,15 @@ export class ImpostorLevel implements Level {
   cameraShot(): CameraShot | null {
     const m = this.meeting;
     if (this.phase === 'eject' && m?.ejected && m.ejected !== 'player') {
-      // Watch them go: from across the table, looking up.
+      // Watch them go: from across the table, then rising after them into space.
       const e = m.ejected.c;
       const r = Math.hypot(e.pos[0], e.pos[2]) || 1;
-      const pos: Vec3 = [(-e.pos[0] / r) * 4.5, 1.3, (-e.pos[2] / r) * 4.5];
-      return { pos, target: [e.pos[0], e.pos[1] + 0.8, e.pos[2]], sharpness: 3 };
+      const pos: Vec3 = [(-e.pos[0] / r) * 3, Math.max(1.4, e.pos[1] - 3.5), (-e.pos[2] / r) * 3];
+      return { pos, target: [e.pos[0], e.pos[1] + 0.8, e.pos[2]], sharpness: 4 };
+    }
+    if (this.phase === 'discuss' || this.phase === 'reveal' || (this.phase === 'eject' && !m?.ejected)) {
+      // Round the table: everyone in view, from over your seat.
+      return { pos: [0, 4.7, SEAT_R + 4.4], target: [0, 0.9, -0.5], sharpness: 4 };
     }
     const d = this.death;
     if (d?.killer && d.t > 0.25) {

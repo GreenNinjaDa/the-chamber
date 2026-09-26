@@ -83,6 +83,10 @@ export class Crewmate {
   hidden = false;
   /** Drawn scaled by this (e.g. a pet). */
   size = 1;
+  /** See-through-ness (1 solid), e.g. when it's right in front of the camera. */
+  opacity = 1;
+  /** The crosshair's pulsing glow (e.g. a body you can report). */
+  highlight = 0;
   private shade: number[];
   private phase = Math.random() * 6;
   private amount = 0;
@@ -123,7 +127,7 @@ export class Crewmate {
     const side = (Math.random() - 0.5) * 1.5;
     this.top = {
       pos: [this.pos[0], this.pos[1] + 0.9, this.pos[2]],
-      vel: [(dx / d) * 2.6 - (dz / d) * side, 5.2, (dz / d) * 2.6 + (dx / d) * side],
+      vel: [(dx / d) * 2.6 - (dz / d) * side, 6.5, (dz / d) * 2.6 + (dx / d) * side],
       yaw: this.facing,
       rx: 0,
       spin: (Math.random() < 0.5 ? -1 : 1) * (7 + Math.random() * 5),
@@ -187,6 +191,17 @@ export class Crewmate {
   }
 
   draw(out: DrawItem[]) {
+    const first = out.length;
+    this.drawModel(out);
+    if (this.opacity < 1 || this.highlight > 0) {
+      for (let i = first; i < out.length; i++) {
+        if (this.opacity < 1) out[i].opacity = this.opacity;
+        if (this.highlight > 0) out[i].highlight = this.highlight;
+      }
+    }
+  }
+
+  private drawModel(out: DrawItem[]) {
     if (this.hidden) return;
     const col = this.color.body, shade = this.shade;
     if (this.state === 'ejected') {

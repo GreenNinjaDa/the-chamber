@@ -24,8 +24,8 @@ const WIRE_COLORS = [[0.85, 0.08, 0.06], [0.1, 0.25, 0.9], [0.95, 0.8, 0.1], [0.
 /** Collider size (along the wall, up, out of the wall) and how far out the model reaches. */
 const SIZES: Record<StationKind, { size: Vec3; depth: number }> = {
   wires: { size: [1.45, 2.5, 0.35], depth: 0.2 },
-  terminal: { size: [1.35, 1.9, 0.8], depth: 0.75 },
-  swipe: { size: [0.8, 2.0, 0.3], depth: 0.2 },
+  terminal: { size: [1.35, 2.45, 0.8], depth: 0.75 },
+  swipe: { size: [0.8, 2.2, 0.3], depth: 0.2 },
   chute: { size: [1.15, 2.4, 0.95], depth: 0.92 },
   dials: { size: [1.35, 2.5, 0.35], depth: 0.2 },
 };
@@ -89,6 +89,11 @@ export class TaskStation {
     };
     const led = (pos: Vec3) =>
       out.push({ mesh: 'sphere', model: mul(f, translation(pos), scaling([0.045, 0.045, 0.045])), color: on ? LED_ON : LED_OFF, pattern: Pattern.emissive });
+    // A soft green glow on the floor in front of a station in use (seen from across the room).
+    if (on) {
+      const d = SIZES[this.kind].depth + 0.7;
+      out.push({ mesh: 'cylinder', model: mul(f, translation([0, 0.012, d]), scaling([1.1, 0.01, 1.1])), color: [0.3, 1.5, 0.7], pattern: Pattern.blob, param: 0.45, shadow: false });
+    }
 
     switch (this.kind) {
       case 'wires': {
@@ -127,17 +132,18 @@ export class TaskStation {
         box([0, 0.93, 0.42], [1.2, 0.06, 0.6], METAL);
         // Keyboard.
         box([0, 0.975, 0.55], [0.8, 0.03, 0.22], [0.12, 0.12, 0.13]);
-        const mon = mul(f, translation([0, 1.45, 0.3]), rotationX(-0.18));
-        out.push({ mesh: 'box', model: mul(mon, scaling([1.05, 0.7, 0.1])), color: [0.16, 0.17, 0.19], spec: 0.4 });
-        screen(mul(mon, translation([0, 0, 0.055])), 0.92, 0.56);
-        box([0, 1.08, 0.3], [0.12, 0.2, 0.08], [0.16, 0.17, 0.19]);
+        // The monitor on a tall stand, so it shows over the head of whoever is typing.
+        const mon = mul(f, translation([0, 2.0, 0.22]), rotationX(-0.12));
+        out.push({ mesh: 'box', model: mul(mon, scaling([1.15, 0.75, 0.1])), color: [0.16, 0.17, 0.19], spec: 0.4 });
+        screen(mul(mon, translation([0, 0, 0.055])), 1.02, 0.6);
+        box([0, 1.3, 0.2], [0.12, 0.8, 0.08], [0.16, 0.17, 0.19]);
         led([0.5, 0.93, 0.73]);
         break;
       }
       case 'swipe': {
-        box([0, 1.35, 0.09], [0.7, 0.95, 0.18], METAL);
+        box([0, 1.45, 0.09], [0.7, 1.25, 0.18], METAL);
         box([0, 1.15, 0.19], [0.52, 0.06, 0.04], RECESS);
-        screen(mul(f, translation([0, 1.6, 0.19])), 0.5, 0.22);
+        screen(mul(f, translation([0, 1.88, 0.19])), 0.55, 0.28);
         // A card: parked in its holder, or swiping back and forth through the slot.
         const sx = on ? Math.sin(t * 4) * 0.2 : -0.18;
         const sy = on ? 1.22 : 0.95;
