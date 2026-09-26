@@ -173,16 +173,19 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   1 chairs). Win the last chair and the exit opens.
 - **Hex-A-Gone** (`src/levels/hexagone/`; Fall Guys' disappearing floor): no test chamber but an 18 m white shaft
   (`chamber: { none: true }`, same 24 x 24 footprint) with three floors of candy hex tiles (`entities/hexFloor.ts`,
-  corner radius 1.05 m, 247 per floor, tops at 13.5 / 9 / 4.5 m: pink, yellow, blue) over glowing goo (1.2 m, with a
+  corner radius 0.95 m, 295 per floor, tops at 13.5 / 9 / 4.5 m: pink, yellow, blue) over glowing goo (1.2 m, with a
   green point light). You land on the top floor with six contestants; a 3-2-1-GO on the LED board on the north wall
   (with an "N LEFT" count; "NO LOITERING" on the south wall), then any tile anyone stands on flashes and drops 0.5 s
-  later (stand still and you fall through; hops only eat the tile you land on). Falling through lands you on the floor
-  below; the goo dissolves you (DISSOLVED). Contestants: old 001 shuffles and drops through all three floors in the
-  first seconds, 067 is good and hops a lot, 218 sprints and panics, 324 is slow and jumps short, 101 stops to cheer
-  whenever someone goes out (and falls through), 456 is steady; they steer toward intact floor, avoid each other and
-  gaps they can't jump, and splash into the goo with an OUT! label. Last one standing, or still up when the 60 s
-  clock runs out, wins: the floor stops dropping, your floor grows back in a ripple and the exit opens in the east
-  wall at its height (it moves if you fall to another floor first). The camera is kept between the floors.
+  later (the player arms whatever their capsule rests on, so standing still lasts 0.5-1 s; hops only eat the tile
+  you land on). Falling through lands you on the floor below; the goo dissolves you (DISSOLVED). Contestants: old 001
+  shuffles and drops through all three floors in the first seconds, 067 is good and hops a lot, 218 sprints and
+  panics, 324 is slow and jumps short, 101 stops to cheer whenever someone goes out (and falls through), 456 is
+  steady; they steer toward intact floor, avoid each other and gaps they can't jump, and splash into the goo with an
+  OUT! label (most are out by 25-45 s). Last one standing, or still up when the 60 s clock runs out, wins: the floor
+  stops dropping, your floor grows back in a ripple and the exit opens in the east wall at its height (it moves if
+  you still fall to another floor). The level places the camera itself (`cameraShot`): the usual over-the-shoulder
+  view, kept under the floor overhead and above the one underfoot wherever there are tiles; dissolved, it looks down
+  at the splash.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one

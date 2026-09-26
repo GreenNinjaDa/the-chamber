@@ -19,7 +19,7 @@ import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type Level
 const H = CHAMBER_HALF;
 /** Tile tops of the three floors, top to bottom. */
 const TOPS = [13.5, 9, 4.5];
-const TILE_R = 1.05;
+const TILE_R = 0.95;
 const TILE_T = 0.4;
 /** Seconds between a tile being stood on and dropping away. */
 const ARM_TIME = 0.5;
