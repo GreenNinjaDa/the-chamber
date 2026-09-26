@@ -81,6 +81,9 @@ const FLIGHT_SPEED = 19;
 /** A ball hitting the player this fast (m/s, toward them) knocks them over; this fast kills. */
 const BALL_KNOCK_SPEED = 2.5;
 const BALL_KILL_SPEED = 14;
+/** ...but only if it was on screen (within this cosine of the view) in the last BALL_SEEN_MEMORY seconds; otherwise it just bowls you over. */
+const BALL_SEEN_COS = Math.cos((40 * Math.PI) / 180);
+const BALL_SEEN_MEMORY = 0.6;
 /** Balls moving faster than this get a streak behind them (they can kill). */
 const BALL_STREAK_SPEED = 11;
 
@@ -176,6 +179,8 @@ interface Ball {
   hitCooldown: number;
   /** Seconds it has sat still (for the ball search). */
   still: number;
+  /** Seconds left of it counting as seen (on screen lately). */
+  seen: number;
   /** Per bumper / sling: seconds before it can kick this ball again. */
   kickCooldown: number[];
   prevVel: Vec3;
@@ -1055,7 +1060,7 @@ export class PinballLevel implements Level {
     const live = this.balls.length;
     if (live >= MAX_BALLS) return;
     const body = spawnSteelBall(this.ctx.physics, TABLE.point(LANE_X, 6.5, BALL_R + 0.05));
-    this.balls.push({ body, state: 'play', t: 0, hitCooldown: 0, still: 0, kickCooldown: [0, 0, 0, 0, 0], prevVel: [0, 0, 0] });
+    this.balls.push({ body, state: 'play', t: 0, hitCooldown: 0, still: 0, seen: 0, kickCooldown: [0, 0, 0, 0, 0], prevVel: [0, 0, 0] });
     this.ballsLaunched++;
   }
 
@@ -1116,6 +1121,13 @@ export class PinballLevel implements Level {
         if (!this.death && !this.msg) this.showMsg('BALL SEARCH', 1.5);
       }
 
+      // Whether it's been on screen lately: only a ball you could have seen coming may kill you.
+      const cam = camera.pos, ct = camera.target;
+      const fx = ct[0] - cam[0], fy = ct[1] - cam[1], fz = ct[2] - cam[2];
+      const bx = p.x - cam[0], by = p.y - cam[1], bz = p.z - cam[2];
+      const cosView = (fx * bx + fy * by + fz * bz) / (Math.hypot(fx, fy, fz) * Math.hypot(bx, by, bz) || 1);
+      b.seen = cosView > BALL_SEEN_COS ? BALL_SEEN_MEMORY : Math.max(0, b.seen - dt);
+
       // Hitting the player.
       if (player.mode !== 'control' || player.inPortal || this.death || b.hitCooldown > 0) continue;
       const feet = player.pos;
@@ -1125,7 +1137,7 @@ export class PinballLevel implements Level {
       if (dist > BALL_R + 0.42 || dist < 1e-4) continue;
       const n: Vec3 = [nx / dist, ny / dist, nz / dist];
       const approach = (v.x - player.vel[0]) * n[0] + (v.y - player.vel[1]) * n[1] + (v.z - player.vel[2]) * n[2];
-      if (approach >= BALL_KILL_SPEED) {
+      if (approach >= BALL_KILL_SPEED && b.seen > 0) {
         const ball: Vec3 = [p.x, p.y, p.z];
         player.kill([v.x * 0.7, 4 + Math.abs(v.y) * 0.3, v.z * 0.7], { violence: 26, origin: ball });
         camera.addShake(1);
@@ -1313,9 +1325,9 @@ export class PinballLevel implements Level {
         out.push({
           mesh: 'sphere',
           model: mul(translation([p.x - v.x * back, p.y - v.y * back, p.z - v.z * back]), scaling([BALL_R * (1 - i * 0.18), BALL_R * (1 - i * 0.18), BALL_R * (1 - i * 0.18)])),
-          color: [1.6 * k, 1.2 * k, 0.6 * k],
+          color: [2.6 * k, 1.1 * k, 0.25 * k],
           pattern: Pattern.emissive,
-          opacity: 0.45 - i * 0.12,
+          opacity: 0.75 - i * 0.18,
           shadow: false,
         });
       }
