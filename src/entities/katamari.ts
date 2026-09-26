@@ -1,5 +1,5 @@
 import {
-  approachAngle, clamp, fromQuat, mul, quatConj, quatMul, rotateByQuat, rotationX, rotationY, rotationZ, scaling, translation,
+  approachAngle, clamp, fromQuat, mul, quatConj, quatMul, rotateByQuat, rotationX, rotationY, rotationZ, scaling, toQuat, translation,
   type Mat4, type Quat, type Vec3,
 } from '../engine/math';
 import type { Body, BodyModel, Physics } from '../engine/physics';
@@ -17,13 +17,18 @@ import { standingRoot } from '../game/body';
 export const KATAMARI_START_RADIUS = 0.31;
 /** The pink core is drawn at this fraction of the collision radius; the knobs and the junk make up the rest. */
 const CORE = 0.9;
-/** A stuck thing may poke out past the collision radius by at most this share of the radius (plus 3 cm). */
-const PROTRUDE = 0.3;
+/**
+ * Stuck things sit on the pink core: small ones sunk to 70% of their reach (so 30% of it stays
+ * out, plus the rest of them), and nothing pokes out past the core by more than this share of the
+ * radius (plus 3 cm); big things are buried deeper instead.
+ */
+const EMBED = 0.7;
+const PROTRUDE = 0.34;
 /**
  * As the ball grows, stuck things ride outward with its surface but sink into it by this share of
  * the growth, so the oldest (and smallest) slowly disappear under the newer ones.
  */
-const SINK = 0.25;
+const SINK = 0.1;
 /** Seconds for a thing to squish into place once stuck. */
 const STICK_TIME = 0.16;
 /** How far behind the ball's surface the prince stands (m), and his height to the top of his head. */
@@ -34,6 +39,14 @@ const PRINCE_HANDS = 0.34;
 const START_MASS = 30;
 const MAX_MASS = 600;
 
+/** Crumbs: little bits of colour added round the ball with everything it rolls up (up to MAX_CRUMBS). */
+const CRUMBS_EACH = 2;
+const MAX_CRUMBS = 200;
+const CRUMB_MESHES: DrawItem['mesh'][] = ['roundbox', 'sphere', 'cylinder', 'box'];
+const CRUMB_COLORS = [
+  [0.85, 0.15, 0.12], [0.15, 0.35, 0.8], [0.95, 0.8, 0.15], [0.92, 0.92, 0.9], [0.62, 0.45, 0.26], [0.2, 0.55, 0.25],
+  [0.95, 0.5, 0.1], [0.55, 0.3, 0.6], [0.3, 0.3, 0.33], [0.7, 0.85, 0.95],
+];
 const CORE_PINK = [0.93, 0.42, 0.66];
 const KNOB_PINK = [0.98, 0.7, 0.84];
 const knobDirs: Vec3[] = [];
@@ -89,6 +102,7 @@ export class Katamari {
   readonly body: Body;
   radius: number;
   private stuck: Stuck[] = [];
+  private crumbs = 0;
   /** How many things it has rolled up. */
   count = 0;
   /** The prince: where he stands (on the floor), which way he faces, and his running cycle. */
@@ -174,25 +188,41 @@ export class Katamari {
     // How far it reaches out along that direction (its box's support), so it pokes out only so far.
     const n = rotateByQuat(quatConj(rot), dir);
     const reach = 0.5 * (Math.abs(n[0]) * dims[0] + Math.abs(n[1]) * dims[1] + Math.abs(n[2]) * dims[2]);
-    const R = this.radius;
-    const to = Math.max(R * 0.35, R + Math.min(reach, PROTRUDE * R + 0.03) - reach);
-    const from = clamp(dist, to, R + reach + 0.3);
-    const s: Stuck = {
-      model: b.model ?? primitiveModel(b),
-      rot,
-      dir,
-      from,
-      depth: R - to,
-      radius: R,
-      t: 0,
-      extent: Math.max(dims[0], dims[1], dims[2]) / 2,
-      local: fromQuat(rot, [dir[0] * from, dir[1] * from, dir[2] * from]),
-      dist: from,
-    };
-    this.stuck.push(s);
+    const extent = Math.max(dims[0], dims[1], dims[2]) / 2;
+    this.stick(b.model ?? primitiveModel(b), rot, dir, reach, extent, dist);
+    // Plus a few crumbs of it elsewhere on the ball, so it looks packed with stuff rather than bald.
+    for (let i = 0; i < CRUMBS_EACH && this.crumbs < MAX_CRUMBS; i++, this.crumbs++) {
+      const c = CRUMB_COLORS[Math.floor(Math.random() * CRUMB_COLORS.length)];
+      const s = clamp(extent * (0.3 + Math.random() * 0.35), 0.05, 0.45);
+      const size: Vec3 = [s * (0.6 + Math.random() * 0.8), s * (0.5 + Math.random() * 0.6), s * (0.6 + Math.random() * 0.8)];
+      const mesh = CRUMB_MESHES[Math.floor(Math.random() * CRUMB_MESHES.length)];
+      const model: BodyModel = (out, m) => out.push({ mesh, model: mul(m, scaling(size)), color: c, spec: 0.3 });
+      const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, r = Math.sqrt(1 - u * u);
+      const q = toQuat(mul(rotationY(Math.random() * 6.3), rotationX(Math.random() * 6.3)));
+      this.stick(model, q, [Math.cos(a) * r, u, Math.sin(a) * r], s * 0.45, s * 0.6, 0);
+    }
     this.count++;
     physics.remove(b);
     return dims;
+  }
+
+  /** Puts something on the surface along `dir` (ball frame) that reaches `reach` out along it, settling in from `from`. */
+  private stick(model: BodyModel, rot: Quat, dir: Vec3, reach: number, extent: number, from: number) {
+    const R = this.radius, core = R * CORE;
+    const to = Math.max(R * 0.3, core + Math.min((1 - EMBED) * reach, PROTRUDE * R + 0.03 - reach));
+    const start = from > 0 ? clamp(from, to, R + reach + 0.3) : to;
+    this.stuck.push({
+      model,
+      rot,
+      dir,
+      from: start,
+      depth: core - to,
+      radius: R,
+      t: 0,
+      extent,
+      local: fromQuat(rot, [dir[0] * start, dir[1] * start, dir[2] * start]),
+      dist: start,
+    });
   }
 
   /** A point on the surface in the ball's own frame (unit direction), in world space right now. */
@@ -257,7 +287,7 @@ export class Katamari {
   /** Where a stuck thing sits now: riding out with the surface as the ball grows, sinking in a little. */
   private restDistance(s: Stuck) {
     const R = this.radius;
-    return Math.max(R * 0.3, R - s.depth - SINK * (R - s.radius));
+    return Math.max(R * 0.3, R * CORE - s.depth - SINK * (R - s.radius));
   }
 
   private drawPrince(out: DrawItem[], time: number) {

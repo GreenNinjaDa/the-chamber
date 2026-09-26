@@ -4,6 +4,7 @@ import { RAPIER, type Body } from '../../engine/physics';
 import { Pattern, type DrawItem } from '../../engine/renderer';
 import { junk, spawnJunk, type JunkDef } from '../../entities/junk';
 import { bigTwo, dimsOf, Katamari } from '../../entities/katamari';
+import { King } from '../../entities/king';
 import { spawnPlush } from '../../entities/plush';
 import { ExitPortal, PortalArrival } from '../../entities/portal';
 import { TRINKETS } from '../../entities/trinkets';
@@ -204,6 +205,9 @@ export class KatamariLevel implements Level {
   /** The star it becomes: where it ends up in the sky. */
   private starFrom: Vec3 = [0, 0, 0];
   private starPos: Vec3 = [0, 80, -60];
+  /** The King himself, looming over the north wall. */
+  private royal = new King();
+  private time = 0;
   private deathShown = false;
   private zapAt: Vec3 = [0, 0, 0];
 
@@ -257,7 +261,7 @@ export class KatamariLevel implements Level {
     this.barFill = { mesh: 'box', model: mul(translation([0, 5.8, -CHAMBER_HALF + 0.1]), scaling([0.01, 0.3, 0.04])), color: BAR_FILL, pattern: Pattern.emissive, shadow: false };
     const tickX = -5 + 10 * ((PLAYER_SIZE / PICK) / GOAL);
     this.barTick = { mesh: 'box', model: mul(translation([tickX, 5.8, -CHAMBER_HALF + 0.12]), scaling([0.08, 0.6, 0.04])), color: BAR_DANGER, pattern: Pattern.emissive, shadow: false };
-    this.youLabel.pos = [tickX, 6.3, WALL_Z];
+    this.youLabel.pos = [tickX, 5.3, WALL_Z];
   }
 
   // --- Setting up the mess ------------------------------------------------------------------------
@@ -429,6 +433,21 @@ export class KatamariLevel implements Level {
     this.kingT = seconds;
     for (let i = 0; i < 3; i++) noise(0.12, { freq: 900 + Math.random() * 900, to: 2600 + Math.random() * 1500, type: 'bandpass', q: 5, vol: 0.3, at: i * 0.13 });
     for (let i = 0; i < 5; i++) tone(rand(130, 260), 0.09, { to: rand(90, 200), wave: 'sawtooth', vol: 0.06, at: 0.05 + i * 0.08 });
+  }
+
+  /** The King rises behind the north wall when he first speaks, flaps his mouth, watches, weeps, glares. */
+  private updateKing(dt: number) {
+    const { player } = this.ctx;
+    const r = this.royal;
+    this.time += dt;
+    if (this.phase !== 'arrival' && (this.phase !== 'intro' || this.phaseT >= DISPLAY_AT - 1.2)) r.rise = Math.min(1, r.rise + dt / 1.6);
+    r.talk = this.kingT > 0 ? 0.5 + 0.5 * Math.sin(this.time * 17) : Math.max(0, r.talk - dt * 4);
+    const watchBall = this.phase === 'eaten' || this.phase === 'intro';
+    if (this.phase === 'star' && this.phaseT < 3.5) r.lookAt = this.starPath(this.phaseT);
+    else if (watchBall) r.lookAt = this.kat.centre();
+    else r.lookAt = [player.pos[0], player.pos[1] + 1.2, player.pos[2]];
+    r.tears = this.phase === 'star' ? Math.min(1, this.phaseT / 0.8) : 0;
+    r.glow = this.phase === 'timeout' ? clamp((this.phaseT - 2.0) / 0.8, 0, 1) * (this.phaseT > 4.6 ? 0 : 1) : 0;
   }
 
   /** Puts a label at a fixed place on screen: `up` is the height (fraction of half the screen above the middle), `size` a fraction of its height. */
@@ -681,6 +700,7 @@ export class KatamariLevel implements Level {
     this.bonkT -= dt;
     if (this.kingT > 0 && (this.kingT -= dt) <= 0) this.kingHead.text = this.kingLine1.text = this.kingLine2.text = '';
     this.kat.update(dt);
+    this.updateKing(dt);
 
     // Remember what the player was carrying (things thrown in count as feeding it).
     if (player.carrying) {
@@ -905,7 +925,7 @@ export class KatamariLevel implements Level {
     const rb = this.kat.body.rb;
     this.setPhase('star');
     this.starFrom = this.kat.centre();
-    this.starPos = [this.starFrom[0] * 0.3, 70, -55];
+    this.starPos = [this.starFrom[0] * 0.3, 62, -42];
     rb.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
     this.kat.body.collider.setEnabled(false);
     this.kat.followBall = false;
@@ -1003,6 +1023,7 @@ export class KatamariLevel implements Level {
     const dl = this.delivery;
     if (dl) drawBeam(out, time, dl.spot, Math.min(1, dl.t / 0.25) * (0.6 + 0.4 * Math.sin(dl.t * 20)));
     this.kat.draw(out, time);
+    this.royal.draw(out, time);
     if (this.phase === 'star' && this.phaseT >= 3.5) this.drawStar(out, time);
     if (this.phase === 'eaten') this.drawRider(out, time);
     if (this.phase === 'timeout' && this.phaseT >= 2.2) this.drawZap(out, time);
@@ -1030,10 +1051,14 @@ export class KatamariLevel implements Level {
     const fire = t >= 3.1;
     const k = fire ? Math.max(0, 1 - (t - 3.1) / 1.4) : clamp((t - 2.2) / 0.9, 0, 1) * 0.3;
     if (k <= 0) return;
+    // From both of the King's eyes to where you stand.
     const p = this.zapAt;
-    const a: Vec3 = [p[0], 0, p[2]], b: Vec3 = [p[0] * 0.3, 90, -60];
-    out.push({ mesh: 'cylinder', model: segment(a, b, (fire ? 0.5 : 0.08) * Math.max(k, 0.2)), color: [4, 4, 4], pattern: Pattern.emissive, shadow: false });
-    out.push({ mesh: 'cylinder', model: segment(a, b, (fire ? 1.6 : 0.3) * Math.max(k, 0.2)), color: rainbow(time * 9), pattern: Pattern.emissive, shadow: false, opacity: 0.45 });
+    const a: Vec3 = [p[0], p[1] + 0.9, p[2]];
+    for (const side of [-1, 1] as const) {
+      const b = this.royal.eye(side);
+      out.push({ mesh: 'cylinder', model: segment(a, b, (fire ? 0.35 : 0.06) * Math.max(k, 0.2)), color: [4, 4, 4], pattern: Pattern.emissive, shadow: false });
+      out.push({ mesh: 'cylinder', model: segment(a, b, (fire ? 1.1 : 0.22) * Math.max(k, 0.2)), color: rainbow(time * 9 + side), pattern: Pattern.emissive, shadow: false, opacity: 0.45 });
+    }
   }
 
   // --- Level interface ----------------------------------------------------------------------------------
