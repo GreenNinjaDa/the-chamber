@@ -31,7 +31,11 @@ export interface DrawItem {
   model: Mat4;
   color: ArrayLike<number>;
   pattern?: number;
-  /** Pattern parameter: panel size for `panels`, opacity for `blob`, 1 = green goo / 2 = a molten object (hotter) for `lava`. */
+  /**
+   * Pattern parameter: panel size for `panels` (negative: underwater tiles of that size, with caustics),
+   * opacity for `blob`, 1 = green goo / 2 = a molten object (hotter) / 3 = see-through pool water
+   * (set `opacity` too) for `lava`.
+   */
   param?: number;
   spec?: number;
   /** 0..1 pulsing glow for the thing under the crosshair. */

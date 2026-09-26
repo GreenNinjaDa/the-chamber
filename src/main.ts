@@ -40,6 +40,7 @@ import { PacmanLevel } from './levels/pacman/pacmanLevel';
 import { BowlingLevel } from './levels/bowling/bowlingLevel';
 import { FloorLavaLevel } from './levels/floorLava/floorLavaLevel';
 import { ElevatorLevel } from './levels/elevator/elevatorLevel';
+import { PoolLevel } from './levels/pool/poolLevel';
 import type { Level, LevelContext, TrackedTarget, WorldLabel } from './levels/level';
 import { LobbyLevel } from './levels/lobby/lobbyLevel';
 
@@ -78,6 +79,7 @@ const LEVELS: ((ctx: LevelContext) => Level)[] = [
   (ctx) => new LaserLevel(ctx),
   (ctx) => new ElevatorLevel(ctx),
   (ctx) => new PacmanLevel(ctx),
+  (ctx) => new PoolLevel(ctx),
 ];
 const params = new URLSearchParams(location.search);
 /** `?sandbox` opens the mechanics test room; `?level=N` skips the lobby and starts at level N. */
