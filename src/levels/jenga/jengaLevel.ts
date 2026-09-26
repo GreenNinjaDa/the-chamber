@@ -68,7 +68,7 @@ const HOVER_HEIGHT = 3;
 /** The exit (east wall) and the ledge in front of it, which slide out for the finale. */
 const EXIT_Z = BASE[2] + 5;
 const LEDGE_Y = 6.5;
-const LEDGE_DEPTH = 1.6;
+const LEDGE_DEPTH = 2;
 const LEDGE_Z: [number, number] = [BASE[2] + 1.9, BASE[2] + 7.2];
 /**
  * The finale (s after it starts): the ledge slides out, Timmy pushes the tower over to PUSH_TIP
@@ -130,7 +130,7 @@ interface Puff {
 }
 
 const HINTS: Record<Cause, string> = {
-  topple: 'The tower leans toward the side that’s missing blocks, and toward wherever you stand. Stand on the side opposite the lean to balance it (the Lean-o-meter on the north wall shows which way).',
+  topple: 'The tower leans toward the side that’s missing blocks, and toward wherever you stand. Stand on the side opposite the lean to balance it (the Lean-o-meters on the north and south walls show which way, and where it’s heading while he pulls one).',
   squash: 'Watch where he’s going to put the block down (its shadow on top), and don’t be there. You can jump up onto a block that’s already down.',
   fall: 'Stay on top. The tower slides you downhill as it leans, so walk uphill, and keep away from the edges.',
   finale: 'When he shoves it over, a ledge and the exit slide out of the east wall: run to the south-east corner of the top and jump for the ledge before the tower hits.',
