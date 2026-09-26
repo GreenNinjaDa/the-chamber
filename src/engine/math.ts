@@ -150,6 +150,26 @@ export function toQuat(m: Mat4): Quat {
   return { w: (m10 - m01) / s, x: (m02 + m20) / s, y: (m12 + m21) / s, z: s / 4 };
 }
 
+/** Spherical interpolation between two rotations. */
+export function quatSlerp(a: Quat, b: Quat, t: number): Quat {
+  let d = a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+  let bx = b.x, by = b.y, bz = b.z, bw = b.w;
+  if (d < 0) {
+    d = -d;
+    bx = -bx; by = -by; bz = -bz; bw = -bw;
+  }
+  let ka = 1 - t, kb = t;
+  if (d < 0.9995) {
+    const angle = Math.acos(d);
+    const s = Math.sin(angle);
+    ka = Math.sin((1 - t) * angle) / s;
+    kb = Math.sin(t * angle) / s;
+  }
+  const q = { x: a.x * ka + bx * kb, y: a.y * ka + by * kb, z: a.z * ka + bz * kb, w: a.w * ka + bw * kb };
+  const n = Math.hypot(q.x, q.y, q.z, q.w);
+  return { x: q.x / n, y: q.y / n, z: q.z / n, w: q.w / n };
+}
+
 export function quatMul(a: Quat, b: Quat): Quat {
   return {
     w: a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,

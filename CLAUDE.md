@@ -70,11 +70,12 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
 - **Level 5 — Raiders of the Lost Chamber** (`src/levels/temple/`, work in progress): its own map, no test chamber. A
   dark stone tunnel lit by a torch in the player's hand. A boulder drops from a deep ceiling shaft between the player
   and the exit portal and chases them (rubber-banded: sprinting stays ahead, walking gets caught) over spiked floor
-  pits; the 8 m one (too far to sprint-jump) needs a vine. A wide pressure plate at the end stops the boulder, the
-  end wall sinks to reveal a second boulder, and gravity slowly rolls over about the tunnel's axis: a quarter turn
-  drops the player onto the side wall (a 1.5 s pause standing there), another onto the ceiling. The map never moves;
-  gravity (the physics world's and the player's own) turns, and the camera turns with the player. The way back has
-  the ceiling's own pits; the new boulder chases, the first rolls ahead and drops into its shaft (12 m deep, so both
+  pits (the 8 m one, too far to sprint-jump, needs a vine), past spikes (rows across the floor, spikes out of the
+  walls; not solid, touching one stuns for 0.5 s) and ~70 loose rocks (debris: boulders roll straight through them).
+  A pressure plate at the end stops the boulder, the end wall sinks to reveal a second boulder, and gravity rolls a
+  smooth half turn about the tunnel's axis onto the ceiling over 5 s, rocks and all; the camera trails the turn. The
+  map never moves; gravity (the physics world's and the player's own) turns. The way back has the ceiling's own pits
+  and spikes; the new boulder chases, the first rolls off from rest and drops into its shaft (12 m deep, so both
   boulders fit with room to spare), crossed on a second vine to the portal. Vines are physical ropes: hold E or left
   mouse near one to hang on at that length (`player.hanging` for the pose); let go to fly on; each snaps after one
   use. Boulders kill on contact with a small push. The map is one fixed body (not kinematic: Rapier's character
@@ -152,7 +153,8 @@ Shared mechanics available to levels (via `ctx`):
 - `player.resume(velocity)` puts the player back in normal control after a scripted mode; `player.partFrames()`
   gives each body part's frame (e.g. to put a torch in the right hand, `foreArmR`).
 - Boulders use `GROUPS_BOULDER`, and invisible `GROUPS_BOULDER_BRIDGE` colliders are floors only boulders touch
-  (so they roll over pits the player has to jump).
+  (so they roll over pits the player has to jump). Loose objects on `GROUPS_DEBRIS` behave normally but boulders
+  pass through them.
 - In scripted modes (`held`, `flying`, `stuck`, `splat`, `swinging`) the physical body is switched off and the pose is drawn
   directly; in `control` and `ragdoll` the body is drawn from physics.
 

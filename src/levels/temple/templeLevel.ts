@@ -2,7 +2,7 @@ import {
   add, clamp, dot, easeInOut, length, mul, normalize, rotationX, rotationZ, scale, scaling, segment, sub, transformDir, transformPoint,
   translation, type Mat4, type Vec3,
 } from '../../engine/math';
-import { GROUPS_BOULDER, GROUPS_BOULDER_BRIDGE, RAPIER, type Body } from '../../engine/physics';
+import { GROUPS_BOULDER, GROUPS_BOULDER_BRIDGE, GROUPS_DEBRIS, RAPIER, type Body } from '../../engine/physics';
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
 import { drawPortal, PORTAL_SQUEEZE_TIME, PortalArrival } from '../../entities/portal';
 import { PressurePlate } from '../../entities/pressurePlate';
@@ -12,9 +12,9 @@ import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type Level
  * The boulder temple (an Indiana Jones parody). Its own map: a dark stone tunnel lit only by the
  * torch in your hand. The exit portal is right there... until a boulder drops out of a deep shaft
  * in the ceiling in front of it and chases you down the tunnel, over spiked pits (the widest needs
- * a vine). At the end a pressure plate stops the boulder, the end wall sinks into the floor to
- * reveal a second boulder, and gravity slowly rolls over: a quarter turn drops you onto the side
- * wall for a moment, another onto the ceiling. Now the ceiling's pits are in your way, the new
+ * a vine), spikes and loose rocks. At the end a pressure plate stops the boulder, the end wall sinks
+ * into the floor to reveal a second boulder, and gravity slowly rolls over onto the ceiling (the
+ * camera trailing behind), rocks and all. Now the ceiling's pits and spikes are in your way, the new
  * boulder chases you home, and the first one rolls ahead of you and drops back down its shaft
  * (now a pit), which you cross on a second vine to reach the portal. Boulders kill on contact.
  *
@@ -33,7 +33,6 @@ const Z_START = -24;
 const Z_ALCOVE_END = 87;
 const END_Z = 80; // the dead-end wall that sinks away
 const PLATE_Z = 76;
-const PLATE_R = 2;
 const PORTAL_Z = -21;
 const PORTAL_R = 2;
 const SPAWN_Z = -2;
@@ -64,13 +63,36 @@ const ROLL_DELAY = 0.7;
 /** After the roll the first boulder rolls away toward the start faster than anyone can run. */
 const FLEE = 10.5;
 /** Once the plate is pressed, the chasing boulder stops at least this far back. */
-const STOP_SHORT = 8;
+const STOP_SHORT = 3;
+/** How quickly the first boulder gets going again after the roll (it starts from rest). */
+const FLEE_GAIN = 0.6;
 
 const END_WAIT = 1;
 const WALL_SINK = 1;
-/** The gravity roll: each quarter turn takes this long, with a pause standing on the side wall in between. */
-const QUARTER_TURN = 2.5;
-const ON_THE_WALL = 1.5;
+/** The gravity roll: one smooth half turn about the tunnel's axis. */
+const ROLL_TIME = 5;
+
+// Spikes: rows across the floor (the way out) and the ceiling (the way back), and spikes sticking
+// out of the walls. They're not solid: touching one knocks you loose for a moment.
+const SPIKE_STUN = 0.5;
+const SPIKE_R = 0.16;
+/** x positions of a row: some leave a way past, a full row has to be jumped. */
+const ROWS = {
+  left: [-1.8, -1.2, -0.6, 0],
+  right: [0, 0.6, 1.2, 1.8],
+  sides: [-1.8, -1.2, 1.2, 1.8],
+  full: [-1.8, -1.2, -0.6, 0, 0.6, 1.2, 1.8],
+};
+const FLOOR_ROWS: [number, number[]][] = [[6, ROWS.left], [22, ROWS.full], [38, ROWS.sides], [58, ROWS.right], [71, ROWS.full]];
+const CEILING_ROWS: [number, number[]][] = [[68, ROWS.right], [51, ROWS.full], [34, ROWS.left], [19, ROWS.sides], [2, ROWS.full]];
+/** Wall spikes: [z, which wall (-1 / +1), height]. Low ones for the way out, high ones for the way back. */
+const WALL_SPIKES: [number, number, number][] = [
+  [11, -1, 0.5], [27, 1, 0.5], [43, -1, 0.5], [61, 1, 0.5], [73, -1, 0.5],
+  [65, -1, H - 0.5], [47, 1, H - 0.5], [29, -1, H - 0.5], [13, 1, H - 0.5], [-1, -1, H - 0.5],
+];
+
+/** Loose rocks all along the tunnel: they tumble when gravity turns; boulders roll straight through them. */
+const ROCKS = 70;
 const DEATH_SCREEN_DELAY = 1.6;
 
 // --- Looks ---------------------------------------------------------------------------------------
@@ -110,7 +132,13 @@ interface Spikes {
   dir: number;
 }
 
-type Stage = 'start' | 'drop' | 'chase' | 'endWait' | 'wallDown' | 'turn1' | 'onWall' | 'turn2' | 'chaseBack';
+/** A single spike on the path: from its base to its tip. */
+interface Spike {
+  base: Vec3;
+  tip: Vec3;
+}
+
+type Stage = 'start' | 'drop' | 'chase' | 'endWait' | 'wallDown' | 'turn' | 'chaseBack';
 
 const DEATHS = {
   boulder: {
@@ -136,6 +164,8 @@ export class TempleLevel implements Level {
   private stageT = 0;
   private pieces: Piece[] = [];
   private spikes: Spikes[] = [];
+  private pathSpikes: Spike[] = [];
+  private spikeGrace = 0;
   private levelBody: RAPIER.RigidBody;
   private flipped = false;
   private endWall: RAPIER.Collider;
@@ -167,7 +197,9 @@ export class TempleLevel implements Level {
     this.endWall = this.solid([0, H / 2, END_Z + 0.5], [W, H, 1], STONE_WALL, false);
     this.plate = new PressurePlate(physics, [0, 0, PLATE_Z], [], player, (down) => {
       if (down && this.stage === 'chase') this.setStage('endWait');
-    }, PLATE_R);
+    });
+    this.placeSpikes();
+    this.scatterRocks();
 
     // Vine 1 hangs from the ceiling over the widest floor pit; vine 2 hangs from the floor over the
     // shaft, for when gravity points at the ceiling. Both a little past the pit's middle.
@@ -258,6 +290,30 @@ export class TempleLevel implements Level {
     this.slab(z, Z_ALCOVE_END, H, H + PIT_DEPTH, W / 2, STONE_CEIL);
   }
 
+  private placeSpikes() {
+    for (const [z, xs] of FLOOR_ROWS) for (const x of xs) this.pathSpikes.push({ base: [x, 0, z], tip: [x, 0.7, z] });
+    for (const [z, xs] of CEILING_ROWS) for (const x of xs) this.pathSpikes.push({ base: [x, H, z], tip: [x, H - 0.7, z] });
+    for (const [z, side, y] of WALL_SPIKES) {
+      const x = (side * W) / 2;
+      this.pathSpikes.push({ base: [x, y, z], tip: [x - side * 0.9, y, z] });
+    }
+  }
+
+  private scatterRocks() {
+    const { physics } = this.ctx;
+    for (let i = 0; i < ROCKS; i++) {
+      const z = Z_START + 3 + Math.random() * (END_Z - Z_START - 5);
+      const x = (Math.random() * 2 - 1) * (W / 2 - 0.5);
+      const size = 0.15 + Math.random() * 0.3;
+      const shade = 0.7 + Math.random() * 0.4;
+      const opts = { mass: 60 * size * size * size * 20, color: STONE_WALL.map((c) => c * shade), grabbable: false, friction: 0.9 };
+      const body = Math.random() < 0.5
+        ? physics.addBall([x, size + 0.02, z], size, opts)
+        : physics.addBox([x, size / 2 + 0.02, z], [size * 1.6, size, size * 1.3], { ...opts, rotation: { x: 0, y: Math.sin(i), z: 0, w: Math.cos(i) } });
+      body.collider.setCollisionGroups(GROUPS_DEBRIS);
+    }
+  }
+
   private makeBoulder(pos: Vec3): Body {
     const body = this.ctx.physics.addBall(pos, BOULDER_R, {
       mass: 3000,
@@ -294,12 +350,12 @@ export class TempleLevel implements Level {
   // --- Update --------------------------------------------------------------------------------------
 
   private turning() {
-    return this.stage === 'turn1' || this.stage === 'turn2';
+    return this.stage === 'turn';
   }
 
-  /** The whole roll, pause included: boulders stay frozen and nothing chases. */
+  /** During the roll the boulders stay frozen and nothing chases. */
   private rolling() {
-    return this.turning() || this.stage === 'onWall';
+    return this.turning();
   }
 
   private setStage(stage: Stage) {
@@ -342,22 +398,16 @@ export class TempleLevel implements Level {
         this.wallDrop = easeInOut(clamp(this.stageT / WALL_SINK, 0, 1)) * (H + 0.1);
         this.endWall.setTranslationWrtParent({ x: 0, y: H / 2 - this.wallDrop, z: END_Z + 0.5 });
         camera.addShake(0.25);
-        if (this.stageT >= WALL_SINK) this.startTurn('turn1');
+        if (this.stageT >= WALL_SINK) this.startTurn();
         break;
-      case 'turn1':
-      case 'turn2': {
-        // Gravity turns about the tunnel's axis; the player (and their camera) turn with it.
-        const k = easeInOut(clamp(this.stageT / QUARTER_TURN, 0, 1));
-        this.setGravity((Math.PI / 2) * ((this.stage === 'turn2' ? 1 : 0) + k));
-        if (this.stageT >= QUARTER_TURN) {
-          if (this.stage === 'turn1') this.setStage('onWall');
-          else this.endRoll();
-        }
+      case 'turn': {
+        // Gravity turns about the tunnel's axis in one smooth half turn; the player (and, a little
+        // behind, their camera) turn with it, and everything loose falls.
+        const k = easeInOut(clamp(this.stageT / ROLL_TIME, 0, 1));
+        this.setGravity(Math.PI * k);
+        if (this.stageT >= ROLL_TIME) this.endRoll();
         break;
       }
-      case 'onWall':
-        if (this.stageT >= ON_THE_WALL) this.startTurn('turn2');
-        break;
       case 'chaseBack':
         break;
     }
@@ -365,6 +415,7 @@ export class TempleLevel implements Level {
     this.driveChase(dt, me);
     this.driveFlee(dt);
     this.updateRope(dt);
+    this.checkSpikes(dt);
     this.checkDeaths();
     this.checkExit(dt);
     this.updateTorch();
@@ -412,25 +463,23 @@ export class TempleLevel implements Level {
       this.fleeDelay -= dt;
       return;
     }
-    this.rollAlong(b, -1, FLEE, dt);
+    this.rollAlong(b, -1, FLEE, dt, FLEE_GAIN);
   }
 
   /** Eases a boulder's speed along the tunnel (+1: toward the end, -1: toward the start) to \`target\`. */
-  private rollAlong(b: Body, along: number, target: number, dt: number) {
+  private rollAlong(b: Body, along: number, target: number, dt: number, gain = 3) {
     const v = b.rb.linvel();
-    const next = v.z + (target * along - v.z) * Math.min(1, dt * 3);
+    const next = v.z + (target * along - v.z) * Math.min(1, dt * gain);
     b.rb.setLinvel({ x: v.x, y: v.y, z: next }, true);
   }
 
-  /** A quarter turn of gravity. The boulders freeze where they are until it's all over. */
-  private startTurn(stage: 'turn1' | 'turn2') {
-    if (stage === 'turn1') {
-      this.parked = this.boulders.map((_, i) => this.boulderPos(i));
-      for (const b of this.boulders) b.rb.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
-      this.chasing = null;
-    }
+  /** The gravity roll. The boulders freeze where they are until it's over. */
+  private startTurn() {
+    this.parked = this.boulders.map((_, i) => this.boulderPos(i));
+    for (const b of this.boulders) b.rb.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
+    this.chasing = null;
     this.ctx.camera.addShake(0.3);
-    this.setStage(stage);
+    this.setStage('turn');
   }
 
   /** Gravity rolled by \`angle\` about the tunnel's axis (0: normal, π/2: onto a side wall, π: onto the ceiling). */
@@ -444,8 +493,9 @@ export class TempleLevel implements Level {
     this.flipped = true;
     this.setGravity(Math.PI);
     this.setStage('chaseBack');
-    // Both boulders fall to the new floor; the first rolls off ahead, the second chases you home.
-    this.release(0, [0, 0, -FLEE]);
+    // Both boulders fall to the new floor. The first starts rolling off toward the start from rest
+    // (if it's close, that's your problem); the second chases you home.
+    this.release(0);
     this.release(1);
     this.chasing = this.boulders[1];
     this.chaseDelay = ROLL_DELAY + 0.5;
@@ -520,11 +570,34 @@ export class TempleLevel implements Level {
       }
     }
     // Pits: down past the floor means onto the spikes.
-    const below = this.stage === 'onWall' ? false : this.flipped ? player.pos[1] > H + 1.2 : player.pos[1] < -1.2;
+    const below = this.flipped ? player.pos[1] > H + 1.2 : player.pos[1] < -1.2;
     if (below) {
       player.hanging = false;
       player.kill(scale(player.up, -2), { violence: 10 });
       this.die('pit');
+    }
+  }
+
+  /** Touching a spike knocks you loose for a moment (they're not deadly, just rude). */
+  private checkSpikes(dt: number) {
+    const { player } = this.ctx;
+    this.spikeGrace = Math.max(0, this.spikeGrace - dt);
+    if (this.spikeGrace > 0 || player.mode !== 'control' || player.inPortal || this.rope || this.death) return;
+    const feet = player.pos;
+    const head = add(feet, scale(player.up, 1.8));
+    for (const sp of this.pathSpikes) {
+      // Closest approach between the spike and the player's feet-to-head line, sampled along the spike.
+      for (let k = 0.2; k <= 1.001; k += 0.2) {
+        const p = add(sp.base, scale(sub(sp.tip, sp.base), k));
+        if (distToSegment(p, feet, head) > 0.3) continue;
+        const away = sub(add(feet, scale(player.up, 0.9)), p);
+        const flat = sub(away, scale(player.up, dot(away, player.up)));
+        const push = length(flat) > 1e-3 ? scale(normalize(flat), 3) : [0, 0, 0] as Vec3;
+        player.knock(add(push, scale(player.up, 2)), SPIKE_STUN);
+        this.ctx.camera.addShake(0.2);
+        this.spikeGrace = 1;
+        return;
+      }
     }
   }
 
@@ -602,6 +675,10 @@ export class TempleLevel implements Level {
           out.push({ mesh: 'cone', model, color: [0.5, 0.48, 0.44], spec: 0.6 });
         }
       }
+    }
+
+    for (const sp of this.pathSpikes) {
+      out.push({ mesh: 'cone', model: segment(sp.base, sp.tip, SPIKE_R), color: [0.55, 0.52, 0.47], spec: 0.7 });
     }
 
     drawPortal(out, this.portalCentre(), [0, 0, 1], PORTAL_R, true);

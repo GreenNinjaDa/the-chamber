@@ -23,10 +23,13 @@ const BODY_BIT = 0x0002; // the player's physical body parts
 const CAPSULE_BIT = 0x0004; // the player's movement capsule
 const BRIDGE_BIT = 0x0008; // invisible floors only boulders use (e.g. over pits the player must jump)
 const BOULDER_BIT = 0x0010; // rolling boulders
+const DEBRIS_BIT = 0x0020; // loose clutter boulders roll straight through
 /** An invisible surface that only boulders touch. */
 export const GROUPS_BOULDER_BRIDGE = (BRIDGE_BIT << 16) | BOULDER_BIT;
-/** A boulder: hits everything, including boulder bridges. */
-export const GROUPS_BOULDER = (BOULDER_BIT << 16) | 0xffff;
+/** A boulder: hits everything (including boulder bridges) except debris. */
+export const GROUPS_BOULDER = (BOULDER_BIT << 16) | (0xffff & ~DEBRIS_BIT);
+/** Loose debris: like any other loose object, but boulders pass through it. */
+export const GROUPS_DEBRIS = (DEBRIS_BIT << 16) | (0xffff & ~BOULDER_BIT & ~BRIDGE_BIT);
 /** Player body parts while animated: collide with the world and props, but not each other. */
 export const GROUPS_PLAYER_BODY = (BODY_BIT << 16) | (0xffff & ~BODY_BIT & ~CAPSULE_BIT & ~BRIDGE_BIT);
 /** Player body parts while limp: also collide with each other (jointed pairs have contacts off). */

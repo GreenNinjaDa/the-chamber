@@ -1,5 +1,5 @@
 import type { Input } from '../engine/input';
-import { add, clamp, lerp3, lookAt, perspective, scale, sub, transformDir, type Vec3 } from '../engine/math';
+import { add, clamp, fromQuat, lerp3, lookAt, perspective, quatSlerp, scale, sub, toQuat, transformDir, type Quat, type Vec3 } from '../engine/math';
 import type { CameraView } from '../engine/renderer';
 import { CHAMBER_HALF } from './chamber';
 import type { Player } from './player';
@@ -8,6 +8,8 @@ import { settings } from './settings';
 const MOUSE_SENSITIVITY = 0.0022;
 const SHOULDER_OFFSET = 0.6;
 const DISTANCE = 3.2;
+/** How quickly the camera catches up when the player's gravity turns (1/s): lower lags more. */
+const TURN_CATCH_UP = 1.6;
 
 /** Over-the-shoulder third-person camera that levels can temporarily take over. */
 export class ThirdPersonCamera {
@@ -21,10 +23,13 @@ export class ThirdPersonCamera {
   confine = true;
   /** The camera's up (follows the player's gravity). */
   up: Vec3 = [0, 1, 0];
+  /** The camera's own idea of the player's gravity: trails behind when it turns. */
+  private frame: Quat = { x: 0, y: 0, z: 0, w: 1 };
 
   reset(yaw = 0) {
     this.confine = true;
     this.up = [0, 1, 0];
+    this.frame = { x: 0, y: 0, z: 0, w: 1 };
     this.yaw = yaw;
     this.pitch = -0.2;
     this.shake = 0;
@@ -43,12 +48,14 @@ export class ThirdPersonCamera {
 
   follow(dt: number, player: Player) {
     const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
-    // Yaw and pitch are in the player's own frame, so the view turns with their gravity.
-    const g = player.gravity;
+    // Yaw and pitch are in the player's own frame, so the view turns with their gravity, a little
+    // behind it so a turn is felt.
+    this.frame = quatSlerp(this.frame, toQuat(player.gravity), 1 - Math.exp(-dt * TURN_CATCH_UP));
+    const g = fromQuat(this.frame, [0, 0, 0]);
     const fwd = transformDir(g, [-Math.sin(this.yaw) * cp, sp, -Math.cos(this.yaw) * cp]);
     const right = transformDir(g, [Math.cos(this.yaw), 0, -Math.sin(this.yaw)]);
-    this.up = player.up;
-    const shoulder = add(add(player.pos, scale(player.up, 1.65)), scale(right, SHOULDER_OFFSET));
+    this.up = transformDir(g, [0, 1, 0]);
+    const shoulder = add(add(player.pos, scale(this.up, 1.65)), scale(right, SHOULDER_OFFSET));
     const desired = sub(shoulder, scale(fwd, DISTANCE));
     if (!this.confine) {
       this.moveTo(desired, add(shoulder, scale(fwd, 10)), dt, 18);
