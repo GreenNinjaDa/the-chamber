@@ -58,6 +58,26 @@ const GLYPHS: Record<string, string[]> = {
   '-': ['00000', '00000', '00000', '11111', '00000', '00000', '00000'],
 };
 
+/**
+ * The 5x7 glyphs of `text` laid out on one line with one-pixel gaps, as seven strings of '1' (on)
+ * and '.' (off), for other pixel renderers (e.g. `PixelSprite` in tamagotchi.ts). Unknown
+ * characters (and spaces) are blank.
+ */
+export function textBitmap(text: string): string[] {
+  text = text.toUpperCase();
+  const rows: string[] = [];
+  for (let row = 0; row < GLYPH_H; row++) {
+    let line = '';
+    for (let c = 0; c < text.length; c++) {
+      if (c) line += '.';
+      const glyph = GLYPHS[text[c]];
+      line += glyph ? glyph[row].replace(/0/g, '.') : '.....';
+    }
+    rows.push(line);
+  }
+  return rows;
+}
+
 export interface PixelTextOptions {
   /** Where the middle of the text goes. */
   centre: Vec3;

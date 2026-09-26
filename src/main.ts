@@ -52,6 +52,7 @@ import { PoolLevel } from './levels/pool/poolLevel';
 import { ImpostorLevel } from './levels/impostor/impostorLevel';
 import { QwopLevel } from './levels/qwop/qwopLevel';
 import { MolesLevel } from './levels/moles/molesLevel';
+import { TamagotchiLevel } from './levels/tamagotchi/tamagotchiLevel';
 import type { Level, LevelContext, TrackedTarget, WorldLabel } from './levels/level';
 import { LobbyLevel } from './levels/lobby/lobbyLevel';
 
@@ -72,6 +73,7 @@ const LEVELS: [string, (ctx: LevelContext) => Level][] = [
   ['mines', (ctx) => new MinesLevel(ctx)],
   ['quiz', (ctx) => new QuizLevel(ctx)],
   ['chairs', (ctx) => new ChairsLevel(ctx)],
+  ['tamagotchi', (ctx) => new TamagotchiLevel(ctx)],
   ['hippos', (ctx) => new HipposLevel(ctx)],
   ['gnome', (ctx) => new GnomeLevel(ctx)],
   ['flappy', (ctx) => new FlappyLevel(ctx)],
