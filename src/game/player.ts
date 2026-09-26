@@ -33,7 +33,7 @@ const WALK_SPEED = 5;
 const SPRINT_SPEED = 8.5;
 const JUMP_SPEED = 7.5;
 /** The raised torch arm (see torchArm): shoulder raise and elbow bend (radians). */
-const TORCH_SHOULDER = 2.0;
+const TORCH_SHOULDER = 1.74; // about 100 degrees: just above level
 const TORCH_ELBOW = 0.5;
 /** A jump pressed this long before you can jump (still in the air, getting up...) happens as soon as you can. */
 const JUMP_BUFFER = 0.1;
