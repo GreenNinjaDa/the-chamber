@@ -304,7 +304,9 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   you (PIANO'D, VENDED, COUCH POTATO...). Bots holding a random rail spot die ~30% of the time, ones that slide away
   from what's overhead ~never. Survive and the doors grind open onto the exit ("DING." / "Ground floor. Mind the
   gap.", the display says B7). A button panel by the doors has an EMERGENCY STOP (`CarPanel`) that only makes
-  sarcastic remarks. `?quickRide` snaps the cable 4 s after the ding.
+  sarcastic remarks. Sound: dings, a muzak `Tune` (record-scratches off at the TWANG), motor hum, creak / ping /
+  groan, brake screech, rushing wind, countdown beeps, the crash, thuds, a rail clink. `?quickRide` snaps the cable
+  4 s after the ding.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
