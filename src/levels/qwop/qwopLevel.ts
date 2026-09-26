@@ -110,6 +110,14 @@ const CHANTS = {
 
 /** Best distance this session, for "personal best / worst" (survives restarts, not reloads). */
 let personalBest: number | null = null;
+/** Failed attempts this session: after a few, the death screen lets something slip. */
+let attempts = 0;
+
+function tips(): [string, string][] {
+  attempts++;
+  if (attempts < 3) return FALL_TIPS;
+  return [FALL_TIPS[0], ['Psst', "Q goes with O. W goes with P. Hold each pair a moment. You didn't hear it from us."], FALL_TIPS[1]];
+}
 
 const pick = <T>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
 
@@ -165,6 +173,10 @@ export class QwopLevel implements Level {
   private noteLabel: WorldLabel = { pos: [0, 5.2, BOARD_Z + 0.2], text: '', size: 0.5, color: '#ffe9a8' };
   private noteT = 0;
   private metresLabel: WorldLabel = { pos: [0, 0, 0], text: '', size: 0.34, color: '#ffffff' };
+  private starterLabel: WorldLabel = { pos: [STARTER_POS[0], 2.35, STARTER_POS[2]], text: '', size: 0.45, color: '#ffffff' };
+  private starterT = 0;
+  /** Each foot's height last frame, for footfalls. */
+  private footY = [1, 1];
   private dnfLabels: WorldLabel[] = DNF.map((d) => ({ pos: [d.at[0] + (d.how === 'bug' ? -0.6 : 0.6), 1.1, d.at[2]], text: 'DNF', size: 0.3, color: '#ff8a80' }));
   private labelList: WorldLabel[] = [];
   private shotPos: Vec3 = [0, 1.45, LANE_Z + 4.4];
@@ -234,6 +246,8 @@ export class QwopLevel implements Level {
     if (this.tapeBroken >= 0) this.tapeBroken += dt;
     this.noteT -= dt;
     if (this.noteT <= 0) this.noteLabel.text = '';
+    this.starterT -= dt;
+    if (this.starterT <= 0) this.starterLabel.text = '';
 
     switch (this.phase) {
       case 'arrive':
@@ -287,6 +301,12 @@ export class QwopLevel implements Level {
     this.t = 0;
   }
 
+  /** The starter says something (over his head). */
+  private say(text: string, seconds = 1.4) {
+    this.starterLabel.text = text;
+    this.starterT = seconds;
+  }
+
   private note(text: string, seconds = 3) {
     this.noteLabel.text = text;
     this.noteT = seconds;
@@ -335,6 +355,7 @@ export class QwopLevel implements Level {
     player.puppetStrength = this.tune.strength;
     this.camX = START_X;
     this.rowStatus.setText('ON YOUR MARKS');
+    this.say('On your marks...');
     this.rowStatus.reveal = 1;
     tone(660, 0.2, { wave: 'sine', vol: 0.15 });
     noise(0.3, { freq: 600, to: 300, type: 'bandpass', q: 1, vol: 0.12 }); // a puff of chalk
@@ -353,6 +374,7 @@ export class QwopLevel implements Level {
     if (this.phase === 'marks' && this.t > 1.5) {
       this.enter('set');
       this.rowStatus.setText('GET SET');
+      this.say('Get set...');
       tone(660, 0.2, { wave: 'sine', vol: 0.15 });
       this.crowd.excitement = 0.05; // a hush
     }
@@ -361,6 +383,7 @@ export class QwopLevel implements Level {
       this.bang = 0;
       this.runTime = 0;
       this.rowStatus.setText('GO!');
+      this.say('BANG!', 0.8);
       sfx.shot();
       noise(0.8, { freq: 900, to: 200, vol: 0.2, at: 0.08 }); // echo round the stadium
       this.crowd.mood = 'cheer';
@@ -385,6 +408,7 @@ export class QwopLevel implements Level {
     if (this.bang >= 0) this.bang += dt;
     this.drive(dt);
     this.wasdJoke();
+    this.footfalls(body);
 
     const pelvis = body.position('pelvis');
     const dist = pelvis[0] - START_X;
@@ -432,6 +456,21 @@ export class QwopLevel implements Level {
     if (pelvis[0] >= FINISH_X) return this.finish();
     if (this.touchingGround(body, 'head') || this.touchingGround(body, 'chest')) return this.fall(dist);
     if (this.runTime >= TIME_LIMIT) return this.timeout(dist);
+  }
+
+  /** A slap for each foot (or knee) that comes down on the track. */
+  private footfalls(body: PhysBody) {
+    for (let i = 0; i < 2; i++) {
+      const name = i ? 'shinR' : 'shinL';
+      const y = body.position(name)[1];
+      const vy = body.velocity(name)[1];
+      if (this.footY[i] > 0.24 && y <= 0.24 && vy < -0.6) {
+        const k = Math.min(1, -vy / 3);
+        tone(95, 0.09, { to: 50, wave: 'sine', vol: 0.1 + 0.12 * k });
+        noise(0.05, { freq: 1500, to: 500, vol: 0.05 + 0.08 * k });
+      }
+      this.footY[i] = y;
+    }
   }
 
   /** Q W O P: the keys push the hip and knee targets along at a rate; let go and they stay put. */
@@ -535,7 +574,7 @@ export class QwopLevel implements Level {
     personalBest = Math.max(personalBest ?? 0, d);
     const metres = dist < -0.3 ? `${(-dist).toFixed(1)} METRES BACKWARDS. BOLD.` : `${d.toFixed(1)} METRES. ${verdict}`;
     this.crowd.shout(pick(['OHHH!', 'NOOO!', 'MEDIC!', 'HE DIED', 'ENCORE!']), 2);
-    this.death = { t: 0, big: 'YOU FELL', small: `${metres}\n${pick(FALL_JOKES)}`, tips: FALL_TIPS };
+    this.death = { t: 0, big: 'YOU FELL', small: `${metres}\n${pick(FALL_JOKES)}`, tips: tips() };
   }
 
   private timeout(dist: number) {
@@ -552,7 +591,7 @@ export class QwopLevel implements Level {
     personalBest = Math.max(personalBest ?? 0, d);
     this.death = {
       t: -2.5, big: 'THE CROWD WENT HOME',
-      small: `${TIME_LIMIT} seconds and ${d.toFixed(1)} metres. Even the starter has gone for a sandwich.`, tips: FALL_TIPS,
+      small: `${TIME_LIMIT} seconds and ${d.toFixed(1)} metres. Even the starter has gone for a sandwich.`, tips: tips(),
     };
   }
 
@@ -594,6 +633,7 @@ export class QwopLevel implements Level {
     for (const l of this.crowd.labels) list.push(l);
     if (this.noteLabel.text) list.push(this.noteLabel);
     if (this.phase !== 'arrive' && this.phase !== 'build') for (const l of this.dnfLabels) list.push(l);
+    if (this.starterLabel.text) list.push(this.starterLabel);
     // QWOP's distance readout, pinned near the top of the side-on view.
     const running = this.phase === 'run' || this.phase === 'fell' || this.phase === 'timeout' || this.phase === 'marks' || this.phase === 'set' ||
       (this.phase === 'finished' && player.mode === 'puppet');
