@@ -67,15 +67,17 @@ export class PortalArrival {
   private readonly dir: Vec3;
   private readonly facing: number;
 
-  constructor(private ctx: LevelContext, spawn: Vec3) {
+  /** `minElevationDeg` narrows the angle toward straight down (e.g. when landing on a small ledge). */
+  constructor(private ctx: LevelContext, spawn: Vec3, opts: { minElevationDeg?: number } = {}) {
     ctx.player.hide();
+    const minElevation = opts.minElevationDeg !== undefined ? (opts.minElevationDeg * Math.PI) / 180 : MIN_ELEVATION;
     // Aim roughly toward the middle of the chamber (± 90°) so you don't get fired into a wall.
     const toCentre = Math.atan2(spawn[0], spawn[2]);
     const yaw = toCentre + (Math.random() - 0.5) * Math.PI;
-    const elevation = MIN_ELEVATION + Math.random() * (MAX_ELEVATION - MIN_ELEVATION);
+    const elevation = minElevation + Math.random() * (MAX_ELEVATION - minElevation);
     this.facing = yaw;
     this.dir = [-Math.sin(yaw) * Math.cos(elevation), -Math.sin(elevation), -Math.cos(yaw) * Math.cos(elevation)];
-    this.centre = [spawn[0], HEIGHT, spawn[2]];
+    this.centre = [spawn[0], spawn[1] + HEIGHT, spawn[2]];
   }
 
   /** True once the player has been spat out and has had time to get back up. */
@@ -147,8 +149,9 @@ export class ExitPortal {
   refuse: (() => boolean) | null = null;
   readonly centre: Vec3;
 
-  constructor(z = 0) {
-    this.centre = [CHAMBER_HALF - 0.02, EXIT_HEIGHT, z];
+  /** `floor`: height of the floor in front of it (e.g. a raised ledge). */
+  constructor(z = 0, private floor = 0) {
+    this.centre = [CHAMBER_HALF - 0.02, floor + EXIT_HEIGHT, z];
   }
 
   get open() {
@@ -194,7 +197,7 @@ export class ExitPortal {
     drawPortal(out, this.centre, [-1, 0, 0], EXIT_RADIUS, true);
     // A wall panel slides aside to reveal it.
     const slide = easeInOut(clamp(this.openT / PANEL_SLIDE_TIME, 0, 1));
-    const panelCentre: Vec3 = [CHAMBER_HALF - PANEL[0] / 2 - 0.005, PANEL[1] / 2, this.centre[2] + slide * (PANEL[2] + 0.1)];
+    const panelCentre: Vec3 = [CHAMBER_HALF - PANEL[0] / 2 - 0.005, this.floor + PANEL[1] / 2, this.centre[2] + slide * (PANEL[2] + 0.1)];
     out.push({
       mesh: 'box',
       model: basis([PANEL[0], 0, 0], [0, PANEL[1], 0], [0, 0, PANEL[2]], panelCentre),

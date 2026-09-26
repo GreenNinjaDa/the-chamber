@@ -31,6 +31,7 @@ const PAT_EMISSIVE = 4;
 const PAT_SKIN = 5;
 const PAT_SKY = 6;
 const PAT_PORTAL = 7;
+const PAT_LAVA = 8;
 
 struct VsOut {
   @builtin(position) pos: vec4f,
@@ -154,6 +155,18 @@ fn portalColor(lp: vec3f, ln: vec3f, t: f32) -> vec3f {
   return col;
 }
 
+// Molten rock in world space: dark crust drifting over glowing orange, slowly churning.
+fn lavaColor(wp: vec3f, t: f32) -> vec3f {
+  let p = wp.xz * 0.32;
+  let w = vec2f(vnoise(p + vec2f(t * 0.05, 1.7)), vnoise(p * 1.3 + vec2f(4.1, t * 0.04)));
+  let n = vnoise(p * 1.6 + w * 2.2 + vec2f(t * 0.03, -t * 0.02));
+  let n2 = vnoise(p * 4.5 + w * 3.0 - vec2f(t * 0.07, t * 0.05));
+  let heat = smoothstep(0.38, 0.8, n * 0.7 + n2 * 0.3);
+  let crust = vec3f(0.07, 0.025, 0.015);
+  let hot = mix(vec3f(1.5, 0.3, 0.03), vec3f(2.6, 1.25, 0.25), smoothstep(0.75, 1.0, heat));
+  return mix(crust, hot, heat);
+}
+
 fn skyColor(dir: vec3f) -> vec3f {
   let l = normalize(frame.sunDir.xyz);
   let t = clamp(dir.y, 0.0, 1.0);
@@ -173,6 +186,9 @@ fn fs(in: VsOut) -> @location(0) vec4f {
   }
   if (pattern == PAT_PORTAL) {
     return vec4f(tonemap(portalColor(in.localPos, in.localNormal, frame.camPos.w)), 1.0);
+  }
+  if (pattern == PAT_LAVA) {
+    return vec4f(tonemap(lavaColor(in.worldPos, frame.camPos.w)), 1.0);
   }
   if (pattern == PAT_EMISSIVE) {
     // Unlit glow (lights, explosion flashes); values above 1 bloom into white through the tonemap.

@@ -13,6 +13,7 @@ import { settings } from './game/settings';
 import { DartsLevel } from './levels/darts/dartsLevel';
 import { CakeLevel } from './levels/cake/cakeLevel';
 import { GrenadeLevel } from './levels/grenade/grenadeLevel';
+import { LavaLevel } from './levels/lava/lavaLevel';
 import type { Level, LevelContext, TrackedTarget, WorldLabel } from './levels/level';
 import { LobbyLevel } from './levels/lobby/lobbyLevel';
 
@@ -25,6 +26,7 @@ const LEVELS: ((ctx: LevelContext) => Level)[] = [
   (ctx) => new GrenadeLevel(ctx),
   // Meant to be a secret level reached by an easter egg; level 3 for now.
   (ctx) => new CakeLevel(ctx),
+  (ctx) => new LavaLevel(ctx),
 ];
 const params = new URLSearchParams(location.search);
 /** `?sandbox` opens the mechanics test room; `?level=N` skips the lobby and starts at level N. */

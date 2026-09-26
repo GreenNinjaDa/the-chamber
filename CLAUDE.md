@@ -59,6 +59,11 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   real cube, 25 kg) lie around;
   the exit is open only while one (or the player) is on the floor button (`entities/pressurePlate.ts`); take it off and the
   panel slides shut again.
+- **Level 4 — Useless Box** (`src/levels/lava/`): lava fills the chamber and rises slowly. You arrive on a small
+  ledge by the exit (east wall, 3 m up); 11 rock pillars snake through the whole pit to a tiny island in the far
+  corner with a useless box (`entities/uselessBox.ts`). Its switch opens the exit, but after a delay the box opens
+  its lid, reaches out and flips it back off; the delay is 1 s, then 2 s, 3 s... The player can't switch it off
+  (E does nothing). Keep flipping until the box waits long enough to jump all the way back.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall.
 
 ## Commands
@@ -74,7 +79,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
 - `src/engine/` — renderer (primitive meshes, sun shadow map, MSAA, patterns), math (column-major,
   WebGPU clip space z ∈ [0,1]), input
 - `src/shaders/*.wgsl` — shaders, imported with `?raw`. Surface patterns (panels, dartboard, blob, skin, sky)
-  are ids in `Pattern` (renderer.ts) that must match the constants in scene.wgsl
+  (and portal, lava) are ids in `Pattern` (renderer.ts) that must match the constants in scene.wgsl
 - `src/engine/physics.ts` — Rapier wrapper: one `Physics` world per level attempt (created in main.ts with the
   chamber colliders), fixed 120 Hz stepping with pre/post-step hooks, dynamic bodies that draw themselves,
   usables, ray casts, collision groups (the player's body parts and capsule are excluded from queries)
@@ -85,7 +90,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
 - `src/entities/` — things that can appear in more than one level (or the lobby / sandbox), each with its model:
   `junk.ts` (28 pieces of household junk; `spawnJunk(physics, junk('fridge'), pos)`), `grenade.ts` (pineapple
   model), `giant.ts`, `dart.ts`, `portal.ts` (entrance / exit portals), `props.ts` (Lever, Button), `cake.ts`, `companions.ts`,
-  `pressurePlate.ts`. Put new
+  `pressurePlate.ts`, `uselessBox.ts`. Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
