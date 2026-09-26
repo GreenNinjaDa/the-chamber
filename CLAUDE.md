@@ -68,10 +68,11 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   (a hit to the head or chest knocks you into the lava), and the 3rd rock from the end sinks 1.8 m and back over
   10 s, carrying you. Lava death is a plain collapse.
 - **Level 5 — Raiders of the Lost Chamber** (`src/levels/temple/`, work in progress): its own map, no test chamber. A
-  dark stone tunnel lit by a torch in the player's hand. A boulder drops from a deep ceiling shaft between the player
+  dark stone tunnel (about 165 m from the spawn to the dead end) lit by a torch in the player's hand. A boulder drops from a deep ceiling shaft between the player
   and the exit portal and chases them (rubber-banded: sprinting stays ahead, walking gets caught) over spiked floor
-  pits (the 8 m one, too far to sprint-jump, needs a vine), past spikes (rows across the floor, full rows kept short;
-  ~50 out of the walls at all heights; random singles; none within 8.5 m of the spawn; not solid, touching one knocks you loose for 0.01 s, then you recover) and ~60 loose rocks of mixed shapes (70-140 kg: pushed slowly, not kicked; they fall when
+  pits (8 in the floor, 9 in the ceiling plus the shaft, edges at slight random angles; the 8 m ones, too far
+  to sprint-jump, have vines), past spikes (rows across the floor, full rows kept short and at least 5 m from any pit;
+  ~50 out of the walls at all heights; random singles; none within 8.5 m of the spawn; not solid, touching one knocks you loose for 0.01 s, then you recover) and ~84 loose rocks of mixed shapes (70-140 kg: pushed slowly, not kicked; they fall when
   gravity flips; debris, so boulders roll straight through them).
   A pressure plate at the end (the boulder keeps coming) sinks the end wall 1 s later to reveal a second boulder; the
   world freezes as soon as the first boulder is within 1 m of the plate or 2 s have passed (`Level.freezeWorld`) while only the camera turns upside down (`camera.turnTarget`), and 0.5 s after

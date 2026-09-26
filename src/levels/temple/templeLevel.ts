@@ -1,5 +1,5 @@
 import {
-  add, clamp, dot, easeInOut, length, mul, normalize, rotationX, rotationZ, scale, scaling, segment, sub, transformDir, transformPoint,
+  add, clamp, dot, easeInOut, length, mul, normalize, rotationX, rotationY, rotationZ, scale, scaling, segment, sub, transformDir, transformPoint,
   translation, type Mat4, type Vec3,
 } from '../../engine/math';
 import { GROUPS_BOULDER, GROUPS_BOULDER_BRIDGE, GROUPS_DEBRIS, RAPIER, type Body } from '../../engine/physics';
@@ -31,9 +31,9 @@ const H = 5; // tunnel height
 const W = 4.6; // tunnel width (a 4 m boulder leaves no room to dodge past)
 const WALL_T = 1;
 const Z_START = -24;
-const Z_ALCOVE_END = 87;
-const END_Z = 80; // the dead-end wall that sinks away
-const PLATE_Z = 76;
+const Z_ALCOVE_END = 169;
+const END_Z = 162; // the dead-end wall that sinks away
+const PLATE_Z = 158;
 const PORTAL_Z = -21;
 const PORTAL_R = 2;
 const SPAWN_Z = -2;
@@ -43,11 +43,20 @@ const SHAFT_W = 7;
 const SHAFT_DEPTH = 12;
 const LAND_Z = (SHAFT[0] + SHAFT[1]) / 2;
 /** Spiked pits in the floor (the way out) and the ceiling (the way back). The 8 m ones need a vine. */
-const FLOOR_PITS: [number, number][] = [[14, 16.5], [30, 32.5], [46, 54], [64, 66.5]];
-const CEILING_PITS: [number, number][] = [[8, 10.5], [24, 26.5], [40, 42.5], [58, 60.5]];
+const FLOOR_PITS: [number, number][] = [
+  [14, 16.5], [30, 32.5], [46, 54], [64, 66.5], [82, 84.5], [98, 100.5], [114, 122], [134, 136.5],
+];
+const CEILING_PITS: [number, number][] = [
+  [8, 10.5], [24, 26.5], [40, 42.5], [58, 60.5], [74, 76.5], [88, 96], [106, 108.5], [124, 126.5], [142, 144.5],
+];
+/** Pits this wide get a vine (a sprint jump only clears about 5.8 m). */
+const VINE_PIT = 6;
 const PIT_DEPTH = 6;
+/** Pit edges are each set at a slight random angle across the tunnel (up to this, radians), on a block this deep. */
+const EDGE_ANGLE = 0.14;
+const EDGE_LIP = 0.6;
 const BOULDER_R = 2;
-const BOULDER2_Z = 83.5;
+const BOULDER2_Z = END_Z + 3.5;
 
 /** Vines: where they hang from, which way they hang (gravity when they're used), and rope length. */
 const VINE_LEN = 2.6;
@@ -87,10 +96,16 @@ const SPIKE_R = 0.16;
 /** Spike lengths vary by this factor; full rows (which have to be jumped) stay shorter. */
 const SPIKE_LENGTH: [number, number] = [0.8, 1.5];
 const FULL_ROW_LENGTH: [number, number] = [0.6, 1.2];
-/** Extra spikes scattered at random. */
-const RANDOM_WALL_SPIKES = 40;
-const RANDOM_FLOOR_SPIKES = 12;
-const RANDOM_CEILING_SPIKES = 12;
+/** Spike rows across the floor (way out) and ceiling (way back), and spikes scattered at random. */
+const FLOOR_ROW_COUNT = 7;
+const CEILING_ROW_COUNT = 7;
+const RANDOM_WALL_SPIKES = 70;
+const RANDOM_FLOOR_SPIKES = 17;
+const RANDOM_CEILING_SPIKES = 17;
+/** Chance a row is full (has to be jumped) rather than leaving a way past. */
+const FULL_ROW_CHANCE = 0.3;
+/** Full rows keep at least this far from any pit edge (m), so you never have to jump both at once. */
+const FULL_ROW_PIT_GAP = 5;
 /** No spikes at all within this far of where the player arrives (m, along the tunnel). */
 const SPAWN_CLEAR = 8.5;
 /** x positions of a row: some leave a way past, a full row has to be jumped. */
@@ -100,20 +115,13 @@ const ROWS = {
   sides: [-1.8, -1.2, 1.2, 1.8],
   full: [-1.8, -1.2, -0.6, 0, 0.6, 1.2, 1.8],
 };
-const FLOOR_ROWS: [number, number[]][] = [[6, ROWS.left], [22, ROWS.full], [38, ROWS.sides], [58, ROWS.right], [71, ROWS.full]];
-const CEILING_ROWS: [number, number[]][] = [[68, ROWS.right], [51, ROWS.full], [34, ROWS.left], [19, ROWS.sides], [2, ROWS.full]];
-/** Wall spikes: [z, which wall (-1 / +1), height]. Low ones for the way out, high ones for the way back. */
-const WALL_SPIKES: [number, number, number][] = [
-  [11, -1, 0.5], [27, 1, 0.5], [43, -1, 0.5], [61, 1, 0.5], [73, -1, 0.5],
-  [65, -1, H - 0.5], [47, 1, H - 0.5], [29, -1, H - 0.5], [13, 1, H - 0.5], [-1, -1, H - 0.5],
-];
 
 /**
  * Loose rocks all along the tunnel, of every shape: heavy enough that you shove them rather than
  * kick them (walking pushes a 100 kg rock at a fifth of your speed), and they fall when gravity
  * turns. Boulders roll straight through them.
  */
-const ROCKS = 60;
+const ROCKS = 84;
 const ROCK_MASS: [number, number] = [70, 140];
 const DEATH_SCREEN_DELAY = 1.6;
 
@@ -136,10 +144,14 @@ interface Piece {
   pos: Vec3;
   size: Vec3;
   color: number[];
+  /** Turned about the vertical (radians). */
+  yaw: number;
 }
 
 interface Vine {
   pivot: Vec3;
+  /** Which half of the run it's for: the way out (hangs from the ceiling) or back (from the floor). */
+  back: boolean;
   /** The way it hangs (down, for whoever will use it). */
   hang: Vec3;
   used: boolean;
@@ -231,11 +243,12 @@ export class TempleLevel implements Level {
     this.placeSpikes();
     this.scatterRocks();
 
-    // Vine 1 hangs from the ceiling over the widest floor pit; vine 2 hangs from the floor over the
-    // shaft, for when gravity points at the ceiling. Both a little past the pit's middle.
+    // A vine over every wide pit, a little past its middle: from the ceiling over the floor's (for
+    // the way out), from the floor over the ceiling's and the shaft (for when gravity points up).
     this.vines = [
-      { pivot: [0, H, FLOOR_PITS[2][0] + 4.5], hang: [0, -1, 0], used: false, fallT: 0 },
-      { pivot: [0, 0, LAND_Z - 0.5], hang: [0, 1, 0], used: false, fallT: 0 },
+      ...FLOOR_PITS.filter(([a, b]) => b - a >= VINE_PIT).map(([a]): Vine => ({ pivot: [0, H, a + 4.5], back: false, hang: [0, -1, 0], used: false, fallT: 0 })),
+      ...CEILING_PITS.filter(([a, b]) => b - a >= VINE_PIT).map(([, b]): Vine => ({ pivot: [0, 0, b - 4.5], back: true, hang: [0, 1, 0], used: false, fallT: 0 })),
+      { pivot: [0, 0, LAND_Z - 0.5], back: true, hang: [0, 1, 0], used: false, fallT: 0 },
     ];
 
     // Boulder 1 waits at the top of the shaft; boulder 2 behind the dead-end wall.
@@ -250,11 +263,24 @@ export class TempleLevel implements Level {
   // --- Building ------------------------------------------------------------------------------------
 
   /** A solid block of temple. */
-  private solid(pos: Vec3, size: Vec3, color: number[], draw = true): RAPIER.Collider {
-    const desc = RAPIER.ColliderDesc.cuboid(size[0] / 2, size[1] / 2, size[2] / 2).setTranslation(pos[0], pos[1], pos[2]);
+  private solid(pos: Vec3, size: Vec3, color: number[], draw = true, yaw = 0): RAPIER.Collider {
+    const desc = RAPIER.ColliderDesc.cuboid(size[0] / 2, size[1] / 2, size[2] / 2)
+      .setTranslation(pos[0], pos[1], pos[2])
+      .setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) });
     const c = this.ctx.physics.world.createCollider(desc, this.levelBody);
-    if (draw) this.pieces.push({ pos, size, color });
+    if (draw) this.pieces.push({ pos, size, color, yaw });
     return c;
+  }
+
+  /**
+   * The edge of a pit at `z`, on the floor/ceiling block that runs from y0 to y1: a short block
+   * turned a little, so the edge runs across the tunnel at a slight angle. `side` is +1 if the
+   * pit is beyond z (the block sits before it), -1 if it's before.
+   */
+  private pitEdge(z: number, side: number, y0: number, y1: number, color: number[]) {
+    const yaw = (Math.random() * 2 - 1) * EDGE_ANGLE;
+    // Wider than the tunnel so the turned block still meets both walls (the walls hide the rest).
+    this.solid([0, (y0 + y1) / 2, z - side * EDGE_LIP], [W + 1.2, y1 - y0, EDGE_LIP * 2], color, true, yaw);
   }
 
   /** A block between two z values and two y values, across x from -hx to hx. */
@@ -294,30 +320,38 @@ export class TempleLevel implements Level {
     this.slab(s0, s1, H + SHAFT_DEPTH, H + SHAFT_DEPTH + 1, SHAFT_W / 2, STONE_CEIL);
 
     // Floor: solid blocks between the pits, each pit with a spiked bottom and a bridge for boulders.
+    // Each pit's edges are separate blocks set at slight angles; the floor between stops short of them.
     let z = Z_START;
     for (const [a, b] of FLOOR_PITS) {
-      this.slab(z, a, -PIT_DEPTH, 0, W / 2, STONE_FLOOR);
-      this.slab(a, b, -PIT_DEPTH - 1, -PIT_DEPTH, W / 2, STONE_FLOOR);
+      this.slab(z === Z_START ? z : z + EDGE_LIP, a - EDGE_LIP, -PIT_DEPTH, 0, W / 2, STONE_FLOOR);
+      this.pitEdge(a, 1, -PIT_DEPTH, 0, STONE_FLOOR);
+      this.pitEdge(b, -1, -PIT_DEPTH, 0, STONE_FLOOR);
+      this.slab(a - EDGE_LIP, b + EDGE_LIP, -PIT_DEPTH - 1, -PIT_DEPTH, W / 2, STONE_FLOOR);
       this.bridge(a, b, 0, 1);
       this.spikes.push({ z: [a, b], y: -PIT_DEPTH, dir: 1 });
       z = b;
     }
-    this.slab(z, Z_ALCOVE_END, -PIT_DEPTH, 0, W / 2, STONE_FLOOR);
+    this.slab(z + EDGE_LIP, Z_ALCOVE_END, -PIT_DEPTH, 0, W / 2, STONE_FLOOR);
 
     // Ceiling: the same, with its own pits (the way back), and a gap for the shaft (no bridge:
     // both boulders end up down there).
     z = Z_START;
     const gaps = [...CEILING_PITS, SHAFT].sort((p, q) => p[0] - q[0]);
+    let prevPit = false;
     for (const [a, b] of gaps) {
-      this.slab(z, a, H, H + PIT_DEPTH, W / 2, STONE_CEIL);
-      if (a !== s0) {
-        this.slab(a, b, H + PIT_DEPTH, H + PIT_DEPTH + 1, W / 2, STONE_CEIL);
+      const pit = a !== s0;
+      this.slab(prevPit ? z + EDGE_LIP : z, pit ? a - EDGE_LIP : a, H, H + PIT_DEPTH, W / 2, STONE_CEIL);
+      if (pit) {
+        this.pitEdge(a, 1, H, H + PIT_DEPTH, STONE_CEIL);
+        this.pitEdge(b, -1, H, H + PIT_DEPTH, STONE_CEIL);
+        this.slab(a - EDGE_LIP, b + EDGE_LIP, H + PIT_DEPTH, H + PIT_DEPTH + 1, W / 2, STONE_CEIL);
         this.bridge(a, b, H, -1);
         this.spikes.push({ z: [a, b], y: H + PIT_DEPTH, dir: -1 });
       }
+      prevPit = pit;
       z = b;
     }
-    this.slab(z, Z_ALCOVE_END, H, H + PIT_DEPTH, W / 2, STONE_CEIL);
+    this.slab(prevPit ? z + EDGE_LIP : z, Z_ALCOVE_END, H, H + PIT_DEPTH, W / 2, STONE_CEIL);
   }
 
   private placeSpikes() {
@@ -329,15 +363,9 @@ export class TempleLevel implements Level {
       this.pathSpikes.push({ base, tip, radius: SPIKE_R * (0.85 + k * 0.15) });
     };
     const jitter = () => (Math.random() - 0.5) * 0.3;
-    const range = (xs: number[]) => (xs === ROWS.full ? FULL_ROW_LENGTH : SPIKE_LENGTH);
-    for (const [z, xs] of FLOOR_ROWS) for (const x of xs) add1([x + jitter(), 0, z + jitter() * 1.5], [0, 1, 0], 0.7, range(xs));
-    for (const [z, xs] of CEILING_ROWS) for (const x of xs) add1([x + jitter(), H, z + jitter() * 1.5], [0, -1, 0], 0.7, range(xs));
-    for (const [z, side, y] of WALL_SPIKES) add1([(side * W) / 2, y + jitter(), z + jitter() * 1.5], [-side, 0, 0], 0.9);
-
-    // And plenty more at random: mostly on the walls (any height), some single ones on the floor
-    // and ceiling. Kept clear of the arrival spot, the plate and the portal, and off pit openings.
+    // Kept clear of the arrival spot, the plate and the portal, and off pit openings.
     const clear = (z: number) => Math.abs(z - SPAWN_Z) > SPAWN_CLEAR && Math.abs(z - PLATE_Z) > 2.5 && z < END_Z - 1;
-    const overGap = (z: number, gaps: [number, number][]) => gaps.some(([a, b]) => z > a - 0.3 && z < b + 0.3);
+    const overGap = (z: number, gaps: [number, number][], margin = 0.3) => gaps.some(([a, b]) => z > a - margin && z < b + margin);
     const pick = (ok: (z: number) => boolean) => {
       for (let tries = 0; tries < 40; tries++) {
         const z = Z_START + 4 + Math.random() * (END_Z - Z_START - 5);
@@ -345,6 +373,26 @@ export class TempleLevel implements Level {
       }
       return null;
     };
+
+    // Rows, spread evenly along the run (nudged off any pit), each one a random pattern.
+    const rows = (count: number, gaps: [number, number][], y: number, dir: number) => {
+      const from = SPAWN_Z + SPAWN_CLEAR + 1, to = PLATE_Z - 3;
+      for (let k = 0; k < count; k++) {
+        const kinds = [ROWS.left, ROWS.right, ROWS.sides];
+        const xs = Math.random() < FULL_ROW_CHANCE ? ROWS.full : kinds[Math.floor(Math.random() * kinds.length)];
+        // A full row has to be jumped, so never right before or after a pit; a partial one can be.
+        const margin = xs === ROWS.full ? FULL_ROW_PIT_GAP : 0.8;
+        let z = from + ((k + 0.5) / count) * (to - from) + (Math.random() - 0.5) * 4;
+        while (overGap(z, gaps, margin) && z < to) z += 1;
+        if (!clear(z) || overGap(z, gaps, margin)) continue;
+        for (const x of xs) add1([x + jitter(), y, z + jitter() * 1.5], [0, dir, 0], 0.7, xs === ROWS.full ? FULL_ROW_LENGTH : SPIKE_LENGTH);
+      }
+    };
+    rows(FLOOR_ROW_COUNT, FLOOR_PITS, 0, 1);
+    rows(CEILING_ROW_COUNT, [...CEILING_PITS, SHAFT], H, -1);
+
+    // And plenty more at random: mostly on the walls (any height), some single ones on the floor
+    // and ceiling.
     for (let i = 0; i < RANDOM_WALL_SPIKES; i++) {
       const z = pick(() => true);
       if (z === null) continue;
@@ -352,11 +400,11 @@ export class TempleLevel implements Level {
       add1([(side * W) / 2, 0.3 + Math.random() * (H - 0.6), z], [-side, 0, 0], 0.6 + Math.random() * 0.7);
     }
     for (let i = 0; i < RANDOM_FLOOR_SPIKES; i++) {
-      const z = pick((z) => !overGap(z, FLOOR_PITS));
+      const z = pick((z) => !overGap(z, FLOOR_PITS, 2.5));
       if (z !== null) add1([(Math.random() * 2 - 1) * (W / 2 - 0.4), 0, z], [0, 1, 0], 0.7);
     }
     for (let i = 0; i < RANDOM_CEILING_SPIKES; i++) {
-      const z = pick((z) => !overGap(z, [...CEILING_PITS, SHAFT]));
+      const z = pick((z) => !overGap(z, [...CEILING_PITS, SHAFT], 2.5));
       if (z !== null) add1([(Math.random() * 2 - 1) * (W / 2 - 0.4), H, z], [0, -1, 0], 0.7);
     }
     // Nothing right where you arrive (the placed rows and wall spikes included).
@@ -609,9 +657,9 @@ export class TempleLevel implements Level {
 
   // --- Vines ---------------------------------------------------------------------------------------
 
-  /** The vine for this half of the run. */
-  private activeVine(): Vine {
-    return this.vines[this.flipped ? 1 : 0];
+  /** The vines for this half of the run. */
+  private activeVines(): Vine[] {
+    return this.vines.filter((v) => v.back === this.flipped);
   }
 
   /**
@@ -644,10 +692,9 @@ export class TempleLevel implements Level {
       }
       return;
     }
-    const vine = this.activeVine();
-    if (!holding || vine.used || player.mode !== 'control' || this.rolling()) return;
-    const bottom = add(vine.pivot, scale(vine.hang, VINE_LEN));
-    if (distToSegment(hands, vine.pivot, bottom) > GRAB_REACH) return;
+    if (!holding || player.mode !== 'control' || this.rolling()) return;
+    const vine = this.activeVines().find((v) => !v.used && distToSegment(hands, v.pivot, add(v.pivot, scale(v.hang, VINE_LEN))) <= GRAB_REACH);
+    if (!vine) return;
     this.rope = { vine, length: clamp(length(sub(hands, vine.pivot)), 0.8, VINE_LEN) };
     player.hanging = true;
   }
@@ -757,7 +804,7 @@ export class TempleLevel implements Level {
 
   draw(out: DrawItem[], time: number) {
     for (const p of this.pieces) {
-      out.push({ mesh: 'box', model: mul(translation(p.pos), scaling(p.size)), color: p.color, pattern: Pattern.panels, param: 1.5, spec: 0.05 });
+      out.push({ mesh: 'box', model: mul(translation(p.pos), rotationY(p.yaw), scaling(p.size)), color: p.color, pattern: Pattern.panels, param: 1.5, spec: 0.05 });
     }
     // The sinking end wall.
     if (this.wallDrop < H) {
@@ -786,18 +833,21 @@ export class TempleLevel implements Level {
 
     drawPortal(out, this.portalCentre(), [0, 0, 1], PORTAL_R, true);
     this.arrival.draw(out);
-    this.drawVine(out);
+    this.drawVines(out);
     this.drawTorch(out, time);
   }
 
-  private drawVine(out: DrawItem[]) {
-    const vine = this.activeVine();
+  private drawVines(out: DrawItem[]) {
+    for (const vine of this.activeVines()) this.drawVine(out, vine);
+  }
+
+  private drawVine(out: DrawItem[], vine: Vine) {
     if (vine.fallT > VINE_FALL_TIME) return;
     const player = this.ctx.player;
     // Snapped vines fall away into the pit.
     const drop = scale(vine.hang, 0.5 * 20 * vine.fallT * vine.fallT);
     const top = add(vine.pivot, drop);
-    const end = this.rope ? add(player.pos, scale(player.up, GRAB_HEIGHT)) : add(add(vine.pivot, scale(vine.hang, VINE_LEN)), drop);
+    const end = this.rope?.vine === vine ? add(player.pos, scale(player.up, GRAB_HEIGHT)) : add(add(vine.pivot, scale(vine.hang, VINE_LEN)), drop);
     out.push({ mesh: 'cylinder', model: segment(top, end, 0.05), color: VINE_COLOR });
     for (let i = 1; i < 5; i++) {
       const p = add(top, scale(sub(end, top), i / 5));
