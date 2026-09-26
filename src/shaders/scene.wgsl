@@ -37,6 +37,7 @@ const PAT_SKY = 6;
 const PAT_PORTAL = 7;
 const PAT_LAVA = 8;
 const PAT_ROCK = 9;
+const PAT_WOOD = 10;
 
 struct VsOut {
   @builtin(position) pos: vec4f,
@@ -198,6 +199,50 @@ fn rockColor(base: vec3f, lp: vec3f, grain: f32) -> vec3f {
   return col;
 }
 
+// Wood, in the object's own space (so it turns with it): growth rings round the object's longest
+// axis (seen as arcs on the end grain, which is darker) and wavy stripes plus fine streaks along
+// it. `sc` is the object's scale (the mesh is a unit one), `seed` (the pattern parameter) moves
+// the tree's heart and tints each piece differently.
+fn woodColor(base: vec3f, lp: vec3f, ln: vec3f, sc: vec3f, seed: f32) -> vec3f {
+  let p = lp * sc;
+  var a = p.z;
+  var q = p.xy;
+  var endGrain = abs(ln.z);
+  if (sc.x >= sc.y && sc.x >= sc.z) {
+    a = p.x;
+    q = p.yz;
+    endGrain = abs(ln.x);
+  } else if (sc.y >= sc.z) {
+    a = p.y;
+    q = p.xz;
+    endGrain = abs(ln.y);
+  }
+  let h = vec2f(hash2(vec2f(seed, 1.37)), hash2(vec2f(seed, 7.91)));
+  // The heart of the tree is off to one side of the piece, so the face grain is gently curved.
+  let heart = vec2f((h.x - 0.5) * 3.0, -1.6 - h.y * 2.5);
+  let warp = vnoise(vec2f(a * 0.5 + seed * 3.7, q.x * 0.9)) * 0.07 + vnoise(vec2f(a * 2.1, q.y * 2.0 + seed)) * 0.02;
+  let r = (length(q - heart) + warp) * 9.0;
+  let ring = smoothstep(0.55, 0.92, fract(r)) * (1.0 - smoothstep(0.92, 1.0, fract(r)));
+  let aa = clamp(fwidth(r) * 1.2, 0.0, 1.0);
+  let dark = mix(ring, 0.3, aa);
+  let streak = vnoise(vec2f((q.x + q.y) * 18.0, a * 0.35 + seed * 5.1));
+  var col = base * (0.84 + 0.24 * hash2(vec2f(seed, 3.3)));
+  col *= 1.0 - 0.26 * dark;
+  col *= 0.9 + 0.14 * streak;
+  col *= mix(1.0, 0.74, smoothstep(0.6, 0.9, endGrain));
+  // Slightly rounded, darker edges, so the pieces read apart where they touch.
+  let an = abs(ln);
+  let e = sc * 0.5 - abs(p);
+  var edge = min(e.y, e.z);
+  if (an.y >= an.x && an.y >= an.z) {
+    edge = min(e.x, e.z);
+  } else if (an.z >= an.x) {
+    edge = min(e.x, e.y);
+  }
+  col *= mix(0.5, 1.0, smoothstep(0.0, 0.05, edge));
+  return col;
+}
+
 // Molten rock in world space: dark crust drifting over glowing orange, slowly churning.
 // `molten` (a thing turned to lava rather than a pool): hotter, finer, and varying with height too.
 fn lavaColor(wp: vec3f, t: f32, goo: f32, molten: f32) -> vec3f {
@@ -302,6 +347,9 @@ fn fs(in: VsOut) -> @location(0) vec4f {
     albedo = dartboardColor(in.localPos, in.localNormal);
   } else if (pattern == PAT_ROCK) {
     albedo = rockColor(albedo, in.localPos, obj.params.y);
+  } else if (pattern == PAT_WOOD) {
+    let sc = vec3f(length(obj.model[0].xyz), length(obj.model[1].xyz), length(obj.model[2].xyz));
+    albedo = woodColor(albedo, in.localPos, in.localNormal, sc, obj.params.y);
   }
 
   let l = normalize(frame.sunDir.xyz);

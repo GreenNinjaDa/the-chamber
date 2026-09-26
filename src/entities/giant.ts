@@ -34,6 +34,8 @@ export class Giant {
   headShake = 0;
   /** A party blindfold over his eyes (and a party hat). */
   blindfold = false;
+  /** Draws the right (reaching) arm and hand see-through below 1, so it doesn't hide what it's reaching for. */
+  armOpacity = 1;
   time = 0;
 
   graspPoint: Vec3 = [0, 0, 0];
@@ -121,12 +123,14 @@ export class Giant {
     }
 
     for (const arm of this.arms) {
+      const first = out.length;
       push('sphere', mul(translation(arm.shoulder), scaling([4.5, 4.5, 4.5])), SHIRT);
       push('cylinder', segment(arm.shoulder, arm.elbow, 3.4), SHIRT);
       push('sphere', mul(translation(arm.elbow), scaling([3.1, 3.1, 3.1])), SKIN, Pattern.skin);
       push('cylinder', segment(arm.elbow, arm.wrist, 2.9), SKIN, Pattern.skin);
       push('sphere', mul(translation(arm.wrist), scaling([2.6, 2.6, 2.6])), SKIN, Pattern.skin);
       drawHand(out, arm.hand, arm.curl, arm.thumbSide);
+      if (arm === this.arms[0] && this.armOpacity < 1) for (let i = first; i < out.length; i++) out[i].opacity = this.armOpacity;
     }
   }
 }
