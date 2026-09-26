@@ -622,8 +622,9 @@ export class PoolLevel implements Level {
       // Just jumped off something floating: it gets kicked down and back.
       const was = this.lastStanding;
       if (was && player.vel[1] > 4) {
-        const push = scale(normalize([player.vel[0], 0, player.vel[2]]), -JUMP_KICK * 0.3 * Math.min(1, Math.hypot(player.vel[0], player.vel[2]) / 4));
-        was.rb.applyImpulse({ x: push[0], y: -JUMP_KICK, z: push[2] }, true);
+        const k = Math.min(1, was.rb.mass() / 20);
+        const push = scale(normalize([player.vel[0], 0, player.vel[2]]), -JUMP_KICK * k * 0.3 * Math.min(1, Math.hypot(player.vel[0], player.vel[2]) / 4));
+        was.rb.applyImpulse({ x: push[0], y: -JUMP_KICK * k, z: push[2] }, true);
       }
       this.standingOn = null;
     }
@@ -632,6 +633,12 @@ export class PoolLevel implements Level {
     const onDeck = player.onGround && p[1] > -0.25 && !this.water.contains(p[0], p[2], 0.1);
     this.outT = onDeck ? this.outT + dt : 0;
     if (this.stage === 'pool' && this.wet && this.outT > 0.4) this.climbedOut();
+    // Made it onto the deck without ever getting wet (dodged the helping hand): it comes back for you.
+    if (!this.wet && this.poolMade && onDeck && this.outT > 1 && this.task === 'idle' && this.t > RELEASE_AT + SINK_TIME) {
+      this.task = 'fetch';
+      this.taskT = 0;
+      this.cursor.flyTo(add(p, [0, 2.3, 0]), 0.7, 1.5);
+    }
   }
 
   private enterWater() {
@@ -1206,7 +1213,7 @@ export class PoolLevel implements Level {
     const n = this.needs;
     n.shown = this.t > POP_AT ? Math.min(1, n.shown + dt * 3) : 0;
     // Out of the pool, it comes back.
-    if (this.everOut) this.energy = Math.min(1, this.energy + dt * 0.25);
+    if (this.everOut && !this.swimming) this.energy = Math.min(1, this.energy + dt * 0.25);
     const e = this.energy;
     const energy = n.needs[0];
     energy.value = e;

@@ -693,6 +693,11 @@ export class KatamariLevel implements Level {
   // --- Flow ------------------------------------------------------------------------------------------
 
   private setPhase(p: Phase) {
+    // Leaving the rolling: no delivery or "!" left hanging about.
+    if (p !== 'rolling') {
+      this.delivery = null;
+      this.alert.text = '';
+    }
     this.phase = p;
     this.phaseT = 0;
   }
