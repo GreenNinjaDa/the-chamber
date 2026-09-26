@@ -1,4 +1,4 @@
-import { add, clamp, cross, easeInOut, mul, scale, scaling, segment, translation, type Vec3 } from '../engine/math';
+import { add, clamp, cross, easeInOut, mul, rotationZ, scale, scaling, segment, translation, type Vec3 } from '../engine/math';
 import type { Physics } from '../engine/physics';
 import { Pattern, type DrawItem } from '../engine/renderer';
 import { CHAMBER_HALF, WALL_HEIGHT } from '../game/chamber';
@@ -127,6 +127,8 @@ export function drawDoors(out: DrawItem[], open: number) {
   // Header and sill.
   out.push({ mesh: 'box', model: mul(translation([CHAMBER_HALF - 0.15, DOOR_H + 0.2, DOOR_Z]), scaling([0.3, 0.4, DOOR_W + JAMB * 2])), color: STEEL, spec: 0.6 });
   out.push({ mesh: 'box', model: mul(translation([CHAMBER_HALF - 0.3, 0.01, DOOR_Z]), scaling([0.6, 0.02, DOOR_W + JAMB * 2])), color: [0.4, 0.41, 0.43], spec: 0.9 });
+  // Mind the gap.
+  out.push({ mesh: 'box', model: mul(translation([CHAMBER_HALF - 0.52, 0.012, DOOR_Z]), scaling([0.1, 0.022, DOOR_W])), color: [0.95, 0.75, 0.05] });
 }
 
 /**
@@ -258,6 +260,35 @@ const SHAFT_WALL = [0.13, 0.125, 0.12];
 const SLAB = [0.24, 0.23, 0.22];
 const LAMP = [3.2, 2.4, 1.3];
 
+/** The hoist stands this high over the roof; the cables go up to its sheave. */
+export const HOIST_H = 5;
+
+/** Where the hoist cables go up to (world y) when the car has gone down `depth`. */
+export function cableTop(depth: number): number {
+  return WALL_HEIGHT + depth + HOIST_H - 1.1;
+}
+
+/**
+ * The hoist on the roof over the shaft: a steel frame on four legs, the motor, and the big grooved
+ * sheave the cables hang from. `roof` is the roof's height.
+ */
+function drawHoist(out: DrawItem[], roof: number) {
+  const h = HOIST_H, c = SHAFT_HALF + 0.8, top = roof + h;
+  const steel = [0.3, 0.32, 0.3];
+  for (const x of [-c, c]) for (const z of [-c, c]) {
+    out.push({ mesh: 'box', model: mul(translation([x, roof + h / 2, z]), scaling([0.4, h, 0.4])), color: steel, shadow: false, spec: 0.3 });
+  }
+  for (const z of [-1.1, 1.1]) {
+    out.push({ mesh: 'box', model: mul(translation([0, top, z]), scaling([c * 2 + 0.4, 0.5, 0.35])), color: BEAM, shadow: false, spec: 0.3 });
+  }
+  for (const x of [-c, c]) out.push({ mesh: 'box', model: mul(translation([x, top, 0]), scaling([0.4, 0.5, c * 2 + 0.4])), color: steel, shadow: false, spec: 0.3 });
+  // The sheave (a big wheel on an axle along x), its hub, and the motor beside it.
+  const wheel = mul(translation([0, top - 0.3, 0]), rotationZ(Math.PI / 2));
+  out.push({ mesh: 'cylinder', model: mul(wheel, scaling([0.85, 0.9, 0.85])), color: [0.2, 0.2, 0.21], shadow: false, spec: 0.7 });
+  out.push({ mesh: 'cylinder', model: mul(wheel, scaling([0.25, 1.4, 0.25])), color: [0.6, 0.6, 0.62], shadow: false, spec: 0.8 });
+  out.push({ mesh: 'box', model: mul(translation([1.6, top + 0.55, 0]), scaling([1.6, 1.2, 1.3])), color: [0.25, 0.42, 0.3], shadow: false, spec: 0.3 });
+}
+
 /** Which landing the car is level with (nearest) after going down `depth` metres from the top floor. */
 export function floorAt(depth: number): number {
   return TOP_FLOOR - Math.round(depth / FLOOR_H);
@@ -275,6 +306,7 @@ export function landingY(n: number, depth: number): number {
  */
 export function drawShaft(out: DrawItem[], depth: number, speed: number) {
   const top = WALL_HEIGHT + depth; // the building's roof
+  drawHoist(out, top);
   if (depth < 0.02) return;
   const bottom = WALL_HEIGHT - 0.6;
   const h = top - bottom, cy = (top + bottom) / 2, w = SHAFT_HALF * 2 + 2;

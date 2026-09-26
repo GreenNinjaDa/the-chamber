@@ -5,7 +5,7 @@ import {
 import { GRAVITY, type Body } from '../../engine/physics';
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
 import {
-  addCarColliders, CABLE_OFFSETS, carRails, DOOR_Z, drawCarTop, drawDoors, drawRails, drawShaft, floorAt, floorLabel, FloorIndicator,
+  addCarColliders, CABLE_OFFSETS, cableTop, carRails, DOOR_Z, drawCarTop, drawDoors, drawRails, drawShaft, floorAt, floorLabel, FloorIndicator,
   FLOOR_H, HITCH, landingY, RAIL_Y, railNearest, railPoint, SHAFT_HALF, TOP_FLOOR, type Rail,
 } from '../../entities/elevator';
 import { junk, spawnJunk } from '../../entities/junk';
@@ -538,7 +538,7 @@ export class ElevatorLevel implements Level {
       this.exit.openNow();
       this.say('DING!', [CHAMBER_HALF - 0.6, 8.6, DOOR_Z], 0.9, '#ffd166', 2);
       for (const d of this.indicators) d.setMessage('DING');
-      if (player.mode === 'control') hud.show('DING. GROUND FLOOR.', 'Mind the gap.\n(The display says B7. The display is a pessimist.)', 4.5);
+      if (player.mode === 'control') hud.show('DING.', 'Ground floor. Mind the gap.\n(The display says B7. The display is a pessimist.)', 4.5);
     }
     void dt;
   }
@@ -905,7 +905,7 @@ export class ElevatorLevel implements Level {
 
   /** The hoist cables: straight up the shaft, until one pings off and then the rest snap. */
   private drawCables(out: DrawItem[], time: number) {
-    const top = WALL_HEIGHT + this.depth + 40;
+    const top = cableTop(this.depth);
     const colour = [0.16, 0.16, 0.17];
     CABLE_OFFSETS.forEach(([dx, dz], i) => {
       const base: Vec3 = [dx, HITCH[1] + 0.2, dz];
