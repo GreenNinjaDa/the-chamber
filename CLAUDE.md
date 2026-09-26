@@ -87,6 +87,12 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   does the player from when the first boulder starts rolling until 5 m before the last jump (over the shaft), when the
   torch goes out and they fade back in over 2 s. The map is one fixed body (not kinematic: Rapier's character
   controller won't climb slopes on kinematic colliders).
+- **Level 6 — Simon Says** (`src/levels/simon/`): the floor is the 1978 Simon toy (four coloured quarter-disc
+  pads round a hub with a button, and a big rubber duck); screens on all four walls give orders, with a timer bar. Do
+  what Simon says (jump, stand on a colour, look up, touch your toes, freeze, press the button, spin, pick up and throw
+  the duck...) in time, and never what he didn't (plain orders, "SIMEON SAYS", "SIMON SAID", "AGAIN."). Any mistake
+  and the floor panel under you is a catapult. It ends with Simon's memory game (step on the pads in the order they
+  lit, twice), then "LEAVE." (the exit refuses you, fatally) before "SIMON SAYS: LEAVE."
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
