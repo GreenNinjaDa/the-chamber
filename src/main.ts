@@ -26,6 +26,7 @@ import { DodgeballLevel } from './levels/dodgeball/dodgeballLevel';
 import { ButtonLevel } from './levels/button/buttonLevel';
 import { MicrowaveLevel } from './levels/microwave/microwaveLevel';
 import { QuizLevel } from './levels/quiz/quizLevel';
+import { DuckHuntLevel } from './levels/duckhunt/duckHuntLevel';
 import { RedLightLevel } from './levels/redLight/redLightLevel';
 import { LaserLevel } from './levels/lasers/laserLevel';
 import { GnomeLevel } from './levels/gnomes/gnomeLevel';
@@ -56,6 +57,7 @@ const LEVELS: ((ctx: LevelContext) => Level)[] = [
   (ctx) => new DodgeballLevel(ctx),
   (ctx) => new SunburnLevel(ctx),
   (ctx) => new FroggerLevel(ctx),
+  (ctx) => new DuckHuntLevel(ctx),
   (ctx) => new ClawLevel(ctx),
   (ctx) => new SnakeLevel(ctx),
   (ctx) => new MicrowaveLevel(ctx),

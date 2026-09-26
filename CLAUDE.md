@@ -243,6 +243,12 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   wrong"), then "DO YOU WANT TO LEAVE?". When the bar runs out, every wrong pad (and the floor between them) is a
   trapdoor. Standing on one pad for 3.5 s locks it in early ("FINAL ANSWER?"; not the pad you were already on). From
   question 4 the pads sometimes swap places.
+- **Duck Hunt** (`src/levels/duckhunt/`): you're the duck. Grass, five bushes and a tree; the hunter is out past the
+  south wall. A big white crosshair chases your chest with lag and a shake (4.2 / 5.2 / 6.2 m/s by round); when it
+  has sat within ~0.6 m of you long enough (or it gets impatient, 3.2 s) it fires: the screen flashes white (fog) and
+  a shot traced from the south wall at the crosshair hits you (BAGGED; the dog pops up: "GOT ONE!") or the first bush
+  or tree in the way (shredded, gone) or nothing (the dog pops up laughing). Three rounds of three shells; then the
+  hunter gives up, the dog shrugs, the exit opens.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
