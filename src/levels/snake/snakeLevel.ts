@@ -252,6 +252,7 @@ export class SnakeLevel implements Level {
       this.overT = 0;
       if (this.eatenT < 0) {
         this.quip.text = pick(WIN_QUIPS);
+        this.tagline.text = 'Disconnecting snakes.';
         this.exit.openNow();
       }
     }
