@@ -585,7 +585,12 @@ export class RedLightLevel implements Level {
     for (const npc of this.npcs) {
       const c = npc.c;
       c.update(dt);
-      if (!c.alive) continue;
+      if (!c.alive) {
+        // Nobody gets flung through a wall.
+        c.pos[0] = clamp(c.pos[0], -CHAMBER_HALF + 1, CHAMBER_HALF - 1);
+        c.pos[2] = clamp(c.pos[2], -CHAMBER_HALF + 1, CHAMBER_HALF - 1);
+        continue;
+      }
       if (!npc.crossed && c.pos[0] > FINISH_X + 0.45) {
         npc.crossed = true;
         c.frozen = false;

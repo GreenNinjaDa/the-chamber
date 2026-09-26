@@ -1,4 +1,4 @@
-import { approachAngle, clamp, mul, rotationX, rotationY, translation, type Mat4, type Vec3 } from '../engine/math';
+import { approachAngle, clamp, mul, rotationX, rotationY, scaling, translation, type Mat4, type Vec3 } from '../engine/math';
 import type { DrawItem } from '../engine/renderer';
 import { drawBody, poseFrames, type BodyColors, type Pose } from '../game/body';
 
@@ -11,6 +11,10 @@ import { drawBody, poseFrames, type BodyColors, type Pose } from '../game/body';
 const TRACK_TOP = [0.13, 0.45, 0.38];
 const TRACK_BOTTOM = [0.12, 0.4, 0.34];
 const SNEAKER = [0.92, 0.92, 0.9];
+const WHITE = [0.93, 0.93, 0.9];
+const PATCH: Vec3 = [0.13, 0.08, 0.01];
+const BACK_PATCH: Vec3 = [0.24, 0.16, 0.01];
+const STRIPE: Vec3 = [0.01, 0.34, 0.035];
 const GRAVITY = 20;
 /** Pelvis height when lying flat on the floor (its centre, m). */
 const LYING_PELVIS = 0.15;
@@ -204,7 +208,16 @@ export class Contestant {
   }
 
   draw(out: DrawItem[]) {
-    drawBody(out, poseFrames(this.root(), this.pose()), this.look.girth ?? 1, this.colors);
+    const f = poseFrames(this.root(), this.pose());
+    drawBody(out, f, this.look.girth ?? 1, this.colors);
+    // White number patches, front and back, and a white stripe down each sleeve.
+    // (drawBody's chest front, belly included.)
+    const deep = 1 + ((this.look.girth ?? 1) - 1) * 1.3;
+    const front = 0.145 * (2 * deep - 1) + 0.004;
+    out.push({ mesh: 'box', model: mul(f.chest, translation([0.12, 0.1, -front]), scaling(PATCH)), color: WHITE });
+    out.push({ mesh: 'box', model: mul(f.chest, translation([0, 0.06, 0.149]), scaling(BACK_PATCH)), color: WHITE });
+    out.push({ mesh: 'box', model: mul(f.upperArmL, translation([-0.076, 0, 0]), scaling(STRIPE)), color: WHITE });
+    out.push({ mesh: 'box', model: mul(f.upperArmR, translation([0.076, 0, 0]), scaling(STRIPE)), color: WHITE });
   }
 }
 
