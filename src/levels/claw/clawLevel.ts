@@ -59,6 +59,9 @@ const DECIDE_AT = 8.5;
 const MIN_HOVER = 3;
 /** Chance (per credit) the kid goes for the spot you're standing on rather than a prize. */
 const AIM_AT_PLAYER = [0.25, 0.45, 0.6];
+/** From the second credit on, the chance the kid changes his mind with SWITCH_AT seconds to go. */
+const FICKLE = 0.35;
+const SWITCH_AT = 2.6;
 
 // --- The claw's go -------------------------------------------------------------------------------
 const DROP_SPEED = 7.5;
@@ -112,6 +115,9 @@ const ARCADE: Environment = {
 };
 const PORTAL_LIGHT = { pos: [CHUTE_C[0], 1.4, CHUTE_C[2]] as Vec3, color: [1.3, 0.45, 2.1] as Vec3, range: 7 };
 const BACKDROP = [0.2, 0.12, 0.4];
+const CABINET = [0.07, 0.05, 0.11];
+/** The cabinet's ceiling, over the gantry. */
+const CEILING_Y = 14;
 const GLASS = [0.025, 0.04, 0.08];
 const FELT = [0.035, 0.03, 0.13];
 const TRIM = [0.78, 0.08, 0.45];
@@ -178,6 +184,8 @@ interface Chant {
   label: WorldLabel;
   start: number;
   end: number;
+  /** Height over the toy (staggered, so neighbours don't talk over each other). */
+  lift: number;
 }
 
 const pick = <T>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
@@ -210,6 +218,9 @@ export class ClawLevel implements Level {
   private closeFrom = PRONGS_OPEN;
   private closeTo = PRONGS_SHUT;
   private held: Held | null = null;
+  /** This credit the kid will change his mind at the last moment; he's doing it right now. */
+  private fickle = false;
+  private hopping = false;
   /** Where the trolley heads to put the load over the chute. */
   private carryTo: [number, number] = [...HOME];
   /** Something slipped at the last jiggle (for the display). */
@@ -231,6 +242,7 @@ export class ClawLevel implements Level {
   private decor: DrawItem[] = [];
   private bulbs: { item: DrawItem; color: Vec3; i: number }[] = [];
   private chants: Chant[] = [];
+  private chantCount = 0;
   private labelList: WorldLabel[] = [];
   private signs: WorldLabel[] = [];
   private creditLabel: WorldLabel = { pos: [0, 8.72, -CHAMBER_HALF + 0.2], text: 'CREDITS 0', size: 0.62, color: '#ff5a36' };
@@ -344,6 +356,21 @@ export class ClawLevel implements Level {
     // The credits display, over the glass.
     d.push({ mesh: 'bevelbox', model: mul(translation([0, 8.35, -E + 0.1]), scaling([6.4, 1.7, 0.12])), color: [0.02, 0.02, 0.03], spec: 0.8, shadow: false });
     d.push({ mesh: 'box', model: mul(translation([0, 8.35, -E + 0.08]), scaling([6.7, 1.95, 0.06])), color: [2.2, 0.35, 0.9], pattern: Pattern.emissive, shadow: false });
+    // The cabinet: dark walls up past the gantry, and a ceiling with fluorescent tubes (the "sun").
+    // None of it casts shadows, so the light still gets in.
+    const lid = CEILING_Y;
+    const upper = lid - WALL_HEIGHT;
+    for (const [pos, size] of [
+      [[0, WALL_HEIGHT + upper / 2, -E - 0.5], [E * 2 + 2, upper, 1]], [[0, WALL_HEIGHT + upper / 2, E + 0.5], [E * 2 + 2, upper, 1]],
+      [[-E - 0.5, WALL_HEIGHT + upper / 2, 0], [1, upper, E * 2 + 2]], [[E + 0.5, WALL_HEIGHT + upper / 2, 0], [1, upper, E * 2 + 2]],
+    ] as [Vec3, Vec3][]) {
+      d.push({ mesh: 'box', model: mul(translation(pos), scaling(size)), color: CABINET, pattern: Pattern.panels, param: 2, spec: 0.2, shadow: false });
+    }
+    d.push({ mesh: 'box', model: mul(translation([0, lid + 0.25, 0]), scaling([E * 2 + 2, 0.5, E * 2 + 2])), color: CABINET, pattern: Pattern.panels, param: 3, spec: 0.1, shadow: false });
+    for (const x of [-8, -2.7, 2.7, 8]) {
+      d.push({ mesh: 'box', model: mul(translation([x, lid - 0.05, 0]), scaling([0.5, 0.1, E * 2 - 3])), color: [0.25, 0.25, 0.3], shadow: false });
+      d.push({ mesh: 'cylinder', model: mul(translation([x, lid - 0.14, 0]), rotationX(Math.PI / 2), scaling([0.12, E * 2 - 3.4, 0.12])), color: [2.6, 2.55, 2.8], pattern: Pattern.emissive, shadow: false });
+    }
     // Marquee trim and chasing bulbs along the top of every wall, and chrome posts in the corners.
     const bandY = WALL_HEIGHT - 0.42;
     for (const [pos, size] of [
@@ -443,6 +470,8 @@ export class ClawLevel implements Level {
     this.clock = CREDIT_TIME;
     this.decided = false;
     this.slipped = false;
+    this.fickle = this.creditNo >= 2 && Math.random() < FICKLE;
+    this.hopping = false;
     this.legPause = rand(0.2, 0.6);
     this.wander();
     this.setPhase('move');
@@ -535,7 +564,17 @@ export class ClawLevel implements Level {
             clamp(this.target[1] + rand(-0.5, 0.5), -CLAW_LIMIT, CLAW_LIMIT),
           ];
         }
-        claw.driveTo(this.target[0], this.target[1], dt, 1.5);
+        // Now and then the kid changes his mind at the last moment: a quick hop to one side.
+        if (this.fickle && this.clock <= SWITCH_AT) {
+          this.fickle = false;
+          const a = rand(0, Math.PI * 2), r = rand(2, 3.2);
+          this.target = [clamp(this.target[0] + Math.cos(a) * r, -CLAW_LIMIT, CLAW_LIMIT), clamp(this.target[1] + Math.sin(a) * r, -CLAW_LIMIT, CLAW_LIMIT)];
+          if (this.nearChute(this.target[0], this.target[1])) this.target[0] = CHUTE_KEEP_OUT - 0.5;
+          this.hopping = true;
+          this.chorusNear(claw.hub(), ['Ooooh?', 'It moves!', 'Ooooh!'], 3);
+        }
+        const arrived = claw.driveTo(this.target[0], this.target[1], dt, this.hopping ? 3.2 : 1.5);
+        if (arrived) this.hopping = false;
         if (this.clock <= 0) this.startDrop();
         break;
       }
@@ -1035,15 +1074,17 @@ export class ClawLevel implements Level {
 
   /** One alien says something. */
   private say(prize: Prize | null, text: string, delay: number, duration: number) {
-    let slot = this.chants.find((c) => c.end < this.t);
+    // The same alien again takes back its own line; otherwise a free slot, a new one, or the oldest.
+    let slot = this.chants.find((c) => c.prize === prize && c.end >= this.t) ?? this.chants.find((c) => c.end < this.t);
     if (!slot) {
       if (this.chants.length < 10) {
-        slot = { prize: null, label: { pos: [0, 0, 0], text: '', size: 0.3, color: ALIEN_TALK }, start: 0, end: 0 };
+        slot = { prize: null, label: { pos: [0, 0, 0], text: '', size: 0.28, color: ALIEN_TALK }, start: 0, end: 0, lift: 0 };
         this.chants.push(slot);
       } else {
         slot = this.chants.reduce((a, b) => (a.end < b.end ? a : b));
       }
     }
+    slot.lift = 0.9 + (this.chantCount++ % 3) * 0.22;
     slot.prize = prize;
     slot.label.text = text;
     slot.start = this.t + delay;
@@ -1079,7 +1120,7 @@ export class ClawLevel implements Level {
       if (this.t < c.start || this.t > c.end || !c.prize || c.prize.gone) continue;
       const t = c.prize.body.rb.translation();
       c.label.pos[0] = t.x;
-      c.label.pos[1] = t.y + 0.95 + Math.sin((this.t - c.start) * 5) * 0.04;
+      c.label.pos[1] = t.y + c.lift + Math.sin((this.t - c.start) * 5) * 0.04;
       c.label.pos[2] = t.z;
       list.push(c.label);
     }

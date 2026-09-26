@@ -4,8 +4,8 @@ import type { DrawItem } from '../engine/renderer';
 import { CHAMBER_HALF, WALL_HEIGHT } from '../game/chamber';
 
 /*
- * A claw-machine claw on a gantry over the whole chamber: two rails on top of the east and west
- * walls, a bridge that runs along them (z), a trolley that runs along the bridge (x), and a cable
+ * A claw-machine claw on a gantry over the whole chamber: two rails along the tops of the east and
+ * west walls, a bridge that runs along them (z), a trolley that runs along the bridge (x), and a cable
  * down to a chrome three-pronged claw. The claw swings a little on its cable when the trolley
  * starts and stops. Its hub is a kinematic collider (it shoves prizes aside on the way down); the
  * prongs are drawn only. The level drives it: `driveTo`, `y` (hub height) and `angle` (prongs).
@@ -195,15 +195,15 @@ export class Claw {
     const m = this.frame;
     // Gantry: rails on top of the side walls, the bridge along them, and the trolley.
     const railY = GANTRY_Y + 0.1;
-    const reach = CHAMBER_HALF + 0.5;
+    const reach = CHAMBER_HALF - 0.25;
     for (const side of [-1, 1]) {
-      out.push({ mesh: 'box', model: mul(translation([side * reach, railY, 0]), scaling([0.35, 0.3, reach * 2 + 0.4])), color: RAIL, spec: 0.5 });
+      out.push({ mesh: 'box', model: mul(translation([side * reach, railY, 0]), scaling([0.35, 0.3, CHAMBER_HALF * 2 - 0.1])), color: RAIL, spec: 0.5 });
       for (const zz of [-1, 1]) {
         const h = railY - WALL_HEIGHT;
         out.push({ mesh: 'box', model: mul(translation([side * reach, WALL_HEIGHT + h / 2, zz * reach]), scaling([0.3, h, 0.3])), color: RAIL, spec: 0.5 });
       }
     }
-    out.push({ mesh: 'box', model: mul(translation([0, railY + 0.02, this.z]), scaling([reach * 2 + 0.3, 0.32, 0.5])), color: [0.85, 0.72, 0.1], spec: 0.4 });
+    out.push({ mesh: 'box', model: mul(translation([0, railY + 0.02, this.z]), scaling([reach * 2 + 0.35, 0.32, 0.5])), color: [0.85, 0.72, 0.1], spec: 0.4 });
     out.push({ mesh: 'roundbox', model: mul(translation([this.x, railY - 0.36, this.z]), scaling([0.9, 0.42, 0.8])), color: DARK_METAL, spec: 0.6 });
     // The cable, from the trolley to the top of the motor.
     const top = transformPoint(m, [0, 0.72, 0]);
