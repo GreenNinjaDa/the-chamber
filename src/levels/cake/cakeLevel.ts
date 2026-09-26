@@ -8,9 +8,10 @@ import { PressurePlate } from '../../entities/pressurePlate';
 import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus, type TrackedTarget } from '../level';
 
 /*
- * Piece of Cake (a secret level, one day; for now level 3). A cake on a pedestal with one slice
- * cut, which you can eat. Companion shapes (every shape but a cube) lie around the room; put one
- * on the floor button and the exit opens.
+ * Piece of Cake (a secret level, one day; for now level 3). A cake on a pedestal, one slice
+ * already cut. Every slice eaten makes you fatter and slower, and the eighth kills you; leaving
+ * without eating any is rude, and also kills you. Companion shapes (every shape but a cube) lie
+ * around the room; the exit is open while one sits on the floor button.
  */
 
 const PLATE_POS: Vec3 = [-7, 0, -7];
@@ -37,11 +38,19 @@ const REFUSE_QUIPS: [string, string][] = [
   ['ONE AT A TIME', 'Somebody already cut you a slice. Eat that one.'],
 ];
 
-/** Each slice fattens the torso this much (just for this life). */
+/** Each slice fattens the torso this much and takes this much off speed and acceleration (this life only). */
 const GIRTH_PER_SLICE = 0.1;
+const SLOWDOWN_PER_SLICE = 0.1;
 const DEATH_SCREEN_DELAY = 1.6;
 
 const pick = <T>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
+
+interface Death {
+  t: number;
+  big: string;
+  small: string;
+  tips: [string, string][];
+}
 
 export class CakeLevel implements Level {
   readonly number = 3;
@@ -52,8 +61,8 @@ export class CakeLevel implements Level {
   private plate: PressurePlate;
   private companions: Body[] = [];
   private cake: Cake;
-  /** Seconds since the fatal slice (-1: not yet). */
-  private burst = -1;
+  /** Set when the player dies; the death screen follows a moment later. */
+  private death: Death | null = null;
 
   constructor(private ctx: LevelContext) {
     const { physics, hud } = ctx;
@@ -91,11 +100,18 @@ export class CakeLevel implements Level {
       if (down) this.exit.openNow();
       else this.exit.closeNow();
     });
+    // Leaving without so much as a slice is rude.
+    this.exit.refuse = () => {
+      if (this.cake.eatenCount > 0) return false;
+      this.rude();
+      return true;
+    };
   }
 
   private ate(n: number) {
     const { player, hud, camera } = this.ctx;
     player.girth = 1 + n * GIRTH_PER_SLICE;
+    player.speedScale = Math.max(0.1, 1 - n * SLOWDOWN_PER_SLICE);
     if (n < CAKE_SLICES) {
       hud.show(...(n === 1 ? pick(EAT_QUIPS) : MORE_QUIPS[n - 2]), n === CAKE_SLICES - 1 ? 5 : 3.5);
       return;
@@ -104,20 +120,37 @@ export class CakeLevel implements Level {
     const chest = add(player.pos, [0, 1.3, 0]);
     player.kill([(Math.random() - 0.5) * 4, 7, (Math.random() - 0.5) * 4], { violence: 45, origin: chest });
     camera.addShake(1);
-    hud.hide();
-    this.burst = 0;
+    this.die('DEATH BY CHOCOLATE', 'The chamber is called Piece of Cake, not The Whole Cake.\nPress R to try again, on an empty stomach.', [
+      ['Hint', 'Seven slices is a meal. Eight is a eulogy.'],
+      ['Controls', 'E eats cake. That was the whole problem.'],
+    ]);
+  }
+
+  /** Tried to leave without eating any cake: the portal spits them back out, hard. */
+  private rude() {
+    const { player, camera } = this.ctx;
+    const chest = add(player.pos, [0, 1.3, 0]);
+    player.kill([-16, 6, (Math.random() - 0.5) * 4], { violence: 22, origin: add(chest, [0.6, 0, 0]) });
+    camera.addShake(0.9);
+    this.die("DON'T BE RUDE. IT'S NOT POISONED.", 'Somebody baked you a cake.\nPress R to try again, and have a slice this time.', [
+      ['Hint', 'Eat at least one slice of cake before you leave. It would be rude not to.'],
+      ['Controls', 'E on the cake eats a slice. Hold left click to carry things, right-click to throw.'],
+    ]);
+  }
+
+  private die(big: string, small: string, tips: [string, string][]) {
+    this.ctx.hud.hide();
+    this.death = { t: 0, big, small, tips };
   }
 
   update(dt: number) {
-    if (this.burst >= 0 && this.status === 'playing') {
-      this.burst += dt;
-      if (this.burst > DEATH_SCREEN_DELAY) {
+    const death = this.death;
+    if (death && this.status === 'playing') {
+      death.t += dt;
+      if (death.t > DEATH_SCREEN_DELAY) {
         this.status = 'lost';
-        this.ctx.hud.show('DEATH BY CHOCOLATE', 'It was only wafer-thin.\nPress R to try again, on an empty stomach.');
-        this.ctx.hud.tips([
-          ['Hint', 'Seven slices is a meal. Eight is a eulogy.'],
-          ['Controls', 'E eats cake. That was the whole problem.'],
-        ]);
+        this.ctx.hud.show(death.big, death.small);
+        this.ctx.hud.tips(death.tips);
       }
     }
     this.arrival.update(dt);

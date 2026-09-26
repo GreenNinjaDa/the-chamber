@@ -140,6 +140,11 @@ export class ExitPortal {
   private openT = 0;
   /** Seconds since the player touched it (-1: not yet). */
   private sucking = -1;
+  /**
+   * Optional doorman: called when the player steps into the portal. Return true to refuse them
+   * (the level decides what happens instead); they won't be sucked in.
+   */
+  refuse: (() => boolean) | null = null;
   readonly centre: Vec3;
 
   constructor(z = 0) {
@@ -177,6 +182,7 @@ export class ExitPortal {
     const nearWall = CHAMBER_HALF - player.pos[0] < 0.75;
     const inside = Math.hypot(player.pos[2] - this.centre[2], player.pos[1] + 1 - this.centre[1]) < EXIT_RADIUS + 0.1;
     if (nearWall && inside) {
+      if (this.refuse?.()) return;
       this.sucking = 0;
       player.shrinkInto(this.centre, PORTAL_SQUEEZE_TIME);
     }

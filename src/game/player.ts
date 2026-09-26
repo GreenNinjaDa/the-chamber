@@ -155,6 +155,8 @@ export class Player {
   inPortal = false;
   /** Torso fatness for this life only (1 = normal); reset() puts it back. */
   girth = 1;
+  /** Multiplies walking / sprinting speed and acceleration, for this life only. */
+  speedScale = 1;
   private portalPivot: Vec3 = [0, 0, 0];
   private portalFrom = 1;
   private portalTo = 1;
@@ -176,6 +178,7 @@ export class Player {
     this.portalTime = 0;
     this.inPortal = false;
     this.girth = 1;
+    this.speedScale = 1;
   }
 
   /** Sucks the player into a portal centred at `pivot`: they shrink into it over `seconds`. */
@@ -272,8 +275,9 @@ export class Player {
     if (len > 0) { mx /= len; mz /= len; }
 
     const sprint = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
-    const speed = (sprint ? SPRINT_SPEED : WALK_SPEED) * (this.gettingUp ? GETUP_MOVE_SCALE : 1);
-    const k = 1 - Math.exp(-dt * (stunned ? 3 : this.onGround ? GROUND_ACCEL : AIR_ACCEL));
+    const speed = (sprint ? SPRINT_SPEED : WALK_SPEED) * (this.gettingUp ? GETUP_MOVE_SCALE : 1) * this.speedScale;
+    const accel = (this.onGround ? GROUND_ACCEL : AIR_ACCEL) * this.speedScale;
+    const k = 1 - Math.exp(-dt * (stunned ? 3 : accel));
     this.vel[0] += (mx * speed - this.vel[0]) * k;
     this.vel[2] += (mz * speed - this.vel[2]) * k;
 
@@ -304,7 +308,7 @@ export class Player {
     }
 
     const hs = Math.hypot(this.vel[0], this.vel[2]);
-    this.moveAmount = Math.min(1, hs / WALK_SPEED);
+    this.moveAmount = Math.min(1, hs / (WALK_SPEED * this.speedScale));
     if (len > 0) this.facing = approachAngle(this.facing, Math.atan2(-mx, -mz), dt * TURN_RATE);
 
     // Aim the upper body toward where the camera looks.
