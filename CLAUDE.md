@@ -94,7 +94,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   and the floor panel under you is a catapult. It ends with Simon's memory game (step on the pads in the order they
   lit, twice), then "LEAVE." (the exit refuses you, fatally) before "SIMON SAYS: LEAVE."
 - **Level 7 — Magnifying Glass** (`src/levels/sunburn/`): the giant is back, with a magnifying glass, and you're the
-  ant. A day passes in ~80 s: the sun (`Environment.sunDir`, light colours) rises in the east, lingers overhead and
+  ant. A day passes in ~64 s: the sun (`Environment.sunDir`, light colours) rises in the east, lingers overhead and
   sets in the west, so the shade moves: along the east wall in the morning, nothing but umbrellas at noon, the west
   wall in the afternoon. The burning spot is a real ray down the sun's direction from the lens to his aim point: it
   lands on the first thing in its way (smoke), and 1 s of it on your body sets you on fire (`player.char`). He
