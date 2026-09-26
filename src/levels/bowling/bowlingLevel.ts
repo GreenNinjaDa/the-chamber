@@ -115,11 +115,15 @@ const RACK_TIME = 2.4;
 const SCORE_AT = 1.0;
 const SWEEP_AT = 2.0;
 const HEAD_BOTTOM = 10.4;
+/** Stray pins (swept short, flung into gutters) pile up; past this many the oldest go. */
+const MAX_PINS = 34;
 const HEAD_TOP = 12.3;
 
 const SPAWN: Vec3 = [0, 0, HEAD_PIN_Z - 1.85];
 /** The exit: halfway down the east gutter, toward the launcher, so the run to it meets the last ball. */
 const EXIT_Z = 1.5;
+/** It opens this long before the last ball is fired. */
+const EXIT_LEAD = 0.8;
 const INTRO_TIME = 3.4;
 const DEATH_SCREEN_DELAY = 1.6;
 
@@ -204,7 +208,7 @@ export class BowlingLevel implements Level {
 
   private door: RAPIER.Collider;
   private doorOpen = 0;
-  private pusher = { z: BACK_Z + 2, yaw: 0, lunge: -1 };
+  private pusher = { z: TUNNEL_END - 0.35, yaw: 0, lunge: -1 };
 
   private sweepRb: RAPIER.RigidBody;
   private sweep = { state: 'idle' as 'idle' | 'down' | 'hold' | 'push' | 'raise' | 'back', t: 0, z: SWEEP_START, lift: SWEEP_LIFT };
@@ -365,6 +369,11 @@ export class BowlingLevel implements Level {
         break;
       case 'hatch': {
         const kind = this.kind();
+        // The exit opens just before the last ball is fired: a race.
+        if (kind === 'final' && !this.exit.open && alive && t >= FIRE_AT - EXIT_LEAD) {
+          this.exit.openNow();
+          this.say('GAME OVER', YELLOW, 'PLEASE RETURN YOUR SHOES');
+        }
         if (this.fired === 0 && t >= FIRE_AT) this.fire(this.balls[0], kind === 'split' ? -1 : 0);
         if (kind === 'split' && this.fired === 1 && t >= FIRE_AT + SECOND_AT) this.fire(this.balls[1], 1);
         if (this.fired >= this.balls.length && this.fired > 0) this.setPhase('roll');
@@ -473,10 +482,6 @@ export class BowlingLevel implements Level {
     ball.state = 'rolling';
     camera.addShake(0.25);
     this.pusher.lunge = 0;
-    if (kind === 'final' && !this.exit.open && !this.death) {
-      this.exit.openNow();
-      this.say('GAME OVER', YELLOW, 'PLEASE RETURN YOUR SHOES');
-    }
     if (inGutter && (kind !== 'split' || side === Math.sign(px))) {
       // A gutter ball: straight across into your gutter, dropping in well before it gets to you.
       ball.kind = 'gutter';
@@ -836,9 +841,15 @@ export class BowlingLevel implements Level {
     }
   }
 
-  /** Pins that fell in the pit (or flew out of the chamber) are gone. */
+  /** Pins that fell in the pit (or flew out of the chamber) are gone; so are the oldest strays past MAX_PINS. */
   private cleanUpPins() {
     const physics = this.ctx.physics;
+    while (this.pins.length > MAX_PINS) {
+      const i = this.pins.findIndex((p) => !this.rack.includes(p));
+      if (i < 0) break;
+      physics.remove(this.pins[i]);
+      this.pins.splice(i, 1);
+    }
     for (let i = this.pins.length - 1; i >= 0; i--) {
       const t = this.pins[i].rb.translation();
       if (t.y < PIT_Y + 1.5 || t.y < -2 && t.z > PIT_EDGE || Math.abs(t.x) > HALF + 3 || Math.abs(t.z) > HALF + 3) {
@@ -908,7 +919,7 @@ export class BowlingLevel implements Level {
     this.reaction.color = color;
     this.southReaction.color = color;
     // Labels draw over everything: don't show the south board through the giant ball.
-    const hide = !!this.giant?.body;
+    const hide = !!this.giant?.body && this.giant.pos[1] < 20;
     this.southReaction.size = hide ? 0 : Math.min(0.7, 9.5 / Math.max(1, this.southReaction.text.length));
     this.southSub.size = hide ? 0 : 0.34;
     return this.labelList;
@@ -927,6 +938,15 @@ export class BowlingLevel implements Level {
     if (g && !g.body) {
       drawBowlingBall(out, fromQuat(g.rot, g.pos), this.giantRadius(), BALL_COLORS.black);
     }
+    if (g && this.phase === 'giantDrop') {
+      // Its (real) shadow lands well off to the side from up there, so darken where it'll land.
+      const h = clamp((g.pos[1] - GIANT_R) / (GIANT_DROP_FROM - GIANT_R), 0, 1);
+      const r = GIANT_R * (0.95 - 0.45 * h);
+      out.push({
+        mesh: 'cylinder', model: mul(translation([g.pos[0], 0.02, g.pos[2]]), scaling([r, 0.01, r])),
+        color: [0, 0, 0], pattern: Pattern.blob, param: 0.85 - 0.55 * h, shadow: false,
+      });
+    }
   }
 
   private drawLauncher(out: DrawItem[], time: number) {
@@ -940,7 +960,8 @@ export class BowlingLevel implements Level {
     const pu = this.pusher;
     const m = mul(translation([0, BALL_R, pu.z]), rotationY(pu.yaw));
     out.push({ mesh: 'cylinder', model: mul(m, basis([1.05, 0, 0], [0, 0, 0.3], [0, -1.05, 0], [0, 0, 0])), color: [0.75, 0.12, 0.08], spec: 0.4 });
-    out.push({ mesh: 'cylinder', model: mul(m, basis([0.18, 0, 0], [0, 0, 3], [0, -0.18, 0], [0, 0, 1.6])), color: [0.6, 0.62, 0.65], spec: 0.8 });
+    const rod = Math.max(0.1, TUNNEL_END - pu.z - 0.15);
+    out.push({ mesh: 'cylinder', model: mul(m, basis([0.18, 0, 0], [0, 0, rod], [0, -0.18, 0], [0, 0, 0.15 + rod / 2])), color: [0.6, 0.62, 0.65], spec: 0.8 });
     // Warning lamps either side of the hatch, blinking while it's busy.
     const busy = this.doorOpen > 0.01;
     const on = busy && Math.floor(time * 4) % 2 === 0;

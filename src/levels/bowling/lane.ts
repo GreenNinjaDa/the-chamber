@@ -1,6 +1,7 @@
 import { mul, rotationY, scaling, translation, type Vec3 } from '../../engine/math';
 import type { Physics } from '../../engine/physics';
 import { Pattern, type DrawItem } from '../../engine/renderer';
+import { pinSpots } from '../../entities/bowling';
 import { CHAMBER_HALF, WALL_HEIGHT } from '../../game/chamber';
 
 /*
@@ -114,6 +115,17 @@ export function buildLaneDraws(): DrawItem[] {
   // A neon strip along the top of the curtain, and another under the scoreboard.
   box([-HALF, CURTAIN_TOP - 0.08, -HALF + 0.01], [HALF, CURTAIN_TOP + 0.04, -HALF + 0.06], [0.4, 3.2, 3.6], { pattern: Pattern.emissive, shadow: false });
 
+  // The ground outside (for the title screen's orbit), around the chamber's footprint.
+  const G = 450, E = HALF + 1;
+  const OUTSIDE = [0.42, 0.44, 0.42];
+  const ground = (min: Vec3, max: Vec3) => box(min, max, OUTSIDE, { pattern: Pattern.panels, param: 8, spec: 0.15 });
+  ground([-G, -1.1, -G], [G, -0.1, -E]);
+  ground([-G, -1.1, TUNNEL_END + 0.5], [G, -0.1, G]);
+  ground([-G, -1.1, -E], [-E, -0.1, TUNNEL_END + 0.5]);
+  ground([E, -1.1, -E], [G, -0.1, TUNNEL_END + 0.5]);
+  ground([HATCH_HALF + 0.5, -1.1, HALF + 1], [E, -0.1, TUNNEL_END + 0.5]);
+  ground([-E, -1.1, HALF + 1], [-HATCH_HALF - 0.5, -0.1, TUNNEL_END + 0.5]);
+
   // Walls: west, east and north run down to the gutters (the curtain covers the north wall's foot).
   wall([-HALF - 1, GUTTER_Y, -HALF - 1], [-HALF, WALL_HEIGHT, HALF + 1]);
   wall([HALF, GUTTER_Y, -HALF - 1], [HALF + 1, WALL_HEIGHT, HALF + 1]);
@@ -153,6 +165,9 @@ export function buildLaneDraws(): DrawItem[] {
     const tipZ = 3.4 + Math.abs(k) * 0.55;
     // The wedge's point is its origin; turned so its curved base faces the hatch (south).
     out.push({ mesh: 'wedge', model: mul(translation([x, 0.002, tipZ]), scaling([0.55, 0.004, 1.3]), rotationY(-3 * Math.PI / 8)), color: INK, spec: 0.3 });
+  }
+  for (const s of pinSpots(HEAD_PIN_Z)) {
+    out.push({ mesh: 'cylinder', model: mul(translation([s[0], 0.002, s[2]]), scaling([0.24, 0.004, 0.24])), color: INK, spec: 0.3 });
   }
   return out;
 }
