@@ -1,3 +1,4 @@
+import { sfx } from '../engine/audio';
 import { add, mul, rotationX, rotationY, scaling, translation, type Vec3 } from '../engine/math';
 import type { Physics, Usable } from '../engine/physics';
 import type { DrawItem } from '../engine/renderer';
@@ -24,6 +25,7 @@ export class Lever implements Usable {
   }
 
   use() {
+    sfx.click();
     this.on = !this.on;
     this.onToggle?.(this.on);
   }
@@ -71,6 +73,7 @@ export class Button implements Usable {
   }
 
   use() {
+    sfx.button();
     this.pressedAt = this.lastTime;
     this.onPress?.();
   }

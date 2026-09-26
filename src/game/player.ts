@@ -1,3 +1,4 @@
+import { sfx } from '../engine/audio';
 import type { Input } from '../engine/input';
 import {
   add, approachAngle, basis, clamp, cross, dot, easeInOut, identity, length, mul, multiply, normalize, scale, scaling, sub, transformDir, translation,
@@ -667,6 +668,7 @@ export class Player {
    */
   knock(velocity: Vec3, stunSeconds: number) {
     if (this.mode !== 'control' || !this.body || this.inPortal || this.stunImmunity > 0) return;
+    sfx.oof(Math.min(1, length(velocity) / 8));
     this.body.muscle = STUNNED_MUSCLE;
     this.stun = stunSeconds;
     this.gettingUp = true;
@@ -695,6 +697,8 @@ export class Player {
       body.setEnabled(true);
     }
     body.muscle = 0;
+    sfx.oof(1);
+    if ((opts.violence ?? length(launch)) >= 18) sfx.splat();
     body.addVelocity([this.vel[0] + launch[0], this.vel[1] + launch[1], this.vel[2] + launch[2]]);
     // A little tumble so deaths don't all look the same.
     body.parts.chest.setAngvel({ x: (Math.random() - 0.5) * 8, y: (Math.random() - 0.5) * 5, z: (Math.random() - 0.5) * 8 }, true);

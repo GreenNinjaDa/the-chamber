@@ -11,6 +11,8 @@ export const settings = {
   invertY: false,
   /** Which level (1-based) the lobby's START portal leads to. */
   startLevel: 1,
+  /** Sound effects on or off. */
+  sound: true,
 };
 
 try {
@@ -18,6 +20,7 @@ try {
   if (typeof saved.mouseSpeed === 'number') settings.mouseSpeed = saved.mouseSpeed;
   if (typeof saved.invertY === 'boolean') settings.invertY = saved.invertY;
   if (typeof saved.startLevel === 'number') settings.startLevel = saved.startLevel;
+  if (typeof saved.sound === 'boolean') settings.sound = saved.sound;
 } catch {
   // No storage: defaults it is.
 }

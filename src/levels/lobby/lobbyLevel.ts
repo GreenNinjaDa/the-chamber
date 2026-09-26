@@ -31,6 +31,7 @@ export class LobbyLevel implements Level {
   private startLabel: WorldLabel;
   private mouseLabel: WorldLabel;
   private invertLabel: WorldLabel;
+  private soundLabel: WorldLabel;
   /** Pranks for players who wander off and leave their character standing here. */
   readonly afk: AfkPranks;
   private deadFor = 0;
@@ -70,6 +71,13 @@ export class LobbyLevel implements Level {
     });
     lever.on = settings.invertY;
     this.invertLabel = { pos: [-8, 2.3, 5], text: '', size: 0.26, color: '#ffd166' };
+    const soundLever = new Lever(physics, [-8, 0, 8.5], Math.PI / 2, (on) => {
+      settings.sound = on;
+      saveSettings();
+      this.refreshLabels();
+    });
+    soundLever.on = settings.sound;
+    this.soundLabel = { pos: [-8, 2.3, 8.5], text: '', size: 0.26, color: '#ffd166' };
 
     this.startLabel = { pos: [WALL, 3.05, 0], text: '', size: 0.26, color: '#e7c6ff' };
     this.fixedLabels.push(
@@ -79,7 +87,7 @@ export class LobbyLevel implements Level {
       { pos: [-WALL, 4.9, 0], text: 'WASD walk · Shift sprint · Space jump', size: 0.5 },
       { pos: [-WALL, 4.1, 0], text: 'E use · Hold click carry · Right-click throw · Esc pause', size: 0.5 },
     );
-    this.allLabels = [...this.fixedLabels, this.startLabel, this.mouseLabel, this.invertLabel];
+    this.allLabels = [...this.fixedLabels, this.startLabel, this.mouseLabel, this.invertLabel, this.soundLabel];
     this.refreshLabels();
 
     // Something to fling around while you make up your mind.
@@ -109,6 +117,7 @@ export class LobbyLevel implements Level {
     this.startLabel.text = `→ LEVEL ${settings.startLevel}`;
     this.mouseLabel.text = `MOUSE SPEED ${settings.mouseSpeed.toFixed(2)}×`;
     this.invertLabel.text = `INVERT LOOK: ${settings.invertY ? 'ON' : 'OFF'}`;
+    this.soundLabel.text = settings.sound ? 'SOUND: ON' : 'SOUND: BLISSFULLY OFF';
   }
 
   update(dt: number) {

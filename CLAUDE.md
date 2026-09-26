@@ -303,7 +303,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
 - `src/main.ts` — game loop, title screen (starts by itself after 10 s), pause, the `LEVELS` list (`?level=N` skips the lobby and starts at
   level N), level start/restart and portal progression, dev hook
 - `src/engine/` — renderer (primitive meshes, sun shadow map, MSAA, patterns), math (column-major,
-  WebGPU clip space z ∈ [0,1]), input
+  WebGPU clip space z ∈ [0,1]), input, audio (procedural WebAudio: `sfx.*` one-shots, `tone`, `noise`, looping `Tune`s; no
+  sound files. Starts on the first click; `?mute` or the lobby's sound lever turn it off)
 - `src/shaders/*.wgsl` — shaders, imported with `?raw`. Surface patterns (panels, dartboard, blob, skin, sky)
   (and portal, lava) are ids in `Pattern` (renderer.ts) that must match the constants in scene.wgsl
 - `src/engine/physics.ts` — Rapier wrapper: one `Physics` world per level attempt (created in main.ts with the
@@ -359,6 +360,9 @@ Shared mechanics available to levels (via `ctx`):
   Hits do this automatically (thresholds at the top of player.ts): the head needs 6 m/s and 40 kg·m/s, the rest
   of the body 1.5× the speed and 5× the momentum. Loose objects count with their mass, walls/bars/scripted
   things as 50 kg, nothing heavier than 50 kg. Only head, chest and pelvis count against non-physics things.
+- Sound (`engine/audio.ts`): portals, buttons, levers, hits, explosions and the death trombone play by themselves.
+  Levels add their own with `sfx.*`, `tone()` / `noise()`, or a `Tune` (call `start()` from update while it
+  should play: starting a level and pausing stop every tune). Never rely on sound alone for a cue.
 - Jumps are buffered: pressing Space up to 0.1 s before the player can jump (`JUMP_BUFFER` in player.ts) jumps as soon
   as they can.
 - The player's movement capsule is wider than the body and never pushes things itself: walking pushes loose

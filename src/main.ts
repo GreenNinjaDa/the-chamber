@@ -1,4 +1,5 @@
 import { Sandbox } from './dev/sandbox';
+import { audioState, sfx, stopTunes, unlockAudio } from './engine/audio';
 import { Input } from './engine/input';
 import { mul, multiply, scaling, translation, type Mat4, type Vec3 } from './engine/math';
 import { initPhysics, Physics } from './engine/physics';
@@ -159,6 +160,7 @@ async function main() {
   hud.setLevel('');
 
   function startLevel() {
+    stopTunes();
     interaction.release();
     ctx.physics.dispose();
     ctx.physics = freshPhysics();
@@ -188,6 +190,7 @@ async function main() {
   });
   function pause() {
     if (!playing || pauseMenu.isOpen) return;
+    stopTunes();
     pausedAt = performance.now();
     pauseMenu.open(inLobby);
     hud.crosshair('hidden');
@@ -215,15 +218,18 @@ async function main() {
   // Clicking starts the game (and grabs the mouse); so does sitting on the title screen too long.
   // Without a click there's no mouse lock yet, so the first click in the chamber takes it.
   canvas.addEventListener('click', () => {
+    unlockAudio();
     input.lock();
     begin();
   });
+  window.addEventListener('keydown', unlockAudio);
 
   const draws: DrawItem[] = [];
   let last = performance.now();
   let time = 0;
 
   let nextOffered = false;
+  let mourned = false;
 
   function tick(dt: number) {
     time += dt;
@@ -262,6 +268,11 @@ async function main() {
         startLevel();
         if (finished) hud.show("THAT'S ALL, FOLKS", 'Every chamber so far. The rest are still being built. Probably.', 4);
       }
+      // The sad trombone, once per death (after the level's own crash and bang).
+      if (level.status === 'lost' && !mourned) {
+        mourned = true;
+        sfx.fail(0.7);
+      } else if (level.status !== 'lost') mourned = false;
       camera.look(dt, input);
       const frozen = level.freezeWorld?.() ?? false;
       if (!frozen) {
@@ -328,6 +339,7 @@ async function main() {
           draw(1 / 60);
         },
         get level() { return level; },
+        audio: audioState,
         get paused() { return pauseMenu.isOpen; },
         pause,
         resume,

@@ -1,3 +1,4 @@
+import { sfx } from '../../engine/audio';
 import { add, clamp, fromQuat, length, mul, normalize, scale, scaling, sub, translation, type Vec3 } from '../../engine/math';
 import type { Body } from '../../engine/physics';
 import { Pattern, type DrawItem } from '../../engine/renderer';
@@ -130,6 +131,7 @@ export class AfkPranks {
     this.flashAt = pos;
     this.flashT = 0;
     camera.addShake(1.2);
+    sfx.explosion(0.6);
     for (const b of physics.bodies) {
       const q = b.rb.translation();
       const d = length(sub([q.x, q.y, q.z], pos));
