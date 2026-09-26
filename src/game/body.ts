@@ -176,7 +176,9 @@ const PARTS: Record<PartName, PartDef> = {
 
 type BallJointName = 'waist' | 'neck' | 'shoulderL' | 'shoulderR' | 'hipL' | 'hipR';
 type HingeName = 'elbowL' | 'elbowR' | 'kneeL' | 'kneeR';
-type JointName = BallJointName | HingeName;
+export type JointName = BallJointName | HingeName;
+/** Per-joint motor strength multipliers for `PhysBody.driveJoints` (left out = 1; 0 = limp). */
+export type JointStrengths = Partial<Record<JointName, number>>;
 
 /** How much harder than a limb joint each joint is to tear (1 = like a limb). */
 const JOINT_TOUGHNESS: Record<JointName, number> = {
@@ -397,11 +399,30 @@ export class PhysBody {
   }
 
   /**
-   * Called every physics substep. Pulls every part toward its animated frame in `targets`
-   * (with the character's velocity as feed-forward) and the joint motors toward `pose`,
-   * all scaled by `muscle`.
+   * Keeps the body in the vertical plane it's in now (world x-y), for side-on, QWOP-style puppets
+   * facing along x (see Player.startPuppet): no part moves along z, and the pelvis only turns
+   * about z. The rest stay in the plane through their joint motors (locking the rotation of both
+   * parts of a motorised joint makes Rapier blow up).
    */
-  drive(h: number, targets: Frames, targetVel: Vec3, pose: Pose) {
+  setPlanar(on: boolean) {
+    for (const name of PART_NAMES) {
+      const rb = this.parts[name];
+      if (on) {
+        const v = rb.linvel(), w = rb.angvel();
+        rb.setLinvel({ x: v.x, y: v.y, z: 0 }, false);
+        rb.setAngvel({ x: 0, y: 0, z: w.z }, false);
+      }
+      rb.setEnabledTranslations(true, true, !on, true);
+    }
+    this.parts.pelvis.setEnabledRotations(!on, !on, true, true);
+  }
+
+  /**
+   * Sets the joint motors toward `pose`, scaled by `muscle`, `strength` and the per-joint
+   * `strengths` (a joint at 0 goes limp). drive() calls this; puppets (Player.startPuppet) use it
+   * on its own, so nothing but the joints holds the body up.
+   */
+  driveJoints(pose: Pose, strengths?: JointStrengths) {
     const m = this.muscle;
     const k = { ball: STIFFNESS.ball * this.strength, hinge: STIFFNESS.hinge * this.strength };
     const d = { ball: DAMPING.ball * this.strength, hinge: DAMPING.hinge * this.strength };
@@ -409,21 +430,23 @@ export class PhysBody {
       if (this.broken.has(name)) return;
       const j = this.balls[name];
       const raw = rawSet(j);
-      if (m <= 0) {
+      const s = m * (strengths?.[name] ?? 1);
+      if (s <= 0) {
         for (const axis of [RAPIER.JointAxis.AngX, RAPIER.JointAxis.AngY, RAPIER.JointAxis.AngZ]) {
           raw.jointConfigureMotorVelocity(j.handle, axis, 0, LIMP_FRICTION);
         }
         return;
       }
-      raw.jointConfigureMotorPosition(j.handle, RAPIER.JointAxis.AngX, x, k.ball * m, d.ball * m);
-      raw.jointConfigureMotorPosition(j.handle, RAPIER.JointAxis.AngY, y, k.ball * m, d.ball * m);
-      raw.jointConfigureMotorPosition(j.handle, RAPIER.JointAxis.AngZ, z, k.ball * m, d.ball * m);
+      raw.jointConfigureMotorPosition(j.handle, RAPIER.JointAxis.AngX, x, k.ball * s, d.ball * s);
+      raw.jointConfigureMotorPosition(j.handle, RAPIER.JointAxis.AngY, y, k.ball * s, d.ball * s);
+      raw.jointConfigureMotorPosition(j.handle, RAPIER.JointAxis.AngZ, z, k.ball * s, d.ball * s);
     };
     const hinge = (name: HingeName, angle: number) => {
       if (this.broken.has(name)) return;
       const j = this.hinges[name];
-      if (m <= 0) j.configureMotorVelocity(0, LIMP_FRICTION);
-      else j.configureMotorPosition(angle, k.hinge * m, d.hinge * m);
+      const s = m * (strengths?.[name] ?? 1);
+      if (s <= 0) j.configureMotorVelocity(0, LIMP_FRICTION);
+      else j.configureMotorPosition(angle, k.hinge * s, d.hinge * s);
     };
     ball('waist', pose.lean, 0, pose.twist ?? 0);
     ball('neck', pose.headPitch);
@@ -435,6 +458,16 @@ export class PhysBody {
     hinge('elbowR', pose.elbowR);
     hinge('kneeL', pose.kneeL);
     hinge('kneeR', pose.kneeR);
+  }
+
+  /**
+   * Called every physics substep. Pulls every part toward its animated frame in `targets`
+   * (with the character's velocity as feed-forward) and the joint motors toward `pose`,
+   * all scaled by `muscle`.
+   */
+  drive(h: number, targets: Frames, targetVel: Vec3, pose: Pose) {
+    const m = this.muscle;
+    this.driveJoints(pose);
     if (m <= 0) return;
 
     for (const name of PART_NAMES) {
