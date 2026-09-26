@@ -1,5 +1,5 @@
 import { Drone, tone, Tune } from '../../engine/audio';
-import { add, clamp, mul, normalize, rotationZ, scale, scaling, sub, translation, type Vec3 } from '../../engine/math';
+import { add, clamp, mul, normalize, rotationX, rotationZ, scale, scaling, sub, translation, type Vec3 } from '../../engine/math';
 import { RAPIER, type Body } from '../../engine/physics';
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
 import { CHAMBER_HALF } from '../../game/chamber';
@@ -44,10 +44,12 @@ const ARC_C = 8.5;
 
 // --- Movement on the slope ------------------------------------------------------------------------------
 /** Downhill drift added to the player (m/s): on the ground, and while airborne. */
-const DRIFT_GROUND = 1.7;
-const DRIFT_AIR = 2.6;
+const DRIFT_GROUND = 2.0;
+const DRIFT_AIR = 3.0;
 /** While scrambling back up after a knock: slower than the body can catch up (player.ts GETUP_SPEED is 1.6 m/s). */
 const DRIFT_GETUP = 0.9;
+/** Walking / sprinting speed and acceleration on the polished playfield (player.speedScale). */
+const PLAYFIELD_GRIP = 0.88;
 
 // --- Flippers --------------------------------------------------------------------------------------------------
 const FLIPPER_X = 4.6;
@@ -105,10 +107,10 @@ const BUMPERS: { p: P2; color: number[]; bell: number }[] = [
   { p: [CX, -3.4], color: [0.2, 0.55, 1.7], bell: 2 },
 ];
 const TARGETS: { p: P2; yaw: number; letter: string }[] = [
-  { p: [-11.2, -0.8], yaw: Math.PI / 2, letter: 'E' },
+  { p: [7.8, -1.2], yaw: (-65 * Math.PI) / 180, letter: 'E' },
   { p: [CX - 5.2, -10.2], yaw: (20 * Math.PI) / 180, letter: 'X' },
-  { p: [5.0, -4.4], yaw: (-40 * Math.PI) / 180, letter: 'I' },
-  { p: [9.05, -0.8], yaw: -Math.PI / 2, letter: 'T' },
+  { p: [-9.95, -1.2], yaw: (65 * Math.PI) / 180, letter: 'I' },
+  { p: [CX, -10.2], yaw: 0, letter: 'T' },
 ];
 const TARGET_COLORS = [[0.95, 0.75, 0.1], [0.95, 0.35, 0.08], [0.95, 0.12, 0.3], [0.2, 0.75, 0.95]];
 const LETTER_LIT = [[2.4, 1.8, 0.2], [2.4, 0.8, 0.12], [2.4, 0.3, 0.7], [0.4, 1.6, 2.4]];
@@ -170,6 +172,8 @@ interface Ball {
   t: number;
   /** Seconds before it can hit the player again. */
   hitCooldown: number;
+  /** Seconds it has sat still (for the ball search). */
+  still: number;
   /** Per bumper / sling: seconds before it can kick this ball again. */
   kickCooldown: number[];
   prevVel: Vec3;
@@ -211,7 +215,7 @@ export class PinballLevel implements Level {
   private ballQueueT = 0;
   private ballsLaunched = 0;
 
-  private plunger = { pull: 0, state: 'idle' as 'idle' | 'pull' | 'fire', t: 0, loaded: 0, collider: null as RAPIER.Collider | null };
+  private plunger = { pull: 0, state: 'idle' as 'idle' | 'pull' | 'fire', t: 0, loaded: 0, withPlayer: false, collider: null as RAPIER.Collider | null };
   private flight: Flight | null = null;
   private plunges = 0;
   private lastPlungeT = -10;
@@ -228,12 +232,15 @@ export class PinballLevel implements Level {
   private dmd: DotMatrix;
   private msg: { text: string; t: number; dur: number; flash: boolean } | null = null;
   private scheduled: { at: number; text: string; dur: number; flash: boolean }[] = [];
+  private wrongTargetT = -10;
   private exitLamps: PixelText[] = [];
   private exitLampColors: number[][] = [];
   private inserts: PixelText[] = [];
   private insertColors: number[][] = [];
   private chevronColors: number[][][] = [];
   private bulbColors: number[][] = [];
+  /** The table's general illumination bulbs (shared by every bulb, dimmed with the power). */
+  private giColor = [0, 0, 0];
   private staticDraws: DrawItem[] = [];
   private labelList: WorldLabel[];
   private popups: Popup[] = [];
@@ -262,6 +269,8 @@ export class PinballLevel implements Level {
     hud.hint('');
     // Dropped straight down into the shooter lane.
     this.arrival = new PortalArrival(ctx, SPAWN, { minElevationDeg: 86 });
+    // The playfield is polished to a shine: a little slippery underfoot.
+    ctx.player.speedScale = PLAYFIELD_GRIP;
 
     this.buildTable();
 
@@ -423,6 +432,27 @@ export class PinballLevel implements Level {
     for (const [x, z, r, c] of stars) drawStar(d, t.frame(x, z, 0, 0.01), r, c, 0.012, { spec: 0.6 });
     // A white outline round the centre star.
     d.push({ mesh: 'tube', model: mul(t.frame(CX, 3.2, 0, 0.008), scaling([1.25, 0.012, 1.25])), color: [0.9, 0.9, 0.95], spec: 0.5, shadow: false });
+
+    // Cabinet side art along the side walls: a dark band with speed stripes, and a row of
+    // general-illumination bulbs along the bottom.
+    const band = 2.4;
+    const STRIPES = [[0.9, 0.15, 0.6], [0.95, 0.75, 0.1], [0.1, 0.7, 0.9]];
+    for (const [x, z0, z1] of [[-H + 0.02, -H, DRAIN_Z], [H - 0.02, -H, H]] as const) {
+      const zc = (z0 + z1) / 2, len = (z1 - z0) / t.cos;
+      const f = t.frame(x, zc);
+      d.push({ mesh: 'box', model: mul(f, translation([0, band / 2 - 0.2, 0]), scaling([0.04, band + 0.4, len])), color: [0.07, 0.02, 0.13], spec: 0.5 });
+      d.push({ mesh: 'box', model: mul(f, translation([0, band, 0]), scaling([0.09, 0.08, len])), color: CHROME, spec: 1.4 });
+      const side = x < 0 ? 1 : -1;
+      for (let z = z0 + 1.2; z < z1 - 1; z += 3.6) {
+        STRIPES.forEach((c, k) => {
+          const fs = t.frame(x + side * 0.02, z + k * 0.6);
+          d.push({ mesh: 'box', model: mul(fs, translation([0, band / 2, 0]), rotationX(0.65), scaling([0.02, band / Math.cos(0.65) - 0.2, 0.3])), color: c, spec: 0.4, shadow: false });
+        });
+      }
+      for (let z = z0 + 0.8; z < z1 - 0.3; z += 1.6) {
+        d.push({ mesh: 'sphere', model: mul(t.frame(x + side * 0.14, z, 0, 0.3), scaling([0.1, 0.1, 0.1])), color: this.giColor, pattern: Pattern.emissive, shadow: false });
+      }
+    }
   }
 
   // --- Update ---------------------------------------------------------------------------------------------------
@@ -540,7 +570,7 @@ export class PinballLevel implements Level {
           this.ballQueueT -= dt;
           if (this.ballQueueT <= 0) {
             this.ballQueue--;
-            this.ballQueueT = 1.3;
+            this.ballQueueT = 2.4;
             this.addBall();
           }
         }
@@ -739,6 +769,16 @@ export class PinballLevel implements Level {
     this.targets.forEach((tg, i) => {
       if (tg.down) return;
       if (!probes.some((p) => tg.touches(p, 0.42))) return;
+      // They only drop in order: you have to spell it.
+      if (i !== this.nextTarget()) {
+        if (this.t - this.wrongTargetT > 2.5) {
+          this.wrongTargetT = this.t;
+          tone(110, 0.18, { wave: 'square', vol: 0.12 });
+          this.showMsg(pick(['IN ORDER', 'SPELL IT', 'NOPE']), 1.1);
+          this.later(1.1, `NEXT: ${TARGETS[this.nextTarget()].letter}`, 1.4, false);
+        }
+        return;
+      }
       tg.drop();
       pinSfx.target(i);
       const down = this.targets.filter((x) => x.down).length;
@@ -750,9 +790,16 @@ export class PinballLevel implements Level {
       } else if (down < 4) {
         this.showMsg(`${this.progress()}`, 1.6);
       }
+      if (down === 1) {
+        // Your reward: another ball. Hooray.
+        this.ballQueue += 1;
+        this.ballQueueT = 1.0;
+        this.later(1.7, 'EXTRA BALL', 2.2);
+        pinSfx.knocker();
+      }
       if (down === 2) {
-        // Completing half the bank lights multiball. Congratulations.
-        this.ballQueue += 2;
+        // Half the word lights multiball. Congratulations.
+        this.ballQueue += 1;
         this.ballQueueT = 1.2;
         this.showMsg('MULTIBALL!', 3);
         pinSfx.multiball();
@@ -763,6 +810,11 @@ export class PinballLevel implements Level {
 
   private progress() {
     return this.targets.map((t) => (t.down ? t.letter : '-')).join(' ');
+  }
+
+  /** Index of the target that counts next (they go in order), or -1 once they're all down. */
+  private nextTarget() {
+    return this.targets.findIndex((t) => !t.down);
   }
 
   private jackpot() {
@@ -852,6 +904,7 @@ export class PinballLevel implements Level {
           pl.loaded += dt;
           if (pl.loaded > (playerOn ? 0.5 : 0.3)) {
             pl.state = 'pull';
+            pl.withPlayer = playerOn;
             pl.t = 0;
             pinSfx.plungerPull();
           }
@@ -866,13 +919,19 @@ export class PinballLevel implements Level {
           pinSfx.plungerFire();
           // The player goes first; a ball sharing the tip waits for the next pull.
           if (playerOn) this.launchPlayer();
-          else for (const b of ballsOn) {
-            // Already rolling (spinning to match), so it doesn't lose half its speed skidding.
+          else {
+            // Every ball queued up the lane goes together, or the first would just ram the rest.
             const s = BALL_LAUNCH * rand(0.95, 1.03);
             const v = scale(TABLE.upSlope, s);
-            b.body.rb.setLinvel({ x: v[0], y: v[1], z: v[2] }, true);
-            b.body.rb.setAngvel({ x: -s / BALL_R, y: 0, z: 0 }, true);
-            b.body.rb.wakeUp();
+            for (const b of this.balls) {
+              if (b.state !== 'play') continue;
+              const p = b.body.rb.translation();
+              if (p.x < LANE_WALL_X + 0.15 || p.z < LANE_TOP_Z + 1 || p.y - BALL_R - TABLE.y(p.z) > 1.2) continue;
+              // Already rolling (spinning to match), so it doesn't lose half its speed skidding.
+              b.body.rb.setLinvel({ x: v[0], y: v[1], z: v[2] }, true);
+              b.body.rb.setAngvel({ x: -s / BALL_R, y: 0, z: 0 }, true);
+              b.body.rb.wakeUp();
+            }
           }
         }
         break;
@@ -952,7 +1011,7 @@ export class PinballLevel implements Level {
     const live = this.balls.length;
     if (live >= MAX_BALLS) return;
     const body = spawnSteelBall(this.ctx.physics, TABLE.point(LANE_X, 6.5, BALL_R + 0.05));
-    this.balls.push({ body, state: 'play', t: 0, hitCooldown: 0, kickCooldown: [0, 0, 0, 0, 0], prevVel: [0, 0, 0] });
+    this.balls.push({ body, state: 'play', t: 0, hitCooldown: 0, still: 0, kickCooldown: [0, 0, 0, 0, 0], prevVel: [0, 0, 0] });
     this.ballsLaunched++;
   }
 
@@ -999,6 +1058,19 @@ export class PinballLevel implements Level {
       const jolt = Math.hypot(v.x - b.prevVel[0], v.y - b.prevVel[1], v.z - b.prevVel[2]);
       if (jolt > 3.5) pinSfx.clack(Math.min(0.45, jolt * 0.04));
       b.prevVel = [v.x, v.y, v.z];
+      // Ball search: a ball sitting still anywhere but the plunger gets a kick, like a real machine
+      // firing every solenoid to shake a stuck ball loose.
+      const onPlunger = p.x > LANE_WALL_X + 0.15 && p.z > PLUNGER_Z - 2.5;
+      b.still = speed < 0.35 && !onPlunger ? b.still + dt : 0;
+      if (b.still > 3) {
+        b.still = 0;
+        const kick = add(TABLE.dir(rand(-4, 4), rand(1, 3)), [0, 3.5, 0]);
+        rb.setLinvel({ x: kick[0], y: kick[1], z: kick[2] }, true);
+        for (const bu of this.bumpers) bu.kick();
+        for (const s of this.slings) s.kick();
+        for (let i = 0; i < 4; i++) tone(90, 0.06, { wave: 'square', vol: 0.12, at: i * 0.09 });
+        if (!this.death && !this.msg) this.showMsg('BALL SEARCH', 1.5);
+      }
 
       // Hitting the player.
       if (player.mode !== 'control' || player.inPortal || this.death || b.hitCooldown > 0) continue;
@@ -1082,6 +1154,12 @@ export class PinballLevel implements Level {
     }
     const m = this.msg;
     let line0 = this.phase === 'arrive' ? 'INSERT COIN' : this.won ? 'EXIT LIT' : 'BALL 1';
+    const next = this.nextTarget();
+    if (this.phase === 'play' && !this.won && next >= 0) {
+      // Between messages the display cycles through its prompts, like any machine in play.
+      const cycle = next > 0 ? ['BALL 1', this.progress(), `SHOOT ${TARGETS[next].letter}`] : ['BALL 1', `SHOOT ${TARGETS[next].letter}`];
+      line0 = cycle[Math.floor(this.t / 2.5) % cycle.length];
+    }
     let show0 = this.phase !== 'arrive' || Math.floor(this.t * 1.6) % 2 === 0;
     if (m) {
       m.t += dt;
@@ -1109,19 +1187,25 @@ export class PinballLevel implements Level {
       const lit = tg.down && (!this.won || blink || this.tiltT > 0);
       const src = lit ? LETTER_LIT[i] : [0.22, 0.04, 0.04];
       for (let k = 0; k < 3; k++) c[k] = src[k] * (this.tiltT > 0 ? 0.3 : 1);
-      // The playfield insert in front of it: dim until it's down.
+      // The playfield insert in front of it: lit once it's down, blinking if it's the one to hit next.
+      const next = i === this.nextTarget() && this.phase === 'play';
       const ic = this.insertColors[i];
-      const on = tg.down ? LETTER_LIT[i] : [0.3, 0.06, 0.04];
+      const on = tg.down || (next && blink) ? LETTER_LIT[i] : [0.3, 0.06, 0.04];
       for (let k = 0; k < 3; k++) ic[k] = on[k] * (0.15 + 0.85 * pw);
-      // Chevrons chase toward targets still standing.
+      // Chevrons chase toward the next target only.
       const cc = this.chevronColors[i];
       const phase = Math.floor(this.t * 5) % 4;
       cc.forEach((col, j) => {
-        const bright = !tg.down && (phase === 2 - j || phase === 3) ? 1 : 0;
-        const base = tg.down ? 0.05 : 0.15;
+        const bright = next && (phase === 2 - j || phase === 3) ? 1 : 0;
+        const base = next ? 0.15 : 0.04;
         for (let k = 0; k < 3; k++) col[k] = (base + bright * 1.6) * LETTER_LIT[i][k] * 0.6 * pw + 0.02;
       });
     });
+    // The general illumination: warm, with the odd flicker.
+    const gi = (0.08 + 0.92 * pw) * (Math.random() < 0.02 ? 0.7 : 1);
+    this.giColor[0] = 2.0 * gi;
+    this.giColor[1] = 1.45 * gi;
+    this.giColor[2] = 0.7 * gi;
     // Chasing bulbs round the backglass.
     const n = 24;
     if (!this.bulbColors.length) for (let i = 0; i < n * 2; i++) this.bulbColors.push([0, 0, 0]);
@@ -1214,7 +1298,16 @@ export class PinballLevel implements Level {
   // --- Camera ------------------------------------------------------------------------------------------------------
 
   cameraShot(): CameraShot | null {
-    return this.arrival.cameraShot() ?? this.drainShot() ?? this.followShot();
+    return this.arrival.cameraShot() ?? this.drainShot() ?? this.plungerShot() ?? this.followShot();
+  }
+
+  /** On the plunger while it pulls back: looking back down the lane at the player (the wall's too close behind). */
+  private plungerShot(): CameraShot | null {
+    const pl = this.plunger;
+    const { player } = this.ctx;
+    if (pl.state !== 'pull' || !pl.withPlayer || player.mode !== 'control') return null;
+    const target = add(player.pos, [0, 0.8, 0]);
+    return { pos: TABLE.point(LANE_X + 0.35, player.pos[2] - 5.2, 3.1), target, sharpness: 5 };
   }
 
   /** Drained: looking down into the pit from over the flippers. */
