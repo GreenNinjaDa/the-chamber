@@ -13,8 +13,8 @@ export const settings = {
   startLevel: 1,
   /** Sound effects on or off. */
   sound: true,
-  /** Levels (1-based) the player has got out of, for the lobby's pads. */
-  beaten: [] as number[],
+  /** Ids of the levels the player has got out of (see LEVELS in main.ts), for the lobby's pads. */
+  beaten: [] as string[],
 };
 
 try {
@@ -23,15 +23,15 @@ try {
   if (typeof saved.invertY === 'boolean') settings.invertY = saved.invertY;
   if (typeof saved.startLevel === 'number') settings.startLevel = saved.startLevel;
   if (typeof saved.sound === 'boolean') settings.sound = saved.sound;
-  if (Array.isArray(saved.beaten)) settings.beaten = saved.beaten.filter((n: unknown) => typeof n === 'number');
+  if (Array.isArray(saved.beaten)) settings.beaten = saved.beaten.filter((n: unknown) => typeof n === 'string');
 } catch {
   // No storage: defaults it is.
 }
 
-/** Remembers that the player got out of level `n`. */
-export function markBeaten(n: number) {
-  if (settings.beaten.includes(n)) return;
-  settings.beaten.push(n);
+/** Remembers that the player got out of the level with this id. */
+export function markBeaten(id: string) {
+  if (settings.beaten.includes(id)) return;
+  settings.beaten.push(id);
   saveSettings();
 }
 

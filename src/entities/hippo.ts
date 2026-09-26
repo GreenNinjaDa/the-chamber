@@ -26,10 +26,10 @@ const MOUTH = [0.35, 0.05, 0.12];
 
 export function drawHippo(out: DrawItem[], pose: HippoPose, color: number[]) {
   const spec = 0.8;
-  // The neck: a thick ribbed tube from the wall to the head.
-  out.push({ mesh: 'cylinder', model: segment(pose.base, pose.head, 0.95), color, spec });
+  // The neck: a thick ribbed tube from the wall to the head (none while it's pulled back into the wall).
+  if (!pose.hollow) out.push({ mesh: 'cylinder', model: segment(pose.base, pose.head, 0.95), color, spec });
   const ring = [color[0] * 0.8, color[1] * 0.8, color[2] * 0.8];
-  for (let k = 1; k < 6; k++) {
+  for (let k = 1; k < 6 && !pose.hollow; k++) {
     const p = add(pose.base, scale([pose.head[0] - pose.base[0], pose.head[1] - pose.base[1], pose.head[2] - pose.base[2]], k / 6));
     out.push({ mesh: 'cylinder', model: segment(add(p, scale(dirOf(pose.base, pose.head), -0.12)), add(p, scale(dirOf(pose.base, pose.head), 0.12)), 1.05), color: ring, spec });
   }

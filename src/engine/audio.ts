@@ -128,6 +128,8 @@ export class Tune {
     const c = ready();
     if (!c) return this.stop();
     const beat = 60 / this.bpm;
+    // Fell behind (a long frame, a hidden tab): skip ahead rather than play every missed note at once.
+    if (this.nextAt < c.currentTime) this.nextAt = c.currentTime + 0.02;
     while (this.nextAt < c.currentTime + 0.25) {
       const [n, beats] = this.notes[this.index];
       const dur = beats * beat;
@@ -157,7 +159,7 @@ export class Drone {
     this.osc.frequency.value = this.freq;
     this.gain = c.createGain();
     this.gain.gain.setValueAtTime(0.0001, c.currentTime);
-    this.gain.gain.exponentialRampToValueAtTime(this.opts.vol ?? 0.05, c.currentTime + 0.3);
+    this.gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, this.opts.vol ?? 0.05), c.currentTime + 0.3);
     const filter = c.createBiquadFilter();
     filter.frequency.value = this.freq * 6;
     this.osc.connect(filter).connect(this.gain).connect(master!);

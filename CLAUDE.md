@@ -404,7 +404,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
 ## Adding a level
 
 Implement `Level` (update / draw / environment / obstacles / cameraShot; take `number` from `ctx.number`, which main.ts
-sets from the level's place in `LEVELS`, so levels can be reordered freely), set `status` to `lost` (with `hud.show`)
+sets from the level's place in `LEVELS`, so levels can be reordered freely; register it there as
+`['id', (ctx) => new MyLevel(ctx)]`, a stable id that saved progress uses), set `status` to `lost` (with `hud.show`)
 when the player dies, and `exited` when they go through the exit portal (`won` still works for an end screen).
 Start with `new PortalArrival(ctx, spawn)` (update/draw it, and return its `cameraShot()` while it has one) and
 put an `ExitPortal` somewhere; its `target()` makes a good `trackedTargets()` entry once open. Levels can take over the camera by returning a

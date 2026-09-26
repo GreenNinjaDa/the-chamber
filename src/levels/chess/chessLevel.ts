@@ -29,6 +29,8 @@ const MOVES_AT: [number, number][] = [[0, 1], [4, 2], [22, 3]];
 /** If White doesn't move off the first square, Black gets impatient after this long. */
 const IMPATIENT = 5;
 const DEATH_SCREEN_DELAY = 1.8;
+/** How far over a square's edge your body can be and still count as on it (m). */
+const OVERLAP = 0.2;
 /** Pieces block the player a little wider than their bases, so neighbours leave no gap to squeeze through. */
 const BLOCK_RADIUS = PIECE_RADIUS + 0.25;
 
@@ -139,6 +141,35 @@ export class ChessLevel implements Level {
 
   // --- The rules -----------------------------------------------------------------------------------
 
+  /** Whether the player's body is on a square (even partly: over its edge by a little counts). */
+  private overlaps(f: number, r: number) {
+    const p = this.ctx.player.pos;
+    return Math.abs(p[0] - sqX(f)) < SQ / 2 + OVERLAP && Math.abs(p[2] - sqZ(r)) < SQ / 2 + OVERLAP;
+  }
+
+  /**
+   * The square Black goes for: yours, or, if you're tucked into the corner of an occupied one, the
+   * nearest free square you're overlapping.
+   */
+  private target(): [number, number] {
+    const p = this.ctx.player.pos;
+    const f0 = fileOf(p[0]), r0 = rankOf(p[2]);
+    if (!this.occupied(f0, r0)) return [f0, r0];
+    let best: [number, number] = [f0, r0], bestD = Infinity;
+    for (let df = -1; df <= 1; df++) {
+      for (let dr = -1; dr <= 1; dr++) {
+        const f = f0 + df, r = r0 + dr;
+        if (f < 0 || f > 7 || r < 0 || r > 7 || this.occupied(f, r) || !this.overlaps(f, r)) continue;
+        const d = Math.hypot(p[0] - sqX(f), p[2] - sqZ(r));
+        if (d < bestD) {
+          bestD = d;
+          best = [f, r];
+        }
+      }
+    }
+    return best;
+  }
+
   /** A piece on (or on its way to) a square. */
   private occupied(f: number, r: number) {
     for (const p of this.pieces) {
@@ -186,7 +217,7 @@ export class ChessLevel implements Level {
           out.push([p.f, r1]);
           if (p.r === 6 && !this.occupied(p.f, r1 - 1) && !isYou(p.f, r1 - 1)) out.push([p.f, r1 - 1]);
         }
-        for (const df of [-1, 1]) if (isYou(p.f + df, r1)) out.push([p.f + df, r1]);
+        for (const df of [-1, 1]) if (isYou(p.f + df, r1) && !this.occupied(p.f + df, r1)) out.push([p.f + df, r1]);
         break;
       }
     }
@@ -196,7 +227,7 @@ export class ChessLevel implements Level {
   /** Black's turn: the best few moves, mostly aimed at where you are or are about to be. */
   private blackMoves(count: number) {
     const { player } = this.ctx;
-    const you: [number, number] = [fileOf(player.pos[0]), rankOf(player.pos[2])];
+    const you = this.target();
     const lead = WARN + FLY * 0.6;
     const ahead: [number, number] = [fileOf(player.pos[0] + player.vel[0] * lead), rankOf(player.pos[2] + player.vel[2] * lead)];
     const aimAhead = Math.random() < 0.6;
@@ -274,7 +305,7 @@ export class ChessLevel implements Level {
       const d = Math.hypot(player.pos[0] - to[0], player.pos[2] - to[2]);
       camera.addShake(Math.max(0, 0.3 - d * 0.02));
       const alive = player.mode === 'control' && !this.death && !player.inPortal && this.promoted < 0;
-      if (alive && fileOf(player.pos[0]) === m.to[0] && rankOf(player.pos[2]) === m.to[1]) this.capture(p);
+      if (alive && this.overlaps(m.to[0], m.to[1])) this.capture(p);
     }
   }
 
@@ -334,7 +365,7 @@ export class ChessLevel implements Level {
     }
     // "CHECK." when a move is coming for your square.
     if (alive && this.promoted < 0 && this.started >= 0) {
-      const check = this.moves.some((m) => m.to[0] === you[0] && m.to[1] === you[1]);
+      const check = this.moves.some((m) => this.overlaps(m.to[0], m.to[1]));
       // (Standing in the corner of an occupied square on the far row doesn't count.)
       this.subLabel.text = check ? 'CHECK.' : you[1] === 7 ? "AN EMPTY SQUARE, PLEASE. THIS ISN'T CHECKERS." : '';
     }

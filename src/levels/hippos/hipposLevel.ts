@@ -1,5 +1,5 @@
 import { noise, note, sfx, tone, Tune } from '../../engine/audio';
-import { clamp, mul, rotationY, scaling, translation, type Vec3 } from '../../engine/math';
+import { basis, clamp, cross, mul, normalize, rotationY, scaling, translation, type Vec3 } from '../../engine/math';
 import { RAPIER, type Body } from '../../engine/physics';
 import { Pattern, type DrawItem } from '../../engine/renderer';
 import { CHAMBER_HALF } from '../../game/chamber';
@@ -223,7 +223,7 @@ export class HipposLevel implements Level {
     const playing = t > 3.2 && this.over < 0;
     if (playing && this.status === 'playing') this.music.start();
     else this.music.stop();
-    if (playing && ((t > SECOND_POUR_AT + 2 && this.marbles.length === 0) || t > GAME_TIME)) this.gameOver();
+    if (playing && !this.death && this.status === 'playing' && ((t > SECOND_POUR_AT + 2 && this.marbles.length === 0) || t > GAME_TIME)) this.gameOver();
 
     for (const h of this.hippos) this.updateHippo(h, dt, playing, alive);
 
@@ -392,12 +392,17 @@ export class HipposLevel implements Level {
         const k = h.state === 'snap' ? 1 : h.t / WIND;
         const d = this.dirOf(h);
         const glow = (0.45 + 0.55 * k) * (0.75 + 0.25 * Math.sin(time * 30));
-        for (let s = 0; s < 7; s++) {
-          const along = 1 + s * 2;
+        for (let s = 0; s < 14; s++) {
+          const along = 0.5 + s;
           const x = h.base[0] + d[0] * along, z = h.base[2] + d[2] * along;
+          // Lying on the dome: tilted to its surface.
+          const y = domeY(x, z);
+          const up: Vec3 = y > 0.01 ? normalize([x, y - DOME_Y, z]) : [0, 1, 0];
+          const side = normalize(cross(up, d));
+          const fwd = cross(side, up);
           out.push({
             mesh: 'box',
-            model: mul(translation([x, domeY(x, z) + 0.06, z]), rotationY(Math.atan2(d[0], d[2])), scaling([LANE_HALF * 2, 0.04, 1.9])),
+            model: basis([side[0] * LANE_HALF * 2, side[1] * LANE_HALF * 2, side[2] * LANE_HALF * 2], [up[0] * 0.04, up[1] * 0.04, up[2] * 0.04], [fwd[0] * 0.95, fwd[1] * 0.95, fwd[2] * 0.95], [x + up[0] * 0.06, y + up[1] * 0.06, z + up[2] * 0.06]),
             color: [h.color[0] * 2.2 * glow, h.color[1] * 2.2 * glow, h.color[2] * 2.2 * glow],
             pattern: Pattern.emissive,
             opacity: 0.6,

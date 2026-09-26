@@ -38,7 +38,7 @@ export class LobbyLevel implements Level {
   status: LevelStatus = 'playing';
   private arrival: PortalArrival;
   private exit = new ExitPortal(0);
-  private pads: { x: number; z: number; n: number; digits: PixelText }[] = [];
+  private pads: { x: number; z: number; n: number; id: string; digits: PixelText }[] = [];
   /** The pad the player is standing on (so stepping on picks it once). */
   private onPad = 0;
   private settled = false;
@@ -52,7 +52,9 @@ export class LobbyLevel implements Level {
   readonly afk: AfkPranks;
   private deadFor = 0;
 
-  constructor(private ctx: LevelContext, levelCount: number) {
+  /** `levelIds`: every level's id, in order (progress is saved by id, so levels can be reordered). */
+  constructor(private ctx: LevelContext, levelIds: string[]) {
+    const levelCount = levelIds.length;
     const { physics, hud } = ctx;
     hud.setLevel('The Chamber · Lobby');
     hud.hint('');
@@ -68,10 +70,10 @@ export class LobbyLevel implements Level {
       const z = PAD_FIRST_Z + row * PAD_SPACING;
       // The number painted on the pad, reading from the south.
       const digits = new PixelText({ centre: [x, 0.06, z], right: [1, 0, 0], up: [0, 0, -1], pixel: 0.12, color: [1.3, 1.3, 1.4], depth: 0.012, pattern: Pattern.emissive }, String(i + 1));
-      this.pads.push({ x, z, n: i + 1, digits });
+      this.pads.push({ x, z, n: i + 1, id: levelIds[i], digits });
     }
     this.fixedLabels.push({ pos: [0, 4.5, -WALL], text: 'PICK YOUR POISON (STAND ON A NUMBER)', size: 0.5, color: '#ffd166' });
-    const beaten = settings.beaten.filter((n) => n <= levelCount).length;
+    const beaten = levelIds.filter((id) => settings.beaten.includes(id)).length;
     this.fixedLabels.push({
       pos: [0, 3.8, -WALL],
       text: beaten === 0 ? 'SURVIVED: NONE. YET.' : beaten >= levelCount ? `SURVIVED: ALL ${levelCount}. SHOW-OFF.` : `SURVIVED: ${beaten} / ${levelCount}`,
@@ -180,7 +182,7 @@ export class LobbyLevel implements Level {
   draw(out: DrawItem[]) {
     for (const pad of this.pads) {
       const picked = pad.n === settings.startLevel;
-      if (settings.beaten.includes(pad.n)) {
+      if (settings.beaten.includes(pad.id)) {
         out.push({ mesh: 'bevelbox', model: mul(translation([pad.x, 0.02, pad.z]), scaling([PAD_SIZE + 0.36, 0.04, PAD_SIZE + 0.36])), color: PAD_RIM, pattern: Pattern.emissive, shadow: false });
       }
       out.push({

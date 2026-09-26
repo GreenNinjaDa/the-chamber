@@ -51,41 +51,41 @@ const SPAWN: Vec3 = [0, 0, 6];
 /** Seconds on the title screen before the game starts by itself. */
 const TITLE_AUTOSTART = 10;
 /** The game's levels, in order. */
-const LEVELS: ((ctx: LevelContext) => Level)[] = [
-  (ctx) => new DartsLevel(ctx),
-  (ctx) => new GrenadeLevel(ctx),
+const LEVELS: [string, (ctx: LevelContext) => Level][] = [
+  ['darts', (ctx) => new DartsLevel(ctx)],
+  ['grenade', (ctx) => new GrenadeLevel(ctx)],
   // Meant to be a secret level reached by an easter egg; level 3 for now.
-  (ctx) => new CakeLevel(ctx),
-  (ctx) => new LavaLevel(ctx),
-  (ctx) => new TempleLevel(ctx),
-  (ctx) => new SimonLevel(ctx),
-  (ctx) => new RedLightLevel(ctx),
-  (ctx) => new ButtonLevel(ctx),
-  (ctx) => new MinesLevel(ctx),
-  (ctx) => new ChairsLevel(ctx),
-  (ctx) => new GnomeLevel(ctx),
-  (ctx) => new QuizLevel(ctx),
-  (ctx) => new DodgeballLevel(ctx),
-  (ctx) => new StealthLevel(ctx),
-  (ctx) => new SunburnLevel(ctx),
-  (ctx) => new FroggerLevel(ctx),
-  (ctx) => new DuckHuntLevel(ctx),
-  (ctx) => new ClawLevel(ctx),
-  (ctx) => new SnakeLevel(ctx),
-  (ctx) => new PinataLevel(ctx),
-  (ctx) => new MicrowaveLevel(ctx),
-  (ctx) => new HexagoneLevel(ctx),
-  (ctx) => new DominoesLevel(ctx),
-  (ctx) => new FloorLavaLevel(ctx),
-  (ctx) => new BowlingLevel(ctx),
-  (ctx) => new TetrisLevel(ctx),
-  (ctx) => new LaserLevel(ctx),
-  (ctx) => new ElevatorLevel(ctx),
-  (ctx) => new PacmanLevel(ctx),
-  (ctx) => new ChessLevel(ctx),
-  (ctx) => new HipposLevel(ctx),
-  (ctx) => new FlappyLevel(ctx),
-  (ctx) => new RockLevel(ctx),
+  ['cake', (ctx) => new CakeLevel(ctx)],
+  ['lava', (ctx) => new LavaLevel(ctx)],
+  ['temple', (ctx) => new TempleLevel(ctx)],
+  ['simon', (ctx) => new SimonLevel(ctx)],
+  ['redlight', (ctx) => new RedLightLevel(ctx)],
+  ['button', (ctx) => new ButtonLevel(ctx)],
+  ['mines', (ctx) => new MinesLevel(ctx)],
+  ['chairs', (ctx) => new ChairsLevel(ctx)],
+  ['gnome', (ctx) => new GnomeLevel(ctx)],
+  ['quiz', (ctx) => new QuizLevel(ctx)],
+  ['dodgeball', (ctx) => new DodgeballLevel(ctx)],
+  ['stealth', (ctx) => new StealthLevel(ctx)],
+  ['sunburn', (ctx) => new SunburnLevel(ctx)],
+  ['frogger', (ctx) => new FroggerLevel(ctx)],
+  ['duckhunt', (ctx) => new DuckHuntLevel(ctx)],
+  ['claw', (ctx) => new ClawLevel(ctx)],
+  ['snake', (ctx) => new SnakeLevel(ctx)],
+  ['pinata', (ctx) => new PinataLevel(ctx)],
+  ['microwave', (ctx) => new MicrowaveLevel(ctx)],
+  ['hexagone', (ctx) => new HexagoneLevel(ctx)],
+  ['dominoes', (ctx) => new DominoesLevel(ctx)],
+  ['floorlava', (ctx) => new FloorLavaLevel(ctx)],
+  ['bowling', (ctx) => new BowlingLevel(ctx)],
+  ['tetris', (ctx) => new TetrisLevel(ctx)],
+  ['laser', (ctx) => new LaserLevel(ctx)],
+  ['elevator', (ctx) => new ElevatorLevel(ctx)],
+  ['pacman', (ctx) => new PacmanLevel(ctx)],
+  ['chess', (ctx) => new ChessLevel(ctx)],
+  ['hippos', (ctx) => new HipposLevel(ctx)],
+  ['flappy', (ctx) => new FlappyLevel(ctx)],
+  ['rock', (ctx) => new RockLevel(ctx)],
 ];
 const params = new URLSearchParams(location.search);
 /** `?sandbox` opens the mechanics test room; `?level=N` skips the lobby and starts at level N. */
@@ -95,7 +95,7 @@ let levelIndex = Math.min(LEVELS.length - 1, Math.max(0, (Number(params.get('lev
 let inLobby = !params.has('level');
 const makeLevel = (ctx: LevelContext) => {
   ctx.number = sandbox || inLobby ? 0 : levelIndex + 1;
-  return sandbox ? new Sandbox(ctx) : inLobby ? new LobbyLevel(ctx, LEVELS.length) : LEVELS[levelIndex](ctx);
+  return sandbox ? new Sandbox(ctx) : inLobby ? new LobbyLevel(ctx, LEVELS.map(([id]) => id)) : LEVELS[levelIndex][1](ctx);
 };
 
 /** Where each tracked target is on screen: a ring if visible, otherwise an edge arrow toward it. */
@@ -268,7 +268,7 @@ async function main() {
       // Through an exit portal: from the lobby to the chosen level, then straight on to the next
       // chamber (after the last, back to the lobby).
       if (level.status === 'exited' && !sandbox) {
-        if (!inLobby) markBeaten(levelIndex + 1);
+        if (!inLobby) markBeaten(LEVELS[levelIndex][0]);
         let finished = false;
         if (inLobby) {
           inLobby = false;
