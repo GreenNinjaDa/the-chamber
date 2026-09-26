@@ -304,7 +304,7 @@ export const SHAFT_HALF = CHAMBER_HALF + 1.3;
 export const FLOOR_H = 4;
 export const TOP_FLOOR = 99;
 /** Shaft details are drawn this far above the car (fog hides the rest). */
-const VIEW_ABOVE = 80;
+const VIEW_ABOVE = 64;
 const SHAFT_WALL = [0.13, 0.125, 0.12];
 const SLAB = [0.24, 0.23, 0.22];
 const LAMP = [3.2, 2.4, 1.3];
