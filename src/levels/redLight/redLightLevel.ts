@@ -2,7 +2,7 @@ import { clamp, length, mul, normalize, rotationY, scaling, segment, sub, toQuat
 import { GROUPS_QUERY_WORLD, RAPIER, type Body } from '../../engine/physics';
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
 import { Contestant, type ContestantLook } from '../../entities/contestant';
-import { Doll, DOLL_HEAD_Y, drawBareTree } from '../../entities/doll';
+import { BareTree, Doll, DOLL_HEAD_Y } from '../../entities/doll';
 import { junk, spawnJunk } from '../../entities/junk';
 import { ExitPortal, PortalArrival } from '../../entities/portal';
 import { CHAMBER_HALF } from '../../game/chamber';
@@ -21,6 +21,7 @@ import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type Level
 const DOLL_POS: Vec3 = [9.5, 0, -5];
 /** Her body faces the east wall (+x). */
 const DOLL_YAW = -Math.PI / 2;
+const TREE_POS: Vec3 = [10.6, 0, -9.6];
 /** The finish line (red tape across the floor) and the start line. */
 const FINISH_X = 7;
 const START_X = -10.4;
@@ -131,7 +132,7 @@ const PARTIAL_LINES = [
   'She is seven metres tall. Your hiding spot was not.',
   'Half hidden is still half seen. It was the wrong half.',
 ];
-const CHEAT_LINE ='Yes, 001 moved too. He has... connections. You do not.';
+const CHEAT_LINE = 'Yes, 001 moved too. He has... connections. You do not.';
 const TIMEUP_LINES = [
   'The line was right there. So was the clock.',
   'Hiding forever is also a way to lose.',
@@ -189,6 +190,12 @@ export class RedLightLevel implements Level {
   private arrival: PortalArrival;
   private exit = new ExitPortal(EXIT_Z);
   private doll = new Doll(DOLL_POS, DOLL_YAW);
+  private tree = new BareTree(TREE_POS);
+  /** The finish line (red tape) and the start line (white tape). */
+  private tapes: DrawItem[] = [
+    { mesh: 'box', model: mul(translation([FINISH_X, 0.006, 0]), scaling([0.3, 0.012, CHAMBER_HALF * 2 - 0.02])), color: [0.85, 0.06, 0.05], shadow: false },
+    { mesh: 'box', model: mul(translation([START_X - 0.45, 0.005, 0]), scaling([0.2, 0.01, CHAMBER_HALF * 2 - 0.02])), color: [0.95, 0.95, 0.93], shadow: false },
+  ];
   private dollColliders = new Set<number>();
   private cover: { body: Body; r: number }[] = [];
   private npcs: Npc[] = [];
@@ -218,6 +225,7 @@ export class RedLightLevel implements Level {
   private seenAt: Vec3 = [0, 0, 0];
   /** Player 001 moved during this red light (and got away with it). */
   private oldManMoved = false;
+  private oldManExcused = false;
   private timeUpZaps = 0;
   private death: Death | null = null;
   private labelList: WorldLabel[] = [];
@@ -236,7 +244,7 @@ export class RedLightLevel implements Level {
 
     for (const c of this.doll.addColliders(physics)) this.dollColliders.add(c.handle);
     // The tree's trunk.
-    physics.addStaticCylinder([10.6, 1.6, -9.6], 0.34, 3.2);
+    physics.addStaticCylinder([TREE_POS[0], 1.6, TREE_POS[2]], 0.34, 3.2);
 
     for (const [name, x, z, yaw] of COVER) {
       const def = junk(name);
@@ -611,7 +619,14 @@ export class RedLightLevel implements Level {
         // Player 001 just keeps shuffling. She pretends not to notice.
         c.frozen = false;
         this.steer(npc, goal, npc.cast.speed * 0.7);
-        if (redT > this.grace) this.oldManMoved = true;
+        if (redT > this.grace && !this.oldManMoved) {
+          this.oldManMoved = true;
+          // The first time, she makes a point of not minding.
+          if (!this.oldManExcused && this.announceT <= 0) {
+            this.oldManExcused = true;
+            this.announce('PLAYER 001... IS FINE.');
+          }
+        }
         continue;
       }
       if (stopped) {
@@ -761,10 +776,8 @@ export class RedLightLevel implements Level {
 
   draw(out: DrawItem[]) {
     this.doll.draw(out);
-    drawBareTree(out, [10.6, 0, -9.6]);
-    // The finish line (red tape) and the start line (white tape).
-    out.push({ mesh: 'box', model: mul(translation([FINISH_X, 0.006, 0]), scaling([0.3, 0.012, CHAMBER_HALF * 2 - 0.02])), color: [0.85, 0.06, 0.05], shadow: false });
-    out.push({ mesh: 'box', model: mul(translation([START_X - 0.45, 0.005, 0]), scaling([0.2, 0.01, CHAMBER_HALF * 2 - 0.02])), color: [0.95, 0.95, 0.93], shadow: false });
+    this.tree.draw(out);
+    for (const tape of this.tapes) out.push(tape);
     for (const npc of this.npcs) npc.c.draw(out);
     for (const b of this.beams) {
       const fade = 1 - b.t / LASER_TIME;

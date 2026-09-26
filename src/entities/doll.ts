@@ -43,6 +43,7 @@ export class Doll {
   private root: Mat4;
   private head: Mat4;
   private eyeColor = [0, 0.02, 0.01];
+  private bodyItems: DrawItem[] | null = null;
 
   /** `yaw`: which way her body faces (0 = -z, -PI/2 = +x). */
   constructor(readonly pos: Vec3, readonly yaw: number) {
@@ -81,6 +82,16 @@ export class Doll {
   }
 
   draw(out: DrawItem[]) {
+    // Everything below the neck never moves: built once.
+    if (!this.bodyItems) {
+      this.bodyItems = [];
+      this.drawBody(this.bodyItems);
+    }
+    for (const item of this.bodyItems) out.push(item);
+    this.drawHead(out);
+  }
+
+  private drawBody(out: DrawItem[]) {
     const m = this.root;
     // Shoes, socks and legs.
     for (const sx of [-1, 1]) {
@@ -114,8 +125,9 @@ export class Doll {
       part(out, m, 'sphere', elbow, [0.17, 0.17, 0.17], SKIN, { pattern: Pattern.skin });
       part(out, m, 'sphere', [1.05 * sx, 2.72, -0.08], [0.19, 0.25, 0.14], SKIN, { pattern: Pattern.skin });
     }
+  }
 
-    // The head.
+  private drawHead(out: DrawItem[]) {
     const h = this.head;
     part(out, h, 'sphere', [0, 0, 0], [HEAD_R, 0.95, 0.96], SKIN, { pattern: Pattern.skin });
     // Bob: the back and top, locks down the sides, straight-cut bangs, two little pigtails.
@@ -148,21 +160,48 @@ export class Doll {
   }
 }
 
-/** A bare, dead-looking tree (every playground game needs one), about 6 m tall. */
-export function drawBareTree(out: DrawItem[], pos: Vec3) {
-  const bark = [0.3, 0.22, 0.16];
-  const m = translation(pos);
-  const tm = (p: Vec3) => transformPoint(m, p);
-  const limb = (a: Vec3, b: Vec3, r: number) => {
-    out.push({ mesh: 'cylinder', model: segment(tm(a), tm(b), r), color: bark });
-    out.push({ mesh: 'sphere', model: mul(m, translation(b), scaling([r, r, r])), color: bark });
+/** Tree limbs relative to its foot: [from, to, radius], grown once (the same tree every time). */
+let treeLimbs: [Vec3, Vec3, number][] | null = null;
+
+function growTree(): [Vec3, Vec3, number][] {
+  let s = 11;
+  const rand = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  const limbs: [Vec3, Vec3, number][] = [];
+  const grow = (from: Vec3, dir: Vec3, len: number, r: number, depth: number) => {
+    const to: Vec3 = [from[0] + dir[0] * len, from[1] + dir[1] * len, from[2] + dir[2] * len];
+    limbs.push([from, to, r]);
+    if (depth === 0) return;
+    const forks = depth >= 2 ? 3 : 2;
+    for (let i = 0; i < forks; i++) {
+      // Branch off near the end (the trunk also sprouts lower down), bending outward and up.
+      const at = depth >= 3 ? 0.55 + i * 0.2 : 0.7 + rand() * 0.3;
+      const start: Vec3 = [from[0] + dir[0] * len * at, from[1] + dir[1] * len * at, from[2] + dir[2] * len * at];
+      const a = rand() * Math.PI * 2, tilt = 0.5 + rand() * 0.5;
+      const nd: Vec3 = [dir[0] * 0.5 + Math.cos(a) * tilt, dir[1] * 0.5 + 0.35, dir[2] * 0.5 + Math.sin(a) * tilt];
+      const l = Math.hypot(nd[0], nd[1], nd[2]);
+      grow(start, [nd[0] / l, nd[1] / l, nd[2] / l], len * (0.55 + rand() * 0.2), r * 0.55, depth - 1);
+    }
   };
-  limb([0, -0.1, 0], [0.1, 3.2, 0.05], 0.32);
-  limb([0.1, 3.1, 0.05], [-0.3, 5.4, 0.2], 0.2);
-  limb([0.1, 2.6, 0.05], [1.4, 4.3, -0.4], 0.15);
-  limb([-0.1, 2.2, 0], [-1.3, 3.6, 0.7], 0.13);
-  limb([-0.2, 4.4, 0.15], [-1.2, 5.6, -0.5], 0.1);
-  limb([0.4, 3.6, -0.1], [0.9, 5.8, 0.3], 0.1);
-  limb([1.0, 3.9, -0.3], [1.8, 4.5, 0.4], 0.07);
-  part(out, m, 'cylinder', [0, 0.05, 0], [0.7, 0.1, 0.7], [0.36, 0.3, 0.24]);
+  grow([0, -0.1, 0], [0.04, 1, 0.02], 3.4, 0.3, 3);
+  return limbs;
+}
+
+/** A bare, dead-looking tree (every playground game needs one), about 6 m tall. Static: built once. */
+export class BareTree {
+  private items: DrawItem[] = [];
+
+  constructor(pos: Vec3) {
+    const bark = [0.28, 0.2, 0.14];
+    treeLimbs ??= growTree();
+    const m = translation(pos);
+    for (const [a, b, r] of treeLimbs) {
+      this.items.push({ mesh: 'cylinder', model: segment(transformPoint(m, a), transformPoint(m, b), r), color: bark });
+      this.items.push({ mesh: 'sphere', model: mul(m, translation(b), scaling([r, r, r])), color: bark });
+    }
+    part(this.items, m, 'cylinder', [0, 0.05, 0], [0.7, 0.1, 0.7], [0.36, 0.3, 0.24]);
+  }
+
+  draw(out: DrawItem[]) {
+    for (const item of this.items) out.push(item);
+  }
 }
