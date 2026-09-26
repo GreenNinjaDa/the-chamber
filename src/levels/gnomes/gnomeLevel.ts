@@ -48,7 +48,7 @@ const FIRST_BLINK = 18;
 const BLINK_MIN = 10;
 const BLINK_MAX = 15;
 /** The telegraph before a blackout: brief dips in the light, [start, end, light level], s before it. */
-const WARN_DIPS: [number, number, number][] = [[-2, -1.92, 0.55], [-1.84, -1.8, 0.75], [-1.3, -1.2, 0.45], [-0.75, -0.66, 0.5], [-0.58, -0.54, 0.7]];
+const WARN_DIPS: [number, number, number][] = [[-2, -1.92, 0.3], [-1.84, -1.8, 0.6], [-1.3, -1.2, 0.25], [-0.75, -0.66, 0.35], [-0.58, -0.54, 0.6]];
 /** The light level below which it counts as dark: nobody sees anything. */
 const DARK = 0.2;
 /** Getting caught: lights out this long, then you see what happened; the death screen follows. */
@@ -79,11 +79,12 @@ const SCRIPT: { end: number; p: number; text: string; update?: boolean }[] = [
   { end: 37, p: 1, text: 'Almost there. For real this time. {p}%' },
 ];
 const WATCH_TOTAL = SCRIPT[SCRIPT.length - 1].end;
+const UPDATE_STAGE = SCRIPT.findIndex((s) => s.update);
 
 const DEATHS = {
-  plain: "They only move when nobody's looking. Nobody was looking.",
-  blink: "Don't blink. Blink and you're dead. The lights blinked. Close enough.",
-  watching: 'Riveting progress bar, to be fair. The gnomes thought so too.',
+  plain: ["They only move when nobody's looking. Nobody was looking.", 'You turned your back on a garden gnome. Rookie mistake.'],
+  blink: ["Don't blink. Blink and you're dead. The lights blinked. Close enough.", 'The lights went out. So did you.'],
+  watching: ['Riveting progress bar, to be fair. The gnomes thought so too.', 'You were watching the bar. The gnomes were watching you.'],
 };
 
 const BAR_GREEN = [0.1, 1.05, 0.22];
@@ -393,7 +394,7 @@ export class GnomeLevel implements Level {
     if (this.status === 'playing' && c.t > CAUGHT_DARK + DEATH_SCREEN_DELAY) {
       this.status = 'lost';
       const { hud } = this.ctx;
-      hud.show('GNOMED', `${DEATHS[c.kind]}\nPress R to try again.`);
+      hud.show('GNOMED', `${pick(DEATHS[c.kind])}\nPress R to try again.`);
       const tips: [string, string][] = [['Hint', 'The bar only fills while you watch it. The gnomes only move while you don\'t. Pick them up and throw them far away.']];
       if (c.kind === 'blink') tips.push(['Also', 'When the lights flicker, get the close ones far away (or into your arms). In the dark, they all come at once.']);
       tips.push(['Controls', 'Hold left click to carry a gnome, right-click to throw it · Mouse to look']);
@@ -512,6 +513,7 @@ export class GnomeLevel implements Level {
       .replace('{n}', String(n))
       .replace('{n1}', String(n + 1))
       .replace('{n4}', String(n + 4));
+    this.headerLabel.text = stage < UPDATE_STAGE ? 'PLEASE WAIT' : stage === UPDATE_STAGE ? 'DO NOT TURN OFF YOUR TEST CHAMBER' : 'PLEASE WAIT (AGAIN)';
     this.subLabel.text = this.watching ? '' : 'PAUSED · A WATCHED BAR ALWAYS FILLS';
   }
 
