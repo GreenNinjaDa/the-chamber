@@ -105,29 +105,42 @@ const HAIR = [0.12, 0.08, 0.05];
 const PACK = [0.35, 0.37, 0.4];
 const BOOT = [0.1, 0.09, 0.08];
 
+/** Colours for drawBody (e.g. other people in the player's body); `pack: null` leaves the backpack off. */
+export interface BodyColors {
+  suit: number[];
+  pants: number[];
+  skin: number[];
+  hair: number[];
+  pack: number[] | null;
+  boot: number[];
+}
+
+export const PLAYER_COLORS: BodyColors = { suit: SUIT, pants: PANTS, skin: SKIN, hair: HAIR, pack: PACK, boot: BOOT };
+
 /**
  * Draws the body from its part frames. `girth` > 1 fattens the torso (wider, and mostly a
- * belly pushing out the front; the backpack stays put).
+ * belly pushing out the front; the backpack stays put). `colors` dresses it as someone else.
  */
-export function drawBody(out: DrawItem[], f: Frames, girth = 1) {
+export function drawBody(out: DrawItem[], f: Frames, girth = 1, colors: BodyColors = PLAYER_COLORS) {
   const rb = (m: Mat4, pos: Vec3, size: Vec3, color: number[]) =>
     out.push({ mesh: 'roundbox', model: mul(m, translation(pos), scaling(size)), color });
   const ball = (m: Mat4, pos: Vec3, size: Vec3, color: number[]) =>
     out.push({ mesh: 'sphere', model: mul(m, translation(pos), scaling(size)), color });
 
+  const c = colors;
   const wide = 1 + (girth - 1) * 0.45, deep = 1 + (girth - 1) * 1.3;
-  rb(f.pelvis, [0, 0, -0.125 * (deep - 1) * 0.6], [0.36 * wide, 0.24, 0.25 * (1 + (deep - 1) * 0.6)], PANTS);
-  rb(f.chest, [0, 0, -0.145 * (deep - 1)], [0.5 * wide, 0.5, 0.29 * deep], SUIT);
-  rb(f.chest, [0, 0.02, 0.19], [0.38, 0.4, 0.14], PACK);
-  ball(f.head, [0, 0, 0], [0.2, 0.23, 0.21], SKIN);
-  ball(f.head, [0, 0.06, 0.03], [0.21, 0.2, 0.22], HAIR);
+  rb(f.pelvis, [0, 0, -0.125 * (deep - 1) * 0.6], [0.36 * wide, 0.24, 0.25 * (1 + (deep - 1) * 0.6)], c.pants);
+  rb(f.chest, [0, 0, -0.145 * (deep - 1)], [0.5 * wide, 0.5, 0.29 * deep], c.suit);
+  if (c.pack) rb(f.chest, [0, 0.02, 0.19], [0.38, 0.4, 0.14], c.pack);
+  ball(f.head, [0, 0, 0], [0.2, 0.23, 0.21], c.skin);
+  ball(f.head, [0, 0.06, 0.03], [0.21, 0.2, 0.22], c.hair);
   for (const s of ['L', 'R'] as const) {
-    rb(f[`upperArm${s}`], [0, 0, 0], [0.15, 0.36, 0.16], SUIT);
-    rb(f[`foreArm${s}`], [0, 0, 0], [0.13, 0.33, 0.14], SUIT);
-    ball(f[`foreArm${s}`], [0, -0.2, 0], [0.075, 0.08, 0.075], SKIN);
-    rb(f[`thigh${s}`], [0, 0, 0], [0.19, 0.46, 0.21], PANTS);
-    rb(f[`shin${s}`], [0, 0, 0], [0.16, 0.43, 0.18], PANTS);
-    rb(f[`shin${s}`], [0, -0.2, -0.05], [0.16, 0.11, 0.28], BOOT);
+    rb(f[`upperArm${s}`], [0, 0, 0], [0.15, 0.36, 0.16], c.suit);
+    rb(f[`foreArm${s}`], [0, 0, 0], [0.13, 0.33, 0.14], c.suit);
+    ball(f[`foreArm${s}`], [0, -0.2, 0], [0.075, 0.08, 0.075], c.skin);
+    rb(f[`thigh${s}`], [0, 0, 0], [0.19, 0.46, 0.21], c.pants);
+    rb(f[`shin${s}`], [0, 0, 0], [0.16, 0.43, 0.18], c.pants);
+    rb(f[`shin${s}`], [0, -0.2, -0.05], [0.16, 0.11, 0.28], c.boot);
   }
 }
 
