@@ -10,7 +10,7 @@ import { Hud, type ScreenLabel, type ScreenMarker } from './game/hud';
 import { Interaction } from './game/interaction';
 import { PauseMenu } from './game/pauseMenu';
 import { Player } from './game/player';
-import { settings } from './game/settings';
+import { markBeaten, settings } from './game/settings';
 import { DartsLevel } from './levels/darts/dartsLevel';
 import { CakeLevel } from './levels/cake/cakeLevel';
 import { ClawLevel } from './levels/claw/clawLevel';
@@ -264,6 +264,7 @@ async function main() {
       // Through an exit portal: from the lobby to the chosen level, then straight on to the next
       // chamber (after the last, back to the lobby).
       if (level.status === 'exited' && !sandbox) {
+        if (!inLobby) markBeaten(levelIndex + 1);
         let finished = false;
         if (inLobby) {
           inLobby = false;

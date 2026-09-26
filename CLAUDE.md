@@ -20,7 +20,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   shrink into it over 0.5 s (`player.shrinkInto`, no control and invulnerable meanwhile) and grow back out of the
   entrance portal over 0.5 s (`player.growFrom`), drawn scaled about the portal's centre.
 - **Lobby** (`src/levels/lobby/`): the main menu is a chamber you walk around in (after the title screen, and via
-  the pause menu). Numbered floor pads pick the level the START portal leads to (step on one), and in the
+  the pause menu). Numbered floor pads pick the level the START portal leads to (step on one; gold-rimmed ones are levels
+  you have got out of, `settings.beaten`, with a tally on the wall), and in the
   south-west corner two buttons change mouse speed and levers invert looking up/down and turn sound off
   (`src/game/settings.ts`, remembered in localStorage). Signs are floating world text
   (`Level.labels()`). **Pause menu** (`src/game/pauseMenu.ts`): Esc, or losing pointer lock (except by tabbing away in the lobby), opens Resume /

@@ -19,6 +19,8 @@ import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type Level
 const PAD_SELECTED: [number, number, number] = [0.35, 1.6, 0.45];
 const PAD_UNDER_FOOT: [number, number, number] = [0.3, 0.32, 0.4];
 const PAD: [number, number, number] = [0.1, 0.11, 0.14];
+/** Pads of levels you've got out of: a gold rim. */
+const PAD_RIM: [number, number, number] = [1.25, 0.9, 0.3];
 /** Level pads: size, spacing and the first row's z (rows run south from the north wall). */
 const PAD_SIZE = 1.9;
 const PAD_SPACING = 2.4;
@@ -69,6 +71,13 @@ export class LobbyLevel implements Level {
       this.pads.push({ x, z, n: i + 1, digits });
     }
     this.fixedLabels.push({ pos: [0, 4.5, -WALL], text: 'PICK YOUR POISON (STAND ON A NUMBER)', size: 0.5, color: '#ffd166' });
+    const beaten = settings.beaten.filter((n) => n <= levelCount).length;
+    this.fixedLabels.push({
+      pos: [0, 3.8, -WALL],
+      text: beaten === 0 ? 'SURVIVED: NONE. YET.' : beaten >= levelCount ? `SURVIVED: ALL ${levelCount}. SHOW-OFF.` : `SURVIVED: ${beaten} / ${levelCount}`,
+      size: 0.4,
+      color: '#ffffff',
+    });
 
     // Settings, in the south-west corner: mouse speed buttons, and levers for inverted look and sound.
     new Button(physics, [SETTINGS_X, 0, 2.2], [0.2, 0.45, 0.9], () => this.changeMouse(1 / 1.2));
@@ -171,6 +180,9 @@ export class LobbyLevel implements Level {
   draw(out: DrawItem[]) {
     for (const pad of this.pads) {
       const picked = pad.n === settings.startLevel;
+      if (settings.beaten.includes(pad.n)) {
+        out.push({ mesh: 'bevelbox', model: mul(translation([pad.x, 0.02, pad.z]), scaling([PAD_SIZE + 0.36, 0.04, PAD_SIZE + 0.36])), color: PAD_RIM, pattern: Pattern.emissive, shadow: false });
+      }
       out.push({
         mesh: 'bevelbox',
         model: mul(translation([pad.x, 0.03, pad.z]), scaling([PAD_SIZE, 0.06, PAD_SIZE])),
