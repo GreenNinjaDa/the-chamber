@@ -31,9 +31,8 @@ const PROTRUDE = 0.34;
 const SINK = 0.1;
 /** Seconds for a thing to squish into place once stuck. */
 const STICK_TIME = 0.16;
-/** How far behind the ball's surface the prince stands (m), and his height to the top of his head. */
+/** How far behind the ball's surface the prince stands (m), and how high his hands push it. */
 const PRINCE_GAP = 0.14;
-export const PRINCE_HEIGHT = 0.62;
 const PRINCE_HANDS = 0.34;
 /** Ball mass: this at the start, growing with its cross-section, up to MAX_MASS (kg). */
 const START_MASS = 30;

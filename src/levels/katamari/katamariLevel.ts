@@ -220,6 +220,8 @@ export class KatamariLevel implements Level {
   private circles: Circle[] = [];
   private noCircles: Circle[] = [];
   private shot: CameraShot = { pos: [0, 0, 0], target: [0, 0, 0], sharpness: 3 };
+  /** Which side of the ball's path the rolled-up camera watches from (0: not chosen yet). */
+  private shotSide = 0;
   private targets: TrackedTarget[] = [];
   private ballTarget: TrackedTarget = { pos: [0, 0, 0], radius: 1 };
   private displayItems: DrawItem[] = [];
@@ -734,7 +736,7 @@ export class KatamariLevel implements Level {
       case 'timeout': this.updateTimeout(); break;
       case 'eaten': this.updateEaten(dt); break;
     }
-    if (this.phase === 'rolling' || this.phase === 'eaten') this.tune.start();
+    if ((this.phase === 'rolling' || this.phase === 'eaten') && this.status === 'playing') this.tune.start();
     else this.tune.stop();
     // A rumble when it's big enough to eat you and bearing down.
     const c = this.kat.centre();
@@ -1135,7 +1137,15 @@ export class KatamariLevel implements Level {
     if (this.phase === 'eaten') {
       const c = this.kat.centre(), R = this.kat.radius, h = this.kat.heading;
       const lim = CHAMBER_HALF - 0.6;
-      shot.pos = [clamp(c[0] - h[0] * (R + 4.5) + h[1] * 2.5, -lim, lim), Math.min(12, c[1] + R * 0.6 + 1.6), clamp(c[2] - h[1] * (R + 4.5) - h[0] * 2.5, -lim, lim)];
+      // From the side of its path (whichever side has more room), so you can watch yourself go round and round.
+      const side = R + 6.5;
+      const room = (s: number) => {
+        const x = c[0] - h[0] * 2 + h[1] * side * s, z = c[2] - h[1] * 2 - h[0] * side * s;
+        return Math.abs(x - clamp(x, -lim, lim)) + Math.abs(z - clamp(z, -lim, lim));
+      };
+      if (this.shotSide === 0 || room(this.shotSide) > room(-this.shotSide) + 2) this.shotSide = room(1) <= room(-1) ? 1 : -1;
+      const s = this.shotSide;
+      shot.pos = [clamp(c[0] - h[0] * 2 + h[1] * side * s, -lim, lim), Math.min(12, c[1] + R * 0.5 + 2.2), clamp(c[2] - h[1] * 2 - h[0] * side * s, -lim, lim)];
       shot.target = c;
       shot.sharpness = 2.5;
       return shot;
