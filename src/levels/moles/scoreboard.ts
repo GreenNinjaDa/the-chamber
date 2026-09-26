@@ -20,6 +20,8 @@ const BULB = [[2.6, 2.0, 0.4], [2.6, 0.4, 0.3]];
 export class Scoreboard {
   /** 0-1: switched on (the LEDs light up in a scattered order). */
   on = 0;
+  /** 0-1: the board unfolds out of the wall (and the mascots rise out of the deck). */
+  appear = 0;
   /** Blink the message line. */
   blink = false;
   private title = new PixelText({ centre: [0, 8.55, Z], right: RIGHT, up: UP, pixel: 0.2, color: [2.6, 2.0, 0.3], depth: 0.05, pattern: Pattern.emissive }, 'WHACK-A-MOLE!');
@@ -62,7 +64,9 @@ export class Scoreboard {
   }
 
   draw(out: DrawItem[], time: number) {
-    for (const it of this.statics) out.push(it);
+    if (this.appear <= 0) return;
+    const first = out.length;
+    for (const it of this.statics) out.push({ ...it });
     if (this.on > 0) {
       for (const p of [this.title, this.score, this.time]) {
         p.reveal = this.on;
@@ -90,9 +94,18 @@ export class Scoreboard {
     for (let y = Y1 - 0.85; y >= Y0 + 0.2; y -= 0.95) bulb(X1 + 0.15, y);
     for (let x = X1; x >= X0 - 0.01; x -= 1) bulb(x, Y0 - 0.15);
     for (let y = Y0 + 0.85; y <= Y1 - 0.2; y += 0.95) bulb(X0 - 0.15, y);
+    if (this.appear < 1) {
+      // Unfolding: squashed flat against the wall to start with, then springing out.
+      const k = this.appear, s = Math.max(0.02, k < 0.7 ? k / 0.7 : 1 + Math.sin(((k - 0.7) / 0.3) * Math.PI) * 0.06);
+      const yc = (Y0 + Y1) / 2;
+      const m = mul(translation([0, yc, Z]), scaling([1, s, 1]), translation([0, -yc, -Z]));
+      for (let i = first; i < out.length; i++) out[i].model = mul(m, out[i].model);
+    }
     // The mascots: giant cool moles cheering either side of the board.
     for (const side of [-1, 1]) {
-      const m = mul(translation([side * 11.0, DECK_TOP, -CHAMBER_HALF + 1.1]), rotationY(Math.PI - side * 0.45), scaling([2.3, 2.3, 2.3]));
+      const rise = Math.min(1, this.appear * 1.2);
+      const y = DECK_TOP - 3.7 * (1 - rise) * (1 - rise);
+      const m = mul(translation([side * 11.0, y, -CHAMBER_HALF + 1.1]), rotationY(Math.PI - side * 0.45), scaling([2.3, 2.3, 2.3]));
       drawMole(out, m, MOLE_LOOKS[0], { dazed: 0, armsUp: 1, walk: 0, walking: 0, time: time + side, flash: 0 });
     }
   }

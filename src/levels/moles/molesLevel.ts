@@ -27,6 +27,8 @@ import { Scoreboard } from './scoreboard';
 const H = CHAMBER_HALF;
 /** The hole you land on and drop through: (-2.5, 0). */
 const SPAWN_HOLE = 1 * HOLE_COLS + 1;
+/** When the plain-looking floor boots up into the arcade (level time). */
+const BOOT_AT = 2.0;
 const CARROTS_NEEDED = 5;
 const CARROTS_ON_DECK = 2;
 const ROUND_TIME = 40;
@@ -48,7 +50,9 @@ const GRAB_TIME = 0.16;
 const HIT_LINE = DECK_TOP + 0.03;
 const MOLE_COUNT = 5;
 const MOLE_SPEED = 2.4;
-const DEATH_SCREEN_DELAY = 2.5;
+const DEATH_SCREEN_DELAY = 2.6;
+/** How long you lie flattened on the hole before slipping down it. */
+const PANCAKE_SHOW = 1.5;
 /** Carrot geometry: its top (leaf end) this far from the hole centre, and its length. */
 const CARROT_IN = 1.18;
 const CARROT_LEN = 1.15;
@@ -56,6 +60,8 @@ const CARROT_R = 0.17;
 
 /** The mallet's pace, from calm (heat 0) to frantic (heat 1): [calm, frantic]. */
 const REACTION = [0.45, 0.2];
+/** Up longer than this and you're his target, however many moles pop up after you. */
+const PATIENCE = [2.0, 1.1];
 const TRAVEL_SPEED = [11, 19];
 const WINDUP = [0.62, 0.36];
 const SMASH = [0.12, 0.085];
@@ -110,6 +116,8 @@ interface Pop {
   grabQueued: boolean;
   /** The mallet was already coming for this hole when they popped up. */
   intoRing: boolean;
+  /** The camera's yaw and pitch in the burrow, to go back to. */
+  view: [number, number];
 }
 
 interface Death {
@@ -155,7 +163,8 @@ export class MolesLevel implements Level {
   /** Who is using each hole's pad: a mole's index, 'player', or nobody. */
   private holeUser: (number | 'player' | null)[] = HOLES.map(() => null);
   private pop: Pop | null = null;
-  private drop: { t: number; from: Vec3; hole: number } | null = null;
+  private drop: { t: number; from: Vec3; hole: number; slide: number } | null = null;
+  private dropWait = 0;
   private ms = {
     state: 'away' as 'away' | 'idle' | 'travel' | 'windup' | 'smash' | 'impact' | 'recover' | 'rest',
     t: 0,
@@ -214,8 +223,11 @@ export class MolesLevel implements Level {
     this.giant.root = [0, -80, 27];
     this.giant.leanTarget = this.giant.lean = 0.3;
     this.giant.rightCurl = 1.2;
+    // Timmy starts out of sight below the south wall, mallet and all.
     this.mallet.aim = [2, DECK_TOP, 15];
     this.mallet.from = normalize([-2, 0, -9]);
+    this.mallet.swing = 0.8;
+    this.mallet.lift = 4 + this.giant.root[1];
     this.giant.update(0, this.mallet.grip());
     const params = new URLSearchParams(location.search);
     this.collected = Math.min(CARROTS_NEEDED - 1, Math.max(0, Number(params.get('moleCarrots')) || 0));
@@ -263,7 +275,7 @@ export class MolesLevel implements Level {
         this.status = 'lost';
         hud.show(death.big, `${death.small}\nPress R to try again.`);
         hud.tips([
-          ['Hint', 'Pop up where the mallet isn’t (watch for its shadow and the red ring; under a hole, a red pad means it’s coming), grab a carrot, get back down. The other moles are your decoys: pop up just as he goes for one.'],
+          ['Hint', 'Pop up where the mallet isn’t (a red ring on a hole, or a red light round the pad under it, means it’s coming), grab a carrot, duck. The other moles are decoys: pop up just as he goes for one. Don’t hang about up there.'],
           ['Controls', 'WASD move · Space (hold) pop up · E or click grab · let go of Space to duck'],
         ]);
       }
@@ -288,20 +300,30 @@ export class MolesLevel implements Level {
     const board = this.board;
     // The floor boots up while you're still picking yourself up, then drops you in.
     if (this.phase === 'intro') {
-      const boot = this.t - 1.55;
+      const boot = this.t - BOOT_AT;
+      if (boot >= 0 && boot - dt < 0) {
+        // Power on: a clunk and a rising whirr.
+        tone(70, 0.3, { to: 45, wave: 'square', vol: 0.15 });
+        noise(0.9, { freq: 200, to: 2500, type: 'bandpass', q: 2, vol: 0.15 });
+      }
       for (let b = 0; b < this.cabinet.bandCount; b++) {
         if (boot >= b * 0.13 && !this.cabinet.isBooted(b)) {
           this.cabinet.boot(b);
           tone(260 + b * 70, 0.08, { wave: 'square', vol: 0.07 });
           if (b === this.cabinet.bandCount - 1) {
-            noise(0.4, { freq: 300, to: 3000, type: 'bandpass', q: 2, vol: 0.2 });
+            this.jingle(['C5', 'G5', 'E5', 'C6'], 0.07);
             for (let k = 0; k < CARROTS_ON_DECK; k++) this.spawnCarrot();
           }
         }
       }
-      if (this.arrival.done && this.cabinet.fullyBooted) this.startDrop();
+      board.appear = clamp((boot - 0.1) / 0.45, 0, 1);
+      // A moment to take it all in, then the floor gives way.
+      if (this.arrival.done && this.cabinet.fullyBooted) {
+        this.dropWait += dt;
+        if (this.dropWait > 0.7) this.startDrop();
+      }
     }
-    if (this.t > 2.45) board.on = Math.min(1, board.on + dt * 1.6);
+    if (this.t > BOOT_AT + 0.6) board.on = Math.min(1, board.on + dt * 1.6);
     if (this.phase === 'drop') this.updateDrop(dt);
     if (this.phase === 'intro' || this.phase === 'drop') {
       board.setMessage('INSERT COIN');
@@ -402,7 +424,10 @@ export class MolesLevel implements Level {
     noise(0.35, { freq: 1500, to: 300, type: 'bandpass', q: 1.5, vol: 0.3 });
     tone(90, 0.25, { to: 50, wave: 'square', vol: 0.12 });
     const hole = this.nearestHole(player.pos, 99);
-    this.drop = { t: 0, from: [...player.pos], hole };
+    // If they've wandered off it, the hole sucks them back over (it's that kind of hole).
+    const dist = Math.hypot(player.pos[0] - HOLES[hole][0], player.pos[2] - HOLES[hole][2]);
+    this.drop = { t: 0, from: [...player.pos], hole, slide: 0.2 + dist * 0.08 };
+    if (dist > 1) noise(0.3 + dist * 0.08, { freq: 600, to: 2400, type: 'bandpass', q: 3, vol: 0.2 });
     player.mode = 'swinging';
     player.vel = [0, 0, 0];
     player.cancelJump();
@@ -414,8 +439,8 @@ export class MolesLevel implements Level {
     if (!d) return;
     d.t += dt;
     const h = HOLES[d.hole];
-    const HANG = 0.4;
-    const slide = ease(clamp(d.t / 0.25, 0, 1));
+    const HANG = d.slide + 0.3;
+    const slide = ease(clamp(d.t / d.slide, 0, 1));
     const fall = Math.max(0, d.t - HANG);
     const y = Math.max(0, d.from[1] - 0.5 * 22 * fall * fall);
     player.pos = [lerp(d.from[0], h[0], slide), y, lerp(d.from[2], h[2], slide)];
@@ -479,6 +504,9 @@ export class MolesLevel implements Level {
         pop.state = 'sink';
         pop.t = 0;
         tone(750, 0.16, { to: 210, wave: 'sine', vol: 0.16 });
+        // Back down to the view you had in the burrow.
+        camera.yaw = pop.view[0];
+        camera.pitch = pop.view[1];
       }
     } else {
       const k = clamp(pop.t / SINK_TIME, 0, 1);
@@ -499,7 +527,7 @@ export class MolesLevel implements Level {
   }
 
   private startPop(h: number) {
-    const { player } = this.ctx;
+    const { player, camera } = this.ctx;
     player.mode = 'swinging';
     player.vel = [0, 0, 0];
     player.cancelJump();
@@ -507,8 +535,11 @@ export class MolesLevel implements Level {
     const committed = this.ms.hole === h && (this.ms.state === 'travel' || this.ms.state === 'windup' || this.ms.state === 'smash');
     this.pop = {
       hole: h, state: 'rise', t: 0, from: [player.pos[0], 0, player.pos[2]], since: this.t, upTime: 0,
-      grab: null, holding: false, grabQueued: false, intoRing: committed,
+      grab: null, holding: false, grabQueued: false, intoRing: committed, view: [camera.yaw, camera.pitch],
     };
+    // Up top, you face Timmy: the view swings round to the south (the burrow's view comes back when you duck).
+    camera.yaw = Math.PI;
+    camera.pitch = -0.2;
     tone(240, 0.12, { to: 720, wave: 'sine', vol: 0.25 });
     tone(110, 0.25, { to: 160, wave: 'triangle', vol: 0.14, at: 0.02 });
     noise(0.06, { freq: 3000, to: 800, vol: 0.15 });
@@ -849,14 +880,19 @@ export class MolesLevel implements Level {
 
   // --- Timmy and his mallet -------------------------------------------------------------------------
 
-  /** The newest thing sticking out of a hole: you or a mole. */
+  /**
+   * What Timmy goes for: the newest thing sticking out of a hole (you or a mole), unless you've
+   * been up so long he can't help noticing you.
+   */
   private newestTarget(): { hole: number; since: number } | null {
+    const pop = this.pop;
+    const up = pop && !this.death && (pop.state === 'rise' || pop.state === 'up');
+    if (up && this.t - pop.since > this.tune01(PATIENCE)) return { hole: pop.hole, since: pop.since };
     let best: { hole: number; since: number } | null = null;
     for (const n of this.moles) {
       if ((n.state === 'rise' || n.state === 'up') && (!best || n.since > best.since)) best = { hole: n.hole, since: n.since };
     }
-    const pop = this.pop;
-    if (pop && !this.death && (pop.state === 'rise' || pop.state === 'up') && (!best || pop.since >= best.since)) best = { hole: pop.hole, since: pop.since };
+    if (up && (!best || pop.since >= best.since)) best = { hole: pop.hole, since: pop.since };
     return best;
   }
 
@@ -982,7 +1018,7 @@ export class MolesLevel implements Level {
         if (ms.t >= ms.dur + (this.pancake && this.pancake.t < 1 ? 0.45 : 0)) {
           ms.state = 'recover';
           ms.t = 0;
-          ms.dur = this.tune01(RECOVER) * (this.pancake ? 2 : 1);
+          ms.dur = this.tune01(RECOVER);
         }
         break;
       }
@@ -991,18 +1027,19 @@ export class MolesLevel implements Level {
         mal.swing = lerp(0, 0.55, u);
         mal.lift = lerp(0, 0.9, u);
         if (u >= 1) {
-          ms.state = 'idle';
+          // Got you: he holds it up out of the way to admire his work.
+          ms.state = this.death ? 'rest' : 'idle';
           ms.t = 0;
           ms.hole = -1;
         }
         break;
       }
       case 'rest': {
-        // Held up out of the way while he looks for a coin.
-        aimTo([1, DECK_TOP, 4.5], 5);
+        // Held up out of the way (by the south wall) while he looks for a coin, or gloats.
+        aimTo([1, DECK_TOP, 8.5], 8);
         mal.swing += (0.75 - mal.swing) * k(3);
-        mal.lift += (2.5 - mal.lift) * k(3);
-        if (this.phase !== 'break') {
+        mal.lift += (3.5 - mal.lift) * k(3);
+        if (this.phase !== 'break' && !this.death) {
           ms.state = 'idle';
           ms.t = 0;
         }
@@ -1150,11 +1187,8 @@ export class MolesLevel implements Level {
     const pc = this.pancake;
     if (pc) {
       pc.t += dt;
-      // After a moment on show, the pancake slides down the hole like a coin into a slot.
-      if (pc.t > 1.35) {
-        if (pc.t - dt <= 1.35) tone(1100, 0.5, { to: 180, wave: 'sine', vol: 0.14 });
-        pc.feet[1] = DECK_TOP - 0.28 - (pc.t - 1.35) * 5;
-      }
+      // After a moment on show, the pancake slips down the hole (slide whistle).
+      if (pc.t > PANCAKE_SHOW && pc.t - dt <= PANCAKE_SHOW) tone(1100, 0.6, { to: 160, wave: 'sine', vol: 0.15 });
     }
     // The on-screen carrot count, pinned near the top of the view once you've got one.
     this.counterLabel.text = this.collected > 0 && !this.death && this.phase !== 'won' ? `CARROTS ${this.collected}/${CARROTS_NEEDED}` : '';
@@ -1179,7 +1213,7 @@ export class MolesLevel implements Level {
         g[0] = 3.2 * on; g[1] = 0.22 * on; g[2] = 0.12 * on;
       } else if (this.carrots.some((c) => c.hole === h)) {
         const p = 0.7 + 0.3 * Math.sin(this.t * 5);
-        g[0] = 2.4 * p; g[1] = 1.0 * p; g[2] = 0.12 * p;
+        g[0] = 2.8 * p; g[1] = 0.75 * p; g[2] = 0.05 * p;
       } else {
         g[0] = PAD_IDLE[0]; g[1] = PAD_IDLE[1]; g[2] = PAD_IDLE[2];
       }
@@ -1229,17 +1263,22 @@ export class MolesLevel implements Level {
     const pc = this.pancake;
     if (pc) {
       // Looking down at the pancake (and then down the hole after it).
-      const back: Vec3 = [Math.sin(camera.yaw), 0, Math.cos(camera.yaw)];
+      // From the north (the mallet comes and goes on the south side), looking down at it.
       const hole: Vec3 = [pc.feet[0], DECK_TOP, pc.feet[2]];
-      const pos: Vec3 = [clamp(hole[0] + back[0] * 3.6, -H + 0.5, H - 0.5), DECK_TOP + 3.3, clamp(hole[2] + back[2] * 3.6, -H + 0.5, H - 0.5)];
-      return { pos, target: add(hole, [0, 0.1, 0]), sharpness: 4 };
+      const side = hole[0] > 0 ? -1 : 1;
+      const pos: Vec3 = [hole[0] + side * 0.9, DECK_TOP + 3.0, Math.max(-H + 0.5, hole[2] - 3.1)];
+      return { pos, target: add(hole, [0, -0.1, 0.5]), sharpness: 3 };
     }
     const cp = Math.cos(camera.pitch), sp = Math.sin(camera.pitch);
     const fwd: Vec3 = [-Math.sin(camera.yaw) * cp, sp, -Math.cos(camera.yaw) * cp];
     const right: Vec3 = [Math.cos(camera.yaw), 0, -Math.sin(camera.yaw)];
     const feet = player.pos;
-    const shoulder = add(add(feet, [0, 1.65, 0]), scale(right, 0.6));
-    const pos = sub(shoulder, scale(fwd, 3.2));
+    const pop = this.pop;
+    const wantUp = this.phase === 'intro' || (this.drop !== null && this.drop.t < this.drop.slide + 0.36) || (pop !== null && pop.state !== 'sink');
+    // Popped up: further back and higher, so the hole, the mallet and Timmy all fit in the view.
+    const popped = pop !== null && pop.state !== 'sink';
+    const shoulder = add(add(feet, [0, popped ? 3.4 : 1.65, 0]), scale(right, popped ? 0.2 : 0.6));
+    const pos = sub(shoulder, scale(fwd, popped ? 7.2 : 3.2));
     const lim = H - 0.3;
     const cx = clamp(pos[0], -lim, lim), cz = clamp(pos[2], -lim, lim);
     const pushed = Math.hypot(pos[0] - cx, pos[2] - cz);
@@ -1247,8 +1286,6 @@ export class MolesLevel implements Level {
     pos[2] = cz;
     pos[1] += pushed * 0.8;
     // Up on the deck (arriving, or popped up), or down in the burrow.
-    const pop = this.pop;
-    const wantUp = this.phase === 'intro' || (this.drop !== null && this.drop.t < 0.45) || (pop !== null && pop.state !== 'sink');
     if (wantUp) pos[1] = Math.max(pos[1], DECK_TOP + 0.55);
     else pos[1] = clamp(pos[1], 0.35, UNDER - 0.22);
     // Changing sides (popping up, ducking, dropping in): cut straight to the other side of the deck.
@@ -1300,17 +1337,6 @@ export class MolesLevel implements Level {
       const c = [3.0 * pulse + 0.4, 0.15, 0.1];
       out.push({ mesh: 'tube', model: mul(translation([hc[0], DECK_TOP + RIM_H + 0.015, hc[2]]), scaling([1.78, 0.03, 1.78])), color: c, pattern: Pattern.emissive, shadow: false });
       out.push({ mesh: 'tube', model: mul(translation([hc[0], UNDER - 0.02, hc[2]]), scaling([1.05, 0.03, 1.05])), color: c, pattern: Pattern.emissive, shadow: false });
-    }
-    // The head's shadow, straight down on the deck: darker the closer it gets.
-    if (this.ms.state !== 'away') {
-      const face = this.mallet.face();
-      const hgt = face[1] - DECK_TOP;
-      if (hgt > -0.5 && hgt < 12) {
-        const c = this.mallet.headCentre();
-        const k = clamp(1 - hgt / 9, 0.15, 1);
-        const r = MALLET_HEAD_R * (1.35 - 0.3 * k);
-        out.push({ mesh: 'cylinder', model: mul(translation([c[0], DECK_TOP + RIM_H + 0.01, c[2]]), scaling([r, 0.01, r])), color: [0, 0, 0], pattern: Pattern.blob, param: 0.35 + 0.5 * k, shadow: false });
-      }
     }
   }
 
@@ -1370,17 +1396,29 @@ export class MolesLevel implements Level {
     }
   }
 
+  /**
+   * You, flattened: a person-shaped pancake lying spread-eagled over the hole with stars going
+   * round, which then tips up and slips down the hole like a letter into a letterbox.
+   */
   private drawPancake(out: DrawItem[]) {
     const pc = this.pancake;
-    if (!pc || pc.feet[1] < DECK_TOP - 2.2) return;
+    if (!pc) return;
+    const t = pc.t;
+    const tip = clamp((t - PANCAKE_SHOW) / 0.25, 0, 1);
+    const fall = Math.max(0, t - PANCAKE_SHOW - 0.25);
+    const y = lerp(DECK_TOP + RIM_H + 0.05, DECK_TOP - 0.35, ease(tip)) - 7 * fall * fall;
+    if (y < DECK_TOP - 3.5) return;
     const first = out.length;
-    const pose: Pose = { lean: 0, headPitch: 0.2, shoulderL: 0, shoulderR: 0, armOut: 1.45, elbowL: 0.05, elbowR: 0.05, hipL: 0.1, hipR: -0.1, kneeL: 0, kneeR: 0 };
-    drawBody(out, poseFrames(standingRoot(pc.feet, pc.facing), pose));
-    // Flattened about the feet, and spread out over the rim.
-    const f = pc.feet;
-    const squash = mul(translation(f), scaling([1.75, 0.24, 1.75]), translation([-f[0], -f[1], -f[2]]));
-    for (let i = first; i < out.length; i++) out[i].model = mul(squash, out[i].model);
-    drawDazedStars(out, [f[0], f[1] + 0.75, f[2]], 0.75, this.t, 0.18);
+    const pose: Pose = { lean: 0, headPitch: 0, shoulderL: 0.15, shoulderR: 0.15, armOut: 1.35, elbowL: 0.05, elbowR: 0.05, hipL: 0.15, hipR: -0.15, kneeL: 0, kneeR: 0 };
+    drawBody(out, poseFrames(translation([0, -0.98, 0]), pose));
+    // Lying face up (head away from the camera, which looks on from the north), squashed thin.
+    const centre: Vec3 = [pc.feet[0], y, pc.feet[2]];
+    const w = mul(translation(centre), rotationX((Math.PI / 2) * (1 - tip)), scaling([1.25, 1.15, 0.22]));
+    for (let i = first; i < out.length; i++) out[i].model = mul(w, out[i].model);
+    if (tip < 1) {
+      const head: Vec3 = [centre[0], centre[1] + 0.25, centre[2] + 0.85 * (1 - tip)];
+      drawDazedStars(out, head, 0.55, this.t, 0.22);
+    }
   }
 
   // --- Level interface bits -----------------------------------------------------------------------

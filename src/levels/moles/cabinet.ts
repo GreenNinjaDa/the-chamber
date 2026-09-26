@@ -63,6 +63,8 @@ export class Cabinet {
   private booted: boolean[] = [];
   /** The rest of the deck, the burrow and its props: drawn as they are. */
   private statics: DrawItem[] = [];
+  /** Arcade trim on the walls, shown once the deck boots. */
+  private trim: DrawItem[] = [];
   private lidColliders: RAPIER.Collider[] = [];
   /** 0 = shut, 1 = open. */
   lidOpen = 0;
@@ -189,9 +191,9 @@ export class Cabinet {
     // Arcade trim above the deck: coloured stripes round the walls.
     for (const [y0, y1, color] of [[3.25, 3.55, [0.9, 0.1, 0.12]], [3.68, 3.82, [1, 0.78, 0.1]]] as [number, number, number[]][]) {
       const ym = (y0 + y1) / 2, hh = y1 - y0;
-      s.push({ mesh: 'box', model: mul(translation([0, ym, H - 0.02]), scaling([H * 2, hh, 0.04])), color, spec: 0.3 });
-      s.push({ mesh: 'box', model: mul(translation([-H + 0.02, ym, 0]), scaling([0.04, hh, H * 2])), color, spec: 0.3 });
-      s.push({ mesh: 'box', model: mul(translation([H - 0.02, ym, 0]), scaling([0.04, hh, H * 2])), color, spec: 0.3 });
+      this.trim.push({ mesh: 'box', model: mul(translation([0, ym, H - 0.02]), scaling([H * 2, hh, 0.04])), color, spec: 0.3 });
+      this.trim.push({ mesh: 'box', model: mul(translation([-H + 0.02, ym, 0]), scaling([0.04, hh, H * 2])), color, spec: 0.3 });
+      this.trim.push({ mesh: 'box', model: mul(translation([H - 0.02, ym, 0]), scaling([0.04, hh, H * 2])), color, spec: 0.3 });
     }
   }
 
@@ -241,6 +243,7 @@ export class Cabinet {
   draw(out: DrawItem[], time: number) {
     for (const band of this.bands) for (const it of band) out.push(it);
     for (const it of this.statics) out.push(it);
+    if (this.booted[0]) for (const it of this.trim) out.push(it);
     // Rims pop up out of the deck as their band boots; lids shrink away when the holes open.
     for (let i = 0; i < HOLES.length; i++) {
       const [x, , z] = HOLES[i];
@@ -257,7 +260,7 @@ export class Cabinet {
         const booted = age >= 0;
         out.push({
           mesh: 'cylinder',
-          model: mul(translation([x, DECK_TOP - SKIN / 2 + 0.004, z]), rotationY(this.lidOpen * 3), scaling([HOLE_R * lid, SKIN + 0.008, HOLE_R * lid])),
+          model: mul(translation([x, DECK_TOP - SKIN / 2, z]), rotationY(this.lidOpen * 3), scaling([HOLE_R * lid, SKIN, HOLE_R * lid])),
           color: booted ? LID : GREY,
           pattern: booted ? Pattern.plain : Pattern.panels,
           param: booted ? 0 : 2,
@@ -309,7 +312,7 @@ export class Cabinet {
       }
       out.push({ mesh: 'cylinder', model: mul(translation([x, y + 0.05, z]), scaling([0.7, 0.1, 0.7])), color: METAL, spec: 0.7 });
       // Hazard stripes round the edge of the pad's top.
-      out.push({ mesh: 'tube', model: mul(translation([x, y + 0.102, z]), scaling([0.66, 0.006, 0.66])), color: [0.95, 0.72, 0.08], shadow: false });
+      out.push({ mesh: 'tube', model: mul(translation([x, y + 0.102, z]), scaling([0.66, 0.006, 0.66])), color: [0.62, 0.62, 0.58], spec: 0.6, shadow: false });
       out.push({ mesh: 'cylinder', model: mul(translation([x, y + 0.103, z]), scaling([0.3, 0.004, 0.3])), color: [0.2, 0.2, 0.22], shadow: false });
     }
   }
