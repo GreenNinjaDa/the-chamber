@@ -93,6 +93,14 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   the duck...) in time, and never what he didn't (plain orders, "SIMEON SAYS", "SIMON SAID", "AGAIN."). Any mistake
   and the floor panel under you is a catapult. It ends with Simon's memory game (step on the pads in the order they
   lit, twice), then "LEAVE." (the exit refuses you, fatally) before "SIMON SAYS: LEAVE."
+- **Level 7 — Magnifying Glass** (`src/levels/sunburn/`): the giant is back, with a magnifying glass, and you're the
+  ant. A day passes in ~80 s: the sun (`Environment.sunDir`, light colours) rises in the east, lingers overhead and
+  sets in the west, so the shade moves: along the east wall in the morning, nothing but umbrellas at noon, the west
+  wall in the afternoon. The burning spot is a real ray down the sun's direction from the lens to his aim point: it
+  lands on the first thing in its way (smoke), and 1 s of it on your body sets you on fire (`player.char`). He
+  chases where you're heading (faster than a sprint at noon, but turning sluggishly: dodge it), and while you hide he
+  burns things out in the sun (the duck melts, the beach ball pops, umbrellas, boxes and the mattress burn away) or
+  lurks at the edge of your shade. At dusk his mum calls him in for dinner and the exit opens.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -168,6 +176,7 @@ Shared mechanics available to levels (via `ctx`):
   physics world's gravity to match with `physics.setGravityDirection(down)`. `player.up` is their current up.
 - `DrawItem.opacity` (0-1) and `player.opacity` draw things see-through (alpha-to-coverage screen-door, still
   casting shadows).
+- `player.char` (0-1) draws the player burnt to a crisp (this life only).
 - `player.torchArm` raises the right arm up and ahead as if holding a torch (the level draws the torch).
 - `player.resume(velocity)` puts the player back in normal control after a scripted mode; `player.partFrames()`
   gives each body part's frame (e.g. to put a torch in the right hand, `foreArmR`).

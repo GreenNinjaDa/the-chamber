@@ -185,6 +185,8 @@ export class Player {
   torchArm = false;
   /** How solid the player is drawn (1 = solid; less is see-through). */
   opacity = 1;
+  /** How burnt the player looks, 0 (not at all) to 1 (charcoal); for this life only. */
+  char = 0;
   /** Torso fatness for this life only (1 = normal); reset() puts it back. */
   girth = 1;
   /** Multiplies walking / sprinting speed and acceleration, for this life only. */
@@ -218,6 +220,7 @@ export class Player {
     this.hanging = false;
     this.torchArm = false;
     this.opacity = 1;
+    this.char = 0;
   }
 
   /**
@@ -767,6 +770,12 @@ export class Player {
       drawBody(out, poseFrames(this.scriptedRoot(), this.pose), this.girth);
     }
     if (this.opacity < 1) for (let i = start; i < out.length; i++) out[i].opacity = this.opacity;
+    if (this.char > 0) {
+      for (let i = start; i < out.length; i++) {
+        const c = out[i].color, k = Math.min(1, this.char);
+        out[i].color = [c[0] + (0.05 - c[0]) * k, c[1] + (0.04 - c[1]) * k, c[2] + (0.035 - c[2]) * k];
+      }
+    }
     // Going through a portal: squeeze everything toward the portal's centre.
     if (this.portalScale < 0.999) {
       const p = this.portalPivot, s = this.portalScale;
