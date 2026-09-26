@@ -57,6 +57,8 @@ const G = 20 * FLIGHT_GRAVITY;
 /** A bird is deadly while faster than this (m/s); Terence at any real speed. */
 const LETHAL_SPEED = 6;
 const TERENCE_LETHAL_SPEED = 2.5;
+/** Linear damping on Terence once he's landed, so he rolls a few metres and stops. */
+const TERENCE_DRAG = 1.1;
 /** A sudden speed change (m/s in one physics step) that counts as hitting something. */
 const BIRD_IMPACT_DV = 2.5;
 const BLOCK_EVENT_DV = 1.2;
@@ -68,8 +70,9 @@ const DASH_AT = 0.5;
 const DASH_SPEED = 27;
 /** He hangs in mid-air this long first (s): the tell. He zooms at where you were when he stopped. */
 const DASH_PAUSE = 0.35;
-/** Bomb's fuse after he lands (s). */
+/** Bomb's fuse after he lands (s), and the drag that stops him rolling after you. */
 const BOMB_FUSE = 2.2;
+const BOMB_DRAG = 3;
 /** After a shot's birds have all landed, wait this long (s) before the next one hops in. */
 const SETTLE = 1.4;
 /** TNT: seconds from being set off to going off (chains ripple). */
@@ -107,6 +110,8 @@ interface ShotSpec {
   error: number;
   /** Lobs over cover when the flat arc would hit something first. */
   smart?: boolean;
+  /** Death-screen hint when this one pops you (else the kind's). */
+  hint?: string;
 }
 
 const SHOTS: ShotSpec[] = [
@@ -114,7 +119,10 @@ const SHOTS: ShotSpec[] = [
   { kind: 'blues', bird: 'blue', name: 'THE BLUES', quip: "We're on a mission from God.", color: '#7ab8ff', flight: 2.1, lead: 0.35, error: 0.4 },
   { kind: 'chuck', bird: 'chuck', name: 'CHUCK', quip: 'I feel the need. The need for speed.', color: '#ffd84a', flight: 2.0, lead: 0.4, error: 0.3 },
   { kind: 'bomb', bird: 'bomb', name: 'BOMB', quip: 'Has a short fuse. Literally.', color: '#c8c8d0', flight: 2.1, lead: 0.7, error: 0.6 },
-  { kind: 'red', bird: 'red', name: 'RED AGAIN', quip: "I'll be back. (He's back.)", color: '#ff5a4a', flight: 1.9, lead: 1, error: 0.25, smart: true },
+  {
+    kind: 'red', bird: 'red', name: 'RED AGAIN', quip: "I'll be back. (He's back.)", color: '#ff5a4a', flight: 1.9, lead: 1, error: 0.25, smart: true,
+    hint: "Red aims where you're going now, and lobs over walls. Change direction (or stop) when he lets go, or get under a roof.",
+  },
   { kind: 'terence', bird: 'terence', name: 'TERENCE', quip: '...', color: '#ff8a7a', flight: 2.5, lead: 0.85, error: 0.4 },
 ];
 
@@ -133,10 +141,10 @@ const POPPED_QUIPS: Record<ShotKind, string[]> = {
 };
 const HINTS: Record<ShotKind, string> = {
   red: 'They shoot from the west. Put something heavy between you and the slingshot, and move when you see where it\'s aiming.',
-  blues: 'The Blues split in three halfway there. Get well clear sideways, or behind something solid.',
-  chuck: 'Chuck zooms straight at where you ARE when he speeds up. Keep moving, or keep stone between you and him.',
+  blues: 'The Blues split in three halfway there and fan out sideways. Step toward or away from the slingshot instead, or get under something solid.',
+  chuck: 'When Chuck stops dead in mid-air, he zooms straight at where you are. Move the moment he stops, or keep stone between you.',
   bomb: 'They shoot from the west. Put something heavy between you and the slingshot, and move when you see where it\'s aiming.',
-  terence: 'Nothing stops Terence, least of all your fortress. Watch where he\'s aimed and get out of the way.',
+  terence: "Nothing stops Terence, least of all your fortress, and he keeps rolling once he lands. Sidestep him; don't run away down his path.",
 };
 
 const pick = <T>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
@@ -335,6 +343,8 @@ interface Flyer {
   blink: number;
   /** Seconds it can't hurt the pig (they're carrying it, or just threw it). */
   grace: number;
+  /** Speed last frame (what it hit the pig with, before bouncing off). */
+  prevSpeed: number;
 }
 
 interface Death {
@@ -800,7 +810,7 @@ export class BirdsLevel implements Level {
     const f: Flyer = {
       shot, bird, r, body, prev: [...pos], lastVel: [...vel], age: 0, flight, landed: -1, justLanded: false, frame,
       trailT: 0, trailBig: true, split: false, charge: -1, dashTarget: [0, 0, 0], dashing: false, fuse: -1, gone: false, blink: rand(1, 3),
-      grace: 0,
+      grace: 0, prevSpeed: length(vel),
     };
     this.flyers.push(f);
     return f;
@@ -903,11 +913,18 @@ export class BirdsLevel implements Level {
         f.justLanded = false;
         this.feathers(pos, f.bird, f.bird === 'terence' ? 12 : 5);
         if (f.bird === 'terence') {
+          // He ploughs on, but not all the way across the room.
+          f.body.rb.setLinearDamping(TERENCE_DRAG);
           camera.addShake(Math.max(0.3, 1.2 - length(sub(player.pos, pos)) / 20));
           sfx.thud(0.9);
           for (let i = 0; i < 14; i++) this.dust(add(pos, [rand(-1.5, 1.5), -f.r + 0.3, rand(-1.5, 1.5)]), DUST, 0.6);
         } else sound.knock(1);
-        if (f.bird === 'bomb') f.fuse = BOMB_FUSE;
+        if (f.bird === 'bomb') {
+          // Lit, and he stays put (more or less) so you can run from him.
+          f.fuse = BOMB_FUSE;
+          f.body.rb.setLinearDamping(BOMB_DRAG);
+          f.body.rb.setAngularDamping(BOMB_DRAG);
+        }
       }
 
       if (f.landed < 0) {
@@ -941,8 +958,14 @@ export class BirdsLevel implements Level {
       }
 
       // Hitting the pig: tested along the whole step, fast birds skip a lot.
+      // Deadly in flight; once they've hit something they only knock you about (the engine does
+      // that), except Terence, who flattens whatever he rolls over.
       f.grace = Math.max(0, f.grace - dt);
-      const lethal = f.grace <= 0 && speed > (f.bird === 'terence' ? TERENCE_LETHAL_SPEED : LETHAL_SPEED);
+      // (The frame it first hits something still counts: that something may be the pig.)
+      // Speed going in, not bouncing off.
+      const hitSpeed = Math.max(speed, f.prevSpeed);
+      f.prevSpeed = speed;
+      const lethal = f.grace <= 0 && (f.bird === 'terence' ? hitSpeed > TERENCE_LETHAL_SPEED : f.landed < 0.1 && hitSpeed > LETHAL_SPEED);
       if (alive && frames && lethal && !this.death) {
         for (const name of PART_NAMES) {
           const m = frames[name];
@@ -1034,7 +1057,7 @@ export class BirdsLevel implements Level {
     this.addScore(PIG_POINTS, chest, '#7dde4a');
     this.cheer();
     const kind = f.shot.kind;
-    this.die('POPPED', pick(POPPED_QUIPS[kind]), HINTS[kind]);
+    this.die('POPPED', pick(POPPED_QUIPS[kind]), f.shot.hint ?? HINTS[kind]);
   }
 
   private squashed(vel: Vec3) {
