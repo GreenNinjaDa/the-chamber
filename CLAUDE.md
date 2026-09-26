@@ -455,6 +455,28 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   OVER, naming the ghost). All pellets eaten: the maze flashes, sinks, and the exit opens; the last 3 pellets get
   purple markers. Score and an unbeatable HIGH SCORE (3,333,360) on the north wall; no looking up while the maze
   is up (keeps the camera above the walls).
+- **Level 40 — Whack-a-Mole** (`src/levels/moles/`; deck and burrow in `cabinet.ts`, the backboard in `scoreboard.ts`):
+  you're the mole. You land on what looks like the usual floor; it boots up band by band into the top of an arcade
+  cabinet (a blue deck 3 m up, wall to wall, fixed colliders, a 4 x 3 grid of yellow-ringed holes, chasing bulbs, the
+  WHACK-A-MOLE! backboard on the north wall with Timmy's SCORE, a TIME and a message line, two giant mascot moles), the
+  lids iris open and the hole under you drops you (after a cartoon hang) into the burrow: dirt, roots, pit props,
+  glowing mushrooms, a lantern glow round you (`pointLight`; darker ambient while the camera is down there), sunlight
+  through the holes, and four other moles (`entities/mole.ts`) who waddle along the grid lines between piston pads under
+  the holes and pop up (crouching first). Timmy (the giant) rises over the south wall with a huge rubber mallet
+  (`entities/mallet.ts`; a raked handle keeps his hand well above the deck). Space under a hole pops you up (scripted:
+  `player.mode = 'swinging'` with a `poseOverride`; the view cuts to a pulled-back one facing Timmy), hold it to stay up,
+  let go to duck (the burrow view comes back). E or a click grabs the carrot lying by the hole (0.6 s up grabs it
+  anyway); carrot holes glow orange on their pads and dangle leaves into the hole. The mallet goes for the newest
+  pop-up (you or a mole) after a reaction, travels over, winds up (a red ring round the hole, its pad and the hole's
+  underside flash red, a red marker on the head while you're up) and BONKs: moles are flattened and fall back down
+  dazed with stars; you're a spread-eagled pancake with stars that then slips down the hole (WHACKED / BONK! /
+  FLATTENED). With nothing up it hovers over the carrot holes; once a carrot has gone, a pop at a carrot hole is its
+  prime target (it turns round mid-travel for you, never once it's winding up); up 2 s (1 s later) and you're the target
+  whatever else pops. Everything speeds up with carrots, rounds and score, and the moles get jumpier (fewer decoys).
+  40 s rounds: GAME OVER, "MOM! MORE QUARTERS!", a 3 s breather, ROUND 2. Five carrots: TILT (all the bulbs flash),
+  "MOOOM! THE MOLE CHEATED!", a six-slam tantrum, he sinks away sulking, and the exit opens in the burrow's east wall by
+  your carrot pile. `?moleCarrots=N` starts with N carrots. Test bots: popping blind and grabbing with E 0.3 s later
+  wins about 2/3 of the time (deaths on the last carrots); waiting for a wind-up on a mole first wins every time (~35 s).
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -527,7 +549,11 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   in `CREW_COLORS`: set `vel` and it waddles; `lift` hops / sinks down a vent, `mouth` / `tongue` / `tongueTo` the
   impostor's flip-top bite, `glow` a red visor, `kill(from)` leaves the bottom half with a bone while the top flies off,
   `eject()` tumbles it up into space, `opacity` / `highlight`), `spaceship.ts` (`TaskStation` on a chamber wall with a
-  screen that lights while `lit`, `Vent` with a flap, `addMeetingTable` / `drawMeetingTable` with the EMERGENCY button). Put new
+  screen that lights while `lit`, `Vent` with a flap, `addMeetingTable` / `drawMeetingTable` with the EMERGENCY button),
+  `mole.ts` (whack-a-mole `Mole`: pink nose, whiskers, buck teeth, optional shades; `squash` flattens it, `dazed` gives
+  X eyes and circling stars, `armsUp`, `walk` / `walking`, `wiggle`; `drawMole` in any frame, `drawDazedStars` over
+  anyone's head), `mallet.ts` (`Mallet`: a giant's rubber mallet posed by `aim` / `swing` / `lift` / `from`; `grip()` is
+  where the giant's hand goes, `face()` the striking face, `squash` on impact). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
@@ -584,7 +610,7 @@ Shared mechanics available to levels (via `ctx`):
 - `player.sitting` draws the sitting pose (`SIT_POSE` in body.ts; the level keeps them on the seat).
 - `player.gravityScale` (1; 0 = weightless) and `player.airControl` (1; 0 = the air velocity is left alone, so they
   drift and the level steers) — this life only. `player.poseOverride` draws a level's own `Pose` while in control
-  (clinging to something, floating); null for the normal animation.
+  (clinging to something, floating), or in `swinging` mode instead of the hanging pose; null for the normal animation.
 - `player.torchArm` raises the right arm up and ahead as if holding a torch (the level draws the torch).
 - `player.resume(velocity)` puts the player back in normal control after a scripted mode; `player.partFrames()`
   gives each body part's frame (e.g. to put a torch in the right hand, `foreArmR`).
