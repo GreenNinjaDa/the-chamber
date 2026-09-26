@@ -1,6 +1,6 @@
 import { note, noise, sfx, tone, Tune } from '../../engine/audio';
 import {
-  add, clamp, cross, easeInOut, length, lerp, mul, normalize, quatConj, rotateByQuat, rotationY, scale, scaling, sub, translation,
+  add, clamp, cross, easeInOut, lerp, mul, normalize, quatConj, rotateByQuat, rotationY, scale, scaling, sub, translation,
   type Mat4, type Quat, type Vec3,
 } from '../../engine/math';
 import { GRAVITY, RAPIER, type Body } from '../../engine/physics';
@@ -348,6 +348,7 @@ export class PoolLevel implements Level {
   private says: Say[] = [];
   private drops: Drop[] = [];
   private ripples: Ripple[] = [];
+  private foams: Ripple[] = [];
   private labelList: WorldLabel[] = [];
   private needs: NeedsPanel;
   private reaper: { pos: Vec3; from: Vec3; to: Vec3; t: number; yaw: number } | null = null;
@@ -365,7 +366,7 @@ export class PoolLevel implements Level {
     this.arrival = new PortalArrival(ctx, SPAWN);
 
     // Walls, as in the standard chamber.
-    const H = CHAMBER_HALF, wy = (WALL_HEIGHT - 0.2) / 2;
+    const H = CHAMBER_HALF;
     for (const [pos, size] of WALLS) physics.addStaticBox(pos, size);
     // The deck: the floor round the pool, solid all the way down to the pool's bottom.
     const depth = -POOL_FLOOR + 0.5, cy = -depth / 2;
@@ -373,7 +374,6 @@ export class PoolLevel implements Level {
     physics.addStaticBox([0, cy, (H + Z_HALF) / 2], [H * 2, depth, H - Z_HALF]);
     physics.addStaticBox([-(H + X_HALF) / 2, cy, 0], [H - X_HALF, depth, Z_HALF * 2]);
     physics.addStaticBox([(H + X_HALF) / 2, cy, 0], [H - X_HALF, depth, Z_HALF * 2]);
-    void wy;
     // The middle of the floor: a slab that sinks to become the bottom of the pool (a fixed body,
     // moved by hand, so the player can stand on it).
     this.slab = physics.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.25, 0));
@@ -459,7 +459,7 @@ export class PoolLevel implements Level {
 
   /** The intro, the ladder and the rest of the cursor's plans, by the clock. */
   private updateScript(dt: number) {
-    const { player, camera } = this.ctx;
+    const { player } = this.ctx;
     const t = this.t;
     if (this.once('pop', t > POP_AT)) {
       SOUND.bling();
@@ -495,7 +495,6 @@ export class PoolLevel implements Level {
     if (this.once('ladder', t > Math.max(LADDER_AT, this.overviewEnd() + 0.8) && this.task === 'idle' && !this.death && player.mode === 'control')) {
       this.bringLadder();
     }
-    void camera;
   }
 
   private overviewEnd() {
@@ -629,7 +628,6 @@ export class PoolLevel implements Level {
       this.standingOn = null;
     }
     this.lastStanding = this.standingOn;
-    void camera;
     // Out of the pool, on the deck: the cursor has a last idea.
     const onDeck = player.onGround && p[1] > -0.25 && !this.water.contains(p[0], p[2], 0.1);
     this.outT = onDeck ? this.outT + dt : 0;
@@ -1132,7 +1130,13 @@ export class PoolLevel implements Level {
     for (let i = 0; i < n; i++) {
       if (this.drops.length > 260) this.drops.shift();
       const a = Math.random() * Math.PI * 2, out = rand(0.5, 2.5) * (0.5 + k);
-      this.drops.push({ pos: [pos[0] + Math.cos(a) * 0.3, pos[1] + 0.05, pos[2] + Math.sin(a) * 0.3], vel: [Math.cos(a) * out, rand(2.5, 6.5) * (0.6 + k * 0.6), Math.sin(a) * out], age: 0, life: 2, size: rand(0.05, 0.12), bubble: false, sparkle: false });
+      this.drops.push({ pos: [pos[0] + Math.cos(a) * 0.3, pos[1] + 0.05, pos[2] + Math.sin(a) * 0.3], vel: [Math.cos(a) * out, rand(2.5, 6.5) * (0.6 + k * 0.6), Math.sin(a) * out], age: 0, life: 2, size: rand(0.07, 0.16), bubble: false, sparkle: false });
+    }
+    // A heap of white foam where it went in.
+    for (let i = 0; i < 3 + Math.round(6 * k); i++) {
+      if (this.foams.length > 40) this.foams.shift();
+      const a = Math.random() * Math.PI * 2, r = rand(0, 0.5) * (0.5 + k);
+      this.foams.push({ pos: [pos[0] + Math.cos(a) * r, pos[1], pos[2] + Math.sin(a) * r], age: 0, life: rand(0.9, 1.6), size: rand(0.3, 0.6) * (0.6 + k) });
     }
     this.ripple(pos, 0.8 + k);
     this.ripple(pos, 0.4 + k * 0.6);
@@ -1193,6 +1197,8 @@ export class PoolLevel implements Level {
     this.drops = this.drops.filter((d) => d.age < d.life);
     for (const r of this.ripples) r.age += dt;
     while (this.ripples.length && this.ripples[0].age > this.ripples[0].life) this.ripples.shift();
+    for (const f of this.foams) f.age += dt;
+    this.foams = this.foams.filter((f) => f.age < f.life);
     this.needs.update(dt);
   }
 
@@ -1212,7 +1218,7 @@ export class PoolLevel implements Level {
 
   // --- Drawing --------------------------------------------------------------------------------------
 
-  draw(out: DrawItem[], time: number) {
+  draw(out: DrawItem[]) {
     this.arrival.draw(out);
     this.exit.draw(out);
     this.drawRoom(out);
@@ -1222,7 +1228,7 @@ export class PoolLevel implements Level {
     this.drawLadder(out);
     this.drawFurniture(out);
     this.drawCursor(out);
-    this.drawSim(out, time);
+    this.drawSim(out);
     if (this.reaper) drawGrimReaper(out, this.reaper.pos, this.reaper.yaw, this.time, clamp((this.reaper.t - 1.8) / 0.5, 0, 1));
     this.drawEffects(out);
   }
@@ -1342,7 +1348,7 @@ export class PoolLevel implements Level {
     }
   }
 
-  private drawSim(out: DrawItem[], _time: number) {
+  private drawSim(out: DrawItem[]) {
     const { player, camera } = this.ctx;
     if (player.mode === 'hidden' || player.inPortal || player.portalScale < 0.99) return;
     const head = player.partFrames().head;
@@ -1377,6 +1383,12 @@ export class PoolLevel implements Level {
       } else {
         out.push({ mesh: 'sphere', model: mul(translation(d.pos), scaling([d.size, d.size * 1.3, d.size])), color: [0.8, 0.93, 1], spec: 1, opacity: 0.8, shadow: false });
       }
+    }
+    // Foam heaped up by splashes, spreading and fading.
+    for (const f of this.foams) {
+      const k = f.age / f.life;
+      const s = f.size * (0.5 + k * 1.4);
+      out.push({ mesh: 'sphere', model: mul(translation([f.pos[0], this.water.level + 0.02, f.pos[2]]), scaling([s, s * 0.35 * (1 - k * 0.6), s])), color: [0.95, 0.98, 1], spec: 0.6, opacity: 0.75 * (1 - k), shadow: false });
     }
     // Ripples: thin rings of foam spreading out on the surface.
     const y = this.water.level + 0.012;
@@ -1478,7 +1490,17 @@ export class PoolLevel implements Level {
     pos[0] = cx;
     pos[2] = cz;
     pos[1] += pushed * 0.8;
-    if (this.poolMade && this.water.contains(pos[0], pos[2], -0.2)) {
+    const p = player.pos;
+    if (this.poolMade && this.water.contains(p[0], p[2]) && p[1] < -0.3) {
+      // In the pool: stay inside it (the deck's edge would hide the Sim), looking down over
+      // their shoulder when backed up against a side; never under the water.
+      const m = 0.3;
+      const px = clamp(pos[0], -X_HALF + m, X_HALF - m), pz = clamp(pos[2], -Z_HALF + m, Z_HALF - m);
+      const pulled = Math.hypot(pos[0] - px, pos[2] - pz);
+      pos[0] = px;
+      pos[2] = pz;
+      pos[1] = Math.max(pos[1] + pulled * 0.3, this.water.level + 0.45);
+    } else if (this.poolMade && this.water.contains(pos[0], pos[2], -0.2)) {
       pos[1] = Math.max(pos[1], this.water.level + 0.45);
     } else {
       const outside = this.poolMade ? Math.max(Math.abs(pos[0]) - X_HALF, Math.abs(pos[2]) - Z_HALF) : 1;
@@ -1582,4 +1604,3 @@ const DRAG_LABELS: WorldLabel[] = [
   { pos: [0, 0, 0], text: '', size: 0.75, color: '#8dff8f' },
 ];
 
-void length;
