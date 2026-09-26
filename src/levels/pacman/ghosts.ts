@@ -103,7 +103,8 @@ export class Ghost {
   /** Eaten: back to the house as a pair of eyes. */
   eaten() {
     this.scared = false;
-    this.state = 'eyes';
+    // Still on the way out of the house: just go back in.
+    this.state = this.state === 'leaving' || this.state === 'house' ? 'entering' : 'eyes';
   }
 
   update(dt: number, crew: GhostCrew, time: number) {

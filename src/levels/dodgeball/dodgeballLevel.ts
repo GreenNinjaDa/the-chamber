@@ -188,7 +188,7 @@ export class DodgeballLevel implements Level {
       if (t.state !== 'down' && this.tilt(t) > DOWN_TILT) {
         t.state = 'down';
         this.say(t, pick(DOWN));
-        if (this.turrets.every((o) => o.state === 'down')) {
+        if (this.turrets.every((o) => o.state === 'down') && !this.death) {
           this.exit.openNow();
           hud.show('YOU WIN. DODGEBALL.', 'The turrets would like it known there are no hard feelings.', 3.5);
         }
@@ -241,6 +241,7 @@ export class DodgeballLevel implements Level {
       carrying.from = null;
     }
     this.wasCarrying = carrying;
+    const frames = alive ? player.partFrames() : null;
     for (const b of this.balls) {
       b.age += dt;
       const v = b.body.rb.linvel();
@@ -256,7 +257,7 @@ export class DodgeballLevel implements Level {
       if (b.spent || b === carrying || (speed < 6 && !b.hostile)) continue;
       // A hostile ball hitting the player (tested along its path this frame).
       if (b.hostile && alive && !player.inPortal && speed > 3) {
-        const f = player.partFrames();
+        const f = frames!;
         const hit = [f.head, f.chest, f.pelvis, f.thighL, f.thighR].some((m) => segDist(prev, pos, [m[12], m[13], m[14]]) < 0.45);
         if (hit) {
           b.spent = true;

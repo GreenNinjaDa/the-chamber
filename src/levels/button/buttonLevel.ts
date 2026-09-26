@@ -36,6 +36,7 @@ class RedButton implements Usable {
   grow = 0;
   sign: WorldLabel;
   whisper: WorldLabel;
+  private hiddenText = '';
   private collider: RAPIER.Collider;
 
   constructor(
@@ -61,6 +62,14 @@ class RedButton implements Usable {
     const s = this.size * Math.max(0.01, this.grow);
     this.collider.setTranslation({ x: pos[0], y: 0.55 * s - (1 - this.grow) * 1.2, z: pos[2] });
     this.sign.pos = add(pos, [0, 1.9 * this.size * this.grow, 0]);
+    // (Labels show through everything: keep the sign blank until the button is up.)
+    if (this.grow < 0.5 && this.sign.text) {
+      this.hiddenText = this.sign.text;
+      this.sign.text = '';
+    } else if (this.grow >= 0.5 && this.hiddenText) {
+      this.sign.text = this.hiddenText;
+      this.hiddenText = '';
+    }
     this.whisper.pos = add(pos, [0, 1.45 * this.size * this.grow, 0]);
   }
 
@@ -150,6 +159,8 @@ export class ButtonLevel implements Level {
     const walls: Vec3[] = [[CHAMBER_HALF, 1.4, pos[2]], [-CHAMBER_HALF, 1.4, pos[2]], [pos[0], 1.4, CHAMBER_HALF], [pos[0], 1.4, -CHAMBER_HALF]];
     const from = walls.reduce((a, b) => (length(sub(a, pos)) < length(sub(b, pos)) ? a : b));
     this.fate = { kind, t: 0, pos, dir: normalize(sub([pos[0], 1.4, pos[2]], from)), from };
+    // You can't outrun your mistakes, not even through the exit.
+    this.exit.refuse = () => true;
     const small: Record<Fate, string> = {
       anvil: 'An anvil. Of course it was an anvil.',
       piano: 'It played one last note. The note was you.',

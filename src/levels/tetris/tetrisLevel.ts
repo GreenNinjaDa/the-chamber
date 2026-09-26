@@ -185,6 +185,7 @@ export class TetrisLevel implements Level {
 
   private aimOffset = 0;
   private steps = 0;
+  private flashUntil = 0;
 
   update(dt: number) {
     const { player, hud, camera } = this.ctx;
@@ -210,7 +211,7 @@ export class TetrisLevel implements Level {
     // A / D always move along it.
     camera.yaw = -Math.PI / 2;
     camera.pitch = 0;
-    if (this.flash.text && this.time % 1 < dt) this.flash.text = '';
+    if (this.flash.text && this.time > this.flashUntil) this.flash.text = '';
 
     if (this.clearing) {
       this.clearing.t += dt;
@@ -231,6 +232,7 @@ export class TetrisLevel implements Level {
       const alive = player.mode === 'control' && !this.death;
       const land = this.landingRow(piece.cells, piece.col);
       if (alive && piece.row - land > COMMIT_ROWS) piece.target = this.aimFor(piece.cells);
+      else piece.target = piece.col;
       this.steps++;
       const dc = this.steps % 2 ? 0 : Math.sign(piece.target - piece.col);
       if (dc && this.fits(piece.cells, piece.col + dc, piece.row) && !this.overlapsPlayer(piece.cells, piece.col + dc, piece.row)) piece.col += dc;
@@ -320,6 +322,7 @@ export class TetrisLevel implements Level {
     this.lines += rows.length;
     this.linesLabel.text = `LINES ${this.lines}`;
     this.flash.text = rows.length >= 4 ? 'TETRIS!' : rows.length > 1 ? `${rows.length} LINES!` : 'LINE!';
+    this.flashUntil = this.time + 1.2;
   }
 
   private crush(big = 'GAME OVER', small?: string) {

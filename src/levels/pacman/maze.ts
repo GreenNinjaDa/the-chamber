@@ -49,7 +49,8 @@ export const toCellZ = (z: number) => (z + CHAMBER_HALF) / CELL - 0.5;
 
 const tile = (i: number, j: number) => (i >= 0 && j >= 0 && i < COLS && j < ROWS ? LAYOUT[j][i] : '#');
 /** Corridor cells, where the player and roaming ghosts go. */
-export const walkable = (i: number, j: number) => '.o P'.includes(tile(i, j));
+export const walkable = (i: number, j: number) =>
+  '.o P'.includes(tile(i, j)) && !(i >= HOUSE.i0 && i <= HOUSE.i1 && j >= HOUSE.j0 && j <= HOUSE.j1);
 
 export interface Rect {
   x0: number;

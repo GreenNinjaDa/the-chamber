@@ -351,7 +351,7 @@ export class SunburnLevel implements Level {
       p.pos = add(p.pos, scale(p.vel, dt));
       p.vel[1] += dt * 0.4;
     }
-    while (this.puffs.length && this.puffs[0].age > this.puffs[0].life) this.puffs.shift();
+    if (this.puffs.some((p) => p.age > p.life)) this.puffs = this.puffs.filter((p) => p.age <= p.life);
     for (const tag of this.tags) {
       tag.ttl -= dt;
       tag.pos = add(tag.pos, [0, dt * 0.3, 0]);
@@ -376,8 +376,11 @@ export class SunburnLevel implements Level {
     if (!lit && this.focusing && this.shadedFor > 1.2) {
       const phase = (this.shadedFor - 1.2) % (PRACTICE_TIME + LURK_TIME);
       if (phase < PRACTICE_TIME) {
-        if (!this.practice || !this.isLit(this.practice())) {
-          const things = this.things.filter((th) => this.isLit(th()));
+        if (!this.practice || this.practice()[1] < -1 || !this.isLit(this.practice())) {
+          const things = this.things.filter((th) => {
+            const p = th();
+            return p[1] > -1 && this.isLit(p);
+          });
           this.practice = things.includes(this.duckCentre) ? this.duckCentre : things.length ? pick(things) : null;
         }
       } else {
@@ -394,6 +397,7 @@ export class SunburnLevel implements Level {
     this.aim = add(this.aim, scale(this.aimVel, dt));
     this.aim[0] = clamp(this.aim[0], -CHAMBER_HALF, CHAMBER_HALF);
     this.aim[2] = clamp(this.aim[2], -CHAMBER_HALF, CHAMBER_HALF);
+    this.aim[1] = Math.max(0, this.aim[1]);
   }
 
   /** The nearest sunlit point on the floor next to the player's shade, if there's one close by. */
