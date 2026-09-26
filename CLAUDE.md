@@ -86,7 +86,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   does the player from when the first boulder starts rolling until 5 m before the last jump (over the shaft), when the
   torch also goes out. The map is one fixed body (not kinematic: Rapier's character
   controller won't climb slopes on kinematic colliders).
-- **Level 6 — Bowling** (`src/levels/bowling/`; map in `lane.ts`): its own map, the chamber's size: a honey-wood lane
+- **Level 6 — Bowling** (`src/levels/bowling/`; map in `lane.ts`): its own map (`none`), with the chamber's footprint so
+  the camera keeps its usual chamber confinement: a honey-wood lane
   (boards, arrows, dots, pin spots), sunken gutters (2.7 m wide, 0.7 m deep) along the east and west walls, a dark pit
   across the north end, a scoreboard on the north wall (and a small one over the hatch) with sarcastic verdicts
   ("STRIKE! (NOT YOU)", "7-10 SPLIT", "MARK IT ZERO", "TURKEY!"...). You arrive among ten 2 m pins (27 kg): you're the
