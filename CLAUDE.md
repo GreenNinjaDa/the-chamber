@@ -340,6 +340,10 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   0.85 s while it rears back, then shoots its neck out and CHOMPS everything in the lane: marbles, or you (swallowed,
   chewed, burped). When the marbles are gone the winner is announced, the others doze off and the east (yellow) one
   yawns with the exit portal in its mouth.
+- **Level 32 — Flappy** (`src/levels/flappy/`): after the arrival the camera swings to a side view (a `cameraShot` from
+  the south) and the wall says FLAP. Space flaps (the player stays in `control` mode, pinned to the lane, with
+  `gravityScale` 1.25, `airControl` 0 and a flapping `poseOverride`; plus a beak). Green pipes with a 5 m gap slide out
+  of the east wall; touching one, or the floor, is death. Ten pipes and you drop to the floor and walk to the exit.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
