@@ -1,3 +1,4 @@
+import { Drone, noise, sfx } from '../../engine/audio';
 import { basis, clamp, easeInOut, fromQuat, mul, quatMul, rotationY, scaling, translation, type Quat, type Vec3 } from '../../engine/math';
 import { RAPIER, type Body } from '../../engine/physics';
 import { Pattern, type DrawItem } from '../../engine/renderer';
@@ -196,6 +197,7 @@ export class BowlingLevel implements Level {
   private t = 0;
 
   private balls: Ball[] = [];
+  private rumble = new Drone(48, { wave: 'triangle', vol: 0.14, wobble: 3 });
   private fired = 0;
   private gutterBallThisFrame = false;
   private giant: { body: Body | null; pos: Vec3; vx: number; vy: number; vz: number; rot: Quat; spin: Quat; wander: Vec3; wanderT: number; deflateT: number } | null = null;
@@ -519,6 +521,8 @@ export class BowlingLevel implements Level {
 
   private updateBalls(dt: number) {
     const { player } = this.ctx;
+    if (this.status === 'playing' && this.balls.some((b) => b.state === 'rolling')) this.rumble.start();
+    else this.rumble.stop();
     for (let i = this.balls.length - 1; i >= 0; i--) {
       const b = this.balls[i];
       const p = b.pos;
@@ -538,6 +542,12 @@ export class BowlingLevel implements Level {
         this.steer(b, dt);
         p[0] += b.vx * dt;
         p[2] += b.vz * dt;
+        // Into the pins (or where they'd be).
+        const pins = HEAD_PIN_Z + 0.4;
+        if (p[2] < pins && p[2] - b.vz * dt >= pins && b.gutter === 0) {
+          sfx.thud(0.6);
+          for (let k = 0; k < 7; k++) noise(0.12, { freq: 1800 + Math.random() * 2500, type: 'bandpass', q: 3, vol: 0.3, at: k * 0.035 + Math.random() * 0.02 });
+        }
         if (b.gutter === 0 && b.kind !== 'gutter') {
           if (Math.abs(p[0]) > LANE_LIMIT) {
             p[0] = clamp(p[0], -LANE_LIMIT, LANE_LIMIT);

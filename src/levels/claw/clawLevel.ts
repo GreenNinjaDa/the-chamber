@@ -1,3 +1,4 @@
+import { Drone, noise, sfx, tone, Tune } from '../../engine/audio';
 import {
   add, clamp, distXZ, easeInOut, lerp3, mul, quatSlerp, rotationX, rotationZ, scale, scaling, sub, translation, type Quat, type Vec3,
 } from '../../engine/math';
@@ -171,6 +172,13 @@ const DEATHS: Record<DeathKind, { big: string; small: string[]; hint: string }> 
 };
 
 type Phase = 'arrive' | 'coins' | 'move' | 'hover' | 'drop' | 'bottom' | 'close' | 'rise' | 'jiggle' | 'carry' | 'release' | 'rest' | 'over';
+/** Phases the gantry motor runs in. */
+const WHIRRING = new Set<Phase>(['move', 'drop', 'rise', 'carry']);
+/** A cheerful arcade loop. [note, beats]. */
+const ARCADE_TUNE: [string | null, number][] = [
+  ['E5', 0.5], ['G5', 0.5], ['C6', 0.5], ['G5', 0.5], ['A5', 0.5], ['F5', 0.5], ['D5', 1],
+  ['F5', 0.5], ['A5', 0.5], ['D6', 0.5], ['A5', 0.5], ['B5', 0.5], ['G5', 0.5], ['E5', 1],
+];
 
 interface Prize extends Plush {
   gone: boolean;
@@ -207,6 +215,8 @@ export class ClawLevel implements Level {
 
   // The kid.
   private phase: Phase = 'arrive';
+  private motor = new Drone(120, { wave: 'square', vol: 0.03, wobble: 8 });
+  private ditty = new Tune(ARCADE_TUNE, 132, { wave: 'square', vol: 0.035 });
   private phaseT = 0;
   private credits = CREDITS;
   private creditNo = 0;
@@ -467,6 +477,15 @@ export class ClawLevel implements Level {
   private setPhase(p: Phase) {
     this.phase = p;
     this.phaseT = 0;
+    if (p === 'coins') for (let k = 0; k < 2; k++) {
+      tone(1760, 0.1, { wave: 'triangle', vol: 0.15, at: k * 0.4 });
+      tone(2637, 0.25, { wave: 'triangle', vol: 0.1, at: k * 0.4 + 0.06 });
+    }
+    if (p === 'close') {
+      sfx.thud(0.35);
+      noise(0.15, { freq: 2500, to: 900, type: 'bandpass', q: 3, vol: 0.25 });
+    }
+    if (p === 'release') noise(0.2, { freq: 3000, to: 1200, type: 'bandpass', q: 4, vol: 0.25 });
   }
 
   private startCredit() {
@@ -873,6 +892,11 @@ export class ClawLevel implements Level {
   // --- Update ------------------------------------------------------------------------------------
 
   update(dt: number) {
+    const playing = this.status === 'playing' && !this.death;
+    if (playing && this.phase !== 'arrive') this.ditty.start();
+    else this.ditty.stop();
+    if (playing && WHIRRING.has(this.phase)) this.motor.start();
+    else this.motor.stop();
     this.t += dt;
     this.phaseT += dt;
     this.arrival.update(dt);

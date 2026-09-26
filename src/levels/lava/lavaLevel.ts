@@ -1,3 +1,4 @@
+import { sfx, tone } from '../../engine/audio';
 import { add, mul, normalize, rotationX, rotationY, scale, scaling, segment, sub, translation, type Vec3 } from '../../engine/math';
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
 import { CHAMBER_HALF, WALL_HEIGHT } from '../../game/chamber';
@@ -163,7 +164,12 @@ export class LavaLevel implements Level {
       physics,
       BOX_POS,
       Math.atan2(face[0], face[2]),
-      (on) => (on ? this.exit.openNow() : this.exit.closeNow()),
+      (on) => {
+        sfx.click();
+        tone(on ? 180 : 140, 0.12, { wave: 'square', vol: 0.1 });
+        if (on) this.exit.openNow();
+        else this.exit.closeNow();
+      },
       BOX_SIZE,
     );
     const front = add(add(BOX_POS, [0, 0.55, 0]), scale(normalize(face), 0.68));
@@ -220,6 +226,8 @@ export class LavaLevel implements Level {
   update(dt: number) {
     const { player, hud } = this.ctx;
     this.t += dt;
+    // Blorp.
+    if (this.status === 'playing' && Math.random() < dt * 2.5) tone(60 + Math.random() * 60, 0.25, { to: 140 + Math.random() * 100, wave: 'sine', vol: 0.12 });
     this.swingBall(this.t);
     this.moveSinker();
     this.checkBall();

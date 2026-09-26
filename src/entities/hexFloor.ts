@@ -1,3 +1,4 @@
+import { tone } from '../engine/audio';
 import { RAPIER, type Physics } from '../engine/physics';
 import { Pattern, type DrawItem } from '../engine/renderer';
 
@@ -9,6 +10,8 @@ import { Pattern, type DrawItem } from '../engine/renderer';
  */
 
 const SQRT3 = Math.sqrt(3);
+let lastPop = 0;
+
 /** Seconds a dropped tile takes to fall and shrink away, and a regrown one to pop back in. */
 const FALL_TIME = 0.45;
 const GROW_TIME = 0.3;
@@ -216,6 +219,11 @@ export class HexFloor {
           tile.blink += dt * (5 + 16 * k);
           if (tile.t >= arm) {
             tile.state = 'falling';
+            const now = performance.now();
+            if (now - lastPop > 70) {
+              lastPop = now;
+              tone(500 + Math.random() * 300, 0.12, { to: 150, wave: 'triangle', vol: 0.12 });
+            }
             tile.t = 0;
             if (tile.collider) this.physics.world.removeCollider(tile.collider, false);
             tile.collider = null;

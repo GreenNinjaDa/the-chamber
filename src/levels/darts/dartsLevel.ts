@@ -1,3 +1,4 @@
+import { noise, sfx, tone } from '../../engine/audio';
 import {
   add, clamp, distXZ, easeInOut, lerp, lerp3, mul, normalize, rotationX, scale, scaling, sub, translation,
   type Vec3,
@@ -201,6 +202,7 @@ export class DartsLevel implements Level {
   private setHand(s: HandState) {
     this.handState = s;
     this.handT = 0;
+    if (s === 'sweep') noise(0.7, { freq: 300, to: 1200, type: 'bandpass', q: 1.2, vol: 0.35 });
   }
 
   private startHover() {
@@ -240,6 +242,7 @@ export class DartsLevel implements Level {
         if (u >= 1) {
           this.to = [...this.grasp];
           camera.addShake(0.5);
+          sfx.thud(0.8);
           const target = this.pickGrabTarget();
           if (target) this.grab(target);
           else this.setHand('sweep');
@@ -413,6 +416,7 @@ export class DartsLevel implements Level {
     } else if (this.held) {
       const dart = this.held;
       dart.state = 'flying';
+      noise(1.2, { freq: 600, to: 2400, type: 'bandpass', q: 2, vol: 0.25 });
       // Aim around the bullseye, not into it (that's the portal).
       dart.vel = ballistic(dart.tip, aimAt(1.6 + Math.random() * 2.6), 1.7, G);
       this.thrown++;
@@ -451,6 +455,7 @@ export class DartsLevel implements Level {
           d.tip[1] = -0.3;
           d.state = 'stuck';
           camera.addShake(0.3);
+          sfx.thud(0.6);
         }
       } else if (d.state === 'flying') {
         d.vel[1] -= G * dt;
@@ -459,6 +464,8 @@ export class DartsLevel implements Level {
         if (d.tip[2] <= BOARD_FACE_Z) {
           d.tip[2] = BOARD_FACE_Z - 0.35;
           d.state = 'board';
+          sfx.thud(0.7);
+          tone(95, 0.35, { to: 70, wave: 'triangle', vol: 0.3 });
         }
       }
     }
