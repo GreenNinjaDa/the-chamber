@@ -44,6 +44,12 @@ export const GNOME_POSES = {
     [CLAWS_R, mirror(CLAWS_R)],
     [REACH_R, mirror(CLAWS_R)],
   ] as ArmPose[],
+  /** Waving you off. */
+  bye: [
+    [WAVE_R, mirror(DOWN_R)],
+    [WAVE_R, mirror(WAVE_R)],
+    [WAVE_R, mirror(HIPS_R)],
+  ] as ArmPose[],
 };
 
 /** Per-gnome look, changed by the level while nobody's watching. */

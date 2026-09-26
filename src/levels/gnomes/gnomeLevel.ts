@@ -293,9 +293,10 @@ export class GnomeLevel implements Level {
         }
         g.state = 'moving';
       }
-      // While nobody's watching, strike a new pose to match how close it is.
+      // While nobody's watching, strike a new pose to match how close it is (or, once the exit
+      // is open, wave you goodbye; they're still coming, mind).
       const d = Math.hypot(player.pos[0] - t.x, player.pos[2] - t.z);
-      const set: PoseSet = d < 3.2 ? 'near' : d < 8 ? 'mid' : 'far';
+      const set: PoseSet = this.complete && d > 2.5 ? 'bye' : d < 3.2 ? 'near' : d < 8 ? 'mid' : 'far';
       if (set !== g.poseSet) {
         g.poseSet = set;
         g.look.arms = pick(GNOME_POSES[set]);
