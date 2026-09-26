@@ -38,6 +38,7 @@ import { GnomeLevel } from './levels/gnomes/gnomeLevel';
 import { SnakeLevel } from './levels/snake/snakeLevel';
 import { PacmanLevel } from './levels/pacman/pacmanLevel';
 import { BowlingLevel } from './levels/bowling/bowlingLevel';
+import { FloorLavaLevel } from './levels/floorLava/floorLavaLevel';
 import type { Level, LevelContext, TrackedTarget, WorldLabel } from './levels/level';
 import { LobbyLevel } from './levels/lobby/lobbyLevel';
 
@@ -70,6 +71,7 @@ const LEVELS: ((ctx: LevelContext) => Level)[] = [
   (ctx) => new MicrowaveLevel(ctx),
   (ctx) => new HexagoneLevel(ctx),
   (ctx) => new DominoesLevel(ctx),
+  (ctx) => new FloorLavaLevel(ctx),
   (ctx) => new BowlingLevel(ctx),
   (ctx) => new TetrisLevel(ctx),
   (ctx) => new LaserLevel(ctx),

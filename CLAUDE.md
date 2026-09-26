@@ -241,7 +241,23 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   and the last domino hits the button that opens the exit. Anywhere else in a falling domino's path: FLATTENED. Not
   in the gap when the chain gets there: it stops, and the finger flicks you instead (FLICKED). If anything else
   stalls the chain for 3.5 s, the giant nudges it on.
-- **Level 24 — Bowling** (`src/levels/bowling/`; map in `lane.ts`): its own map (`none`), with the chamber's footprint so
+- **Level 24 — The Floor Is Lava** (`src/levels/floorLava/`): the kids' game, taken literally, in a living room (red and blue
+  sofas, blue and mustard armchairs, coffee table, beanbags, a blue rug, piano and bench, fridge, washing machine,
+  bathtub, mattress, bookcase, crates, pillows; `entities/livingRoom.ts` plus junk). A host on four wall TVs announces
+  rules ("RULE #n"), each with a 3-2-1 countdown (the digit also big on the HUD with the rule under it); meanwhile
+  whatever is about to turn blinks molten, faster and faster (the floor: its panel seams glow), then it's lava
+  (`Pattern.lava` param 2 on things; the floor goes tile by tile in a quick ripple; the room glows warm). Standing on
+  lava (9 rays down round the feet; any safe surface under you wins) for 0.25 s in all burns you up (`player.char`,
+  smoke, flames); every new touch costs at least 0.05 s, so hopping across only goes so far. Rules: the floor (the
+  rug is floor); the couches (armchairs aren't; a pillow on a couch isn't a couch); the floor and the crates; the
+  ceiling (there isn't one); everything blue, and the floor; the floor and whatever you're standing on; the floor,
+  rising to 1 m (a 5 s count; high ground: the piano, the fridge from the washing machine, the crate stairs in the
+  south corners).
+  Finale: "EVERYTHING IS LAVA EXCEPT..." a giant rubber duck (`entities/giantDuck.ts`) drops out of the sky (purple
+  marker; landing on you is QUACKED), 5 s to get on it; everything else melts and sinks into lava rising to 0.55 m,
+  "THE DUCK IS A BOAT NOW." and it sails you to the exit ("THE EXIT IS NOT LAVA. PROBABLY."). ~95 s in all.
+  `?lavaStep=N` starts at step N of the script (8 = the duck).
+- **Level 25 — Bowling** (`src/levels/bowling/`; map in `lane.ts`): its own map (`none`), with the chamber's footprint so
   the camera keeps its usual chamber confinement: a honey-wood lane
   (boards, arrows, dots, pin spots), sunken gutters (2.7 m wide, 0.7 m deep) along the east and west walls, a dark pit
   across the north end, a scoreboard on the north wall (and a small one over the hatch) with sarcastic verdicts
@@ -255,12 +271,12 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   and pushes everything into the pit (jump it; swept = "CLEARED"), then ten pins come down on strings onto their
   spots (standing on one = "PINNED"). After the giant, the last ball is fired 0.8 s after the exit (east wall, in
   the gutter halfway down the lane) opens, and more keep coming until you leave.
-- **Level 25 — Falling Blocks** (`src/levels/tetris/`): a glass-fronted well one cell deep and ten wide against the east wall,
+- **Level 26 — Falling Blocks** (`src/levels/tetris/`): a glass-fronted well one cell deep and ten wide against the east wall,
   seen side-on (the level's camera shot; A / D move along it). Tetrominoes fall a row at a time, steering toward
   wherever you stand (a column every other row) and committing 4 rows up (a ghost shows where they'll land); what
   lands is what you climb, up to the exit (open from the start, 5 m up the east wall). Full rows clear and drop
   everything above. Crushed = GAME OVER; the stack reaching the top of the well = TOPPED OUT.
-- **Level 26 — Laser Show** (`src/levels/lasers/`; Fall Guys' Jump Club meets the Resident Evil laser hallway): the
+- **Level 27 — Laser Show** (`src/levels/lasers/`; Fall Guys' Jump Club meets the Resident Evil laser hallway): the
   lights go down (dark red) and an emitter pylon (`entities/laser.ts`, `LaserPylon`) rises out of a floor hatch.
   A low beam (0.35 m) grows out opposite the player and sweeps round, speeding up from 5 s to 2.5 s a turn: jump it.
   Then a mast rises and a high beam (1.6 m) joins, turning the other way at a different speed: duck it (stand still and
@@ -271,7 +287,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   4.2 m/s. Any beam touching a body part (`BodySlicer`: the real part frames as slightly shrunk capsules/boxes, swept
   in 4 cm steps so fast beams can't skip a limb) slices you: `player.kill` with violence 30 (42 for the grid) at the
   cut. One red point light rides with the pylon, then with each wall. `?laserSkip=N` starts the show N s in.
-- **Level 27 — Pac-Man** (`src/levels/pacman/`): after the arrival the floor goes dark navy, the sun dims to a moon
+- **Level 28 — Pac-Man** (`src/levels/pacman/`): after the arrival the floor goes dark navy, the sun dims to a moon
   and a 13×13-cell maze (`maze.ts`: black blocks outlined in glowing arcade blue, 1.5 m tall so you can't jump
   onto them but the camera sees over; 2.25 m corridors; a ghost house with a pink door in the middle) rises out of
   the floor, shoving the player out of its way, while the camera shows the whole board from above (READY!). 81
@@ -327,7 +343,10 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   anyone else's head), `snake.ts` (grid snake: movement, AI, colliders, model), `pixelText.ts` (5x7
   dot-matrix text built from blocks), `apple.ts`, `ghost.ts` (arcade ghost: `drawGhost`, normal / scared / flashing / eyes only), `plush.ts` (plush toys: `spawnPlush(physics, 'alien', pos, look)`), `claw.ts` (claw-machine claw and gantry: `driveTo`, hub height `y`, prong `angle`, `distanceTo` for grabbing it), `bowling.ts` (2 m bowling pins: `spawnPin`, `pinSpots`, `uprightness`; `drawBowlingBall` with finger holes), `hexFloor.ts` (`HexFloor`: a floor of hexagonal tiles, each a
   static collider, that flash and drop once touched; `support` / `touch` / `freeze` / `regrowFrom`; drawn with the
-  chamfered `'hextile'` mesh from renderer.ts). Put new
+  chamfered `'hextile'` mesh from renderer.ts), `livingRoom.ts` (sofa / armchair in any colour, coffee table,
+  beanbag, piano bench: `spawnFurniture`, sofas and armchairs with seat / back / arm colliders so you stand on the
+  cushions; `drawRug`, `drawPainting`), `giantDuck.ts` (a 4 m rubber duck you can stand on: a fixed body the level
+  moves with `moveTo`, which carries a rider along). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
@@ -382,6 +401,10 @@ Shared mechanics available to levels (via `ctx`):
 - `player.torchArm` raises the right arm up and ahead as if holding a torch (the level draws the torch).
 - `player.resume(velocity)` puts the player back in normal control after a scripted mode; `player.partFrames()`
   gives each body part's frame (e.g. to put a torch in the right hand, `foreArmR`).
+- Rapier's character controller can't jump up alongside kinematic colliders (the jump dies at once) or up an
+  overhang (counts as bumping your head): for something moving that the player should climb onto, use a fixed body
+  and teleport it every frame, and move whoever stands on it yourself (`GiantDuck.moveTo`).
+- `Pattern.lava` with `param` 2 draws a thing turned molten (hotter than a pool, and varying with height too).
 - Boulders use `GROUPS_BOULDER`, and invisible `GROUPS_BOULDER_BRIDGE` colliders are floors only boulders touch
   (so they roll over pits the player has to jump). Loose objects on `GROUPS_DEBRIS` behave normally but boulders
   pass through them.
