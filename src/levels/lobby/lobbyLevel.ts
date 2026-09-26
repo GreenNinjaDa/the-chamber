@@ -39,6 +39,7 @@ export class LobbyLevel implements Level {
   private pads: { x: number; z: number; n: number; digits: PixelText }[] = [];
   /** The pad the player is standing on (so stepping on picks it once). */
   private onPad = 0;
+  private settled = false;
   private fixedLabels: WorldLabel[] = [];
   private allLabels: WorldLabel[] = [];
   private startLabel: WorldLabel;
@@ -146,6 +147,11 @@ export class LobbyLevel implements Level {
     // Stepping onto a level pad picks it.
     const standing = this.arrival.done && player.mode === 'control' && player.onGround && !player.inPortal;
     const pad = standing ? this.padUnder() : 0;
+    // (Landing on one from the portal doesn't count: only stepping onto one.)
+    if (standing && !this.settled) {
+      this.settled = true;
+      this.onPad = pad;
+    }
     if (pad && pad !== this.onPad) this.pickLevel(pad);
     if (standing || !player.onGround) this.onPad = pad;
     // The only way to die in the lobby is to leave your character unattended near a grenade.
