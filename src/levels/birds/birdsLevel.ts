@@ -1,6 +1,6 @@
 import { noise, sfx, tone } from '../../engine/audio';
 import {
-  add, basis, clamp, cross, dot, easeInOut, fromQuat, length, lerp, mul, normalize, scale, scaling, segment, sub, toQuat,
+  add, approachAngle, basis, clamp, cross, dot, easeInOut, fromQuat, length, lerp, mul, normalize, scale, scaling, segment, sub, toQuat,
   translation, type Mat4, type Vec3,
 } from '../../engine/math';
 import { GROUPS_QUERY_WORLD, RAPIER, type Body } from '../../engine/physics';
@@ -25,7 +25,8 @@ import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type Level
  */
 
 // --- Tuning -----------------------------------------------------------------------------------
-const SPAWN: Vec3 = [1.2, 0, -0.4];
+/** Where the pig lands: just east of the fortress, in the clear (the portal flings you toward the middle). */
+const SPAWN: Vec3 = [4.8, 0, 0.6];
 const EXIT_Z = 5;
 /** The slingshot's base, outside the west wall (it faces east, +x). */
 const SLING_BASE: Vec3 = [-17, -0.1, 0];
@@ -35,6 +36,8 @@ const WALL_TOP = WALL_HEIGHT;
 /** Script times, in seconds after the arrival: the slingshot rises, the birds perch on the wall, the penny drops. */
 const RISE_AT = 1.0;
 const RISE_TIME = 3.2;
+/** For this long after the rise starts, the view is steered toward the slingshot. */
+const LOOK_TIME = 2.6;
 const PERCH_AT = 3.0;
 const PERCH_GAP = 0.32;
 const REVEAL_AT = 6.2;
@@ -58,8 +61,10 @@ const BLOCK_EVENT_DV = 1.2;
 const SPLIT_AT = 0.45;
 const SPLIT_ANGLE = 0.24;
 /** Chuck zooms at you this far into his flight, at this speed (m/s), in a straight line. */
-const DASH_AT = 0.52;
+const DASH_AT = 0.5;
 const DASH_SPEED = 27;
+/** He hangs in mid-air this long first (s): the tell. He zooms at where you were when he stopped. */
+const DASH_PAUSE = 0.35;
 /** Bomb's fuse after he lands (s). */
 const BOMB_FUSE = 2.2;
 /** After a shot's birds have all landed, wait this long (s) before the next one hops in. */
@@ -79,7 +84,7 @@ const COVER_MASS = 40;
 const SQUASH_SPEED = 4;
 /** Points: the birds' board; a popped pig is worth this; the three stars. */
 const PIG_POINTS = 5000;
-const STARS = [10000, 20000, 30000];
+const STARS = [8000, 16000, 25000];
 const DEATH_SCREEN_DELAY = 1.8;
 const CONTROLS = 'WASD move · Shift sprint · Space jump · Hold left click carry · Right-click throw';
 
@@ -317,6 +322,9 @@ interface Flyer {
   trailT: number;
   trailBig: boolean;
   split: boolean;
+  /** Chuck: seconds into his mid-air wind-up before the zoom (-1: not yet), and where he'll zoom. */
+  charge: number;
+  dashTarget: Vec3;
   dashing: boolean;
   /** Bomb: seconds left on the fuse (-1 = not lit). */
   fuse: number;
@@ -388,6 +396,7 @@ export class BirdsLevel implements Level {
 
   private nameLabel: WorldLabel = { pos: [0, 0, 0], text: '', size: 1.1, color: '#fff' };
   private quipLabel: WorldLabel = { pos: [0, 0, 0], text: '', size: 0.55, color: '#fff' };
+  private alertLabel: WorldLabel = { pos: [0, 0, 0], text: '', size: 1.4, color: '#ffd84a' };
   private labelList: WorldLabel[] = [];
   private breakSounds = 0;
   private knockSounds = 0;
@@ -488,9 +497,9 @@ export class BirdsLevel implements Level {
     W(4.7, 0.22, 3.1, 2.4, 0.22, 0.45);
     W(4.2, 0, -5, 0.3, 0.3, 2.4);
     W(1.2, 0, -5.2, 0.9, 0.9, 0.9);
-    S(5.5, 0, -1.2, 0.7, 0.7, 0.7);
+    S(6.8, 0, -2.6, 0.7, 0.7, 0.7);
     S(0.6, 0, 4.4, 0.7, 0.7, 0.7);
-    Gl(6, 0, 0.6, 1.6, 1.2, 0.14);
+    Gl(7.4, 0, 1.2, 1.6, 1.2, 0.14);
     T(4.2, 0, 6.4);
   }
 
@@ -562,6 +571,14 @@ export class BirdsLevel implements Level {
       camera.addShake(0.35);
     }
     this.sling.rise = clamp((s - RISE_AT) / RISE_TIME, 0, 1);
+    // While it rises, turn the view to it (gently; the mouse still works).
+    if (s >= RISE_AT && s < RISE_AT + LOOK_TIME && player.mode === 'control') {
+      const to = sub(add(SLING_BASE, [0, 15, 0]), player.pos);
+      const yaw = Math.atan2(-to[0], -to[2]);
+      const k = 1 - Math.exp(-dt * 2.5);
+      camera.yaw = approachAngle(camera.yaw, yaw, k);
+      camera.pitch += (0.32 - camera.pitch) * k;
+    }
     if (!this.revealed && s >= REVEAL_AT) {
       this.revealed = true;
       if (!this.death) {
@@ -769,7 +786,7 @@ export class BirdsLevel implements Level {
     body.rb.setLinvel({ x: vel[0], y: vel[1], z: vel[2] }, true);
     const f: Flyer = {
       shot, bird, r, body, prev: [...pos], lastVel: [...vel], age: 0, flight, landed: -1, justLanded: false, frame,
-      trailT: 0, trailBig: true, split: false, dashing: false, fuse: -1, gone: false, blink: rand(1, 3),
+      trailT: 0, trailBig: true, split: false, charge: -1, dashTarget: [0, 0, 0], dashing: false, fuse: -1, gone: false, blink: rand(1, 3),
     };
     this.flyers.push(f);
     return f;
@@ -844,6 +861,7 @@ export class BirdsLevel implements Level {
 
   private updateFlyers(dt: number) {
     const { player, camera } = this.ctx;
+    this.alertLabel.text = '';
     const alive = !this.death && player.mode === 'control' && !player.inPortal;
     const frames = alive ? player.partFrames() : null;
     for (const f of this.flyers) {
@@ -871,16 +889,29 @@ export class BirdsLevel implements Level {
       if (f.landed < 0) {
         // In flight: specials, and the trail of puffs.
         if (f.bird === 'blue' && !f.split && f.shot.kind === 'blues' && f.age >= f.flight * SPLIT_AT) this.splitBlues(f, pos, vel);
-        if (f.bird === 'chuck' && !f.dashing && f.age >= f.flight * DASH_AT) this.dash(f, pos);
+        if (f.bird === 'chuck' && !f.dashing) {
+          if (f.charge < 0 && f.age >= f.flight * DASH_AT) this.windUp(f, pos);
+          else if (f.charge >= 0) {
+            f.charge += dt;
+            if (f.charge >= DASH_PAUSE) this.dash(f, pos);
+          }
+        }
+        const winding = f.charge >= 0 && !f.dashing;
         f.trailT -= dt;
-        if (f.trailT <= 0) {
+        if (winding) {
+          // Hanging in the air, trembling with rage, glaring at the pig.
+          const jitter: Vec3 = [rand(-0.05, 0.05), rand(-0.05, 0.05), rand(-0.05, 0.05)];
+          f.frame = facingFrame(sub(f.dashTarget, pos), add(pos, jitter));
+          this.alertLabel.pos = add(pos, [0, f.r + 1.1, 0]);
+          this.alertLabel.text = '!';
+        } else if (f.trailT <= 0) {
           f.trailT = f.dashing ? 0.025 : 0.05;
           const big = f.trailBig;
           f.trailBig = !big;
-          const size = (big ? 0.17 : 0.1) * (f.bird === 'terence' ? 2 : f.bird === 'blue' ? 0.8 : 1);
+          const size = (big ? 0.22 : 0.13) * (f.bird === 'terence' ? 1.4 : f.bird === 'blue' ? 0.8 : 1);
           this.emit(Kind.Trail, sub(pos, scale(normalize(vel), f.r * 0.9)), [0, 0, 0], [size, size, size], 1e9, TRAIL);
         }
-        f.frame = facingFrame(vel, pos);
+        if (!winding) f.frame = facingFrame(vel, pos);
       } else {
         f.landed += dt;
       }
@@ -939,12 +970,23 @@ export class BirdsLevel implements Level {
     for (let i = 0; i < 5; i++) this.dust(add(pos, randomUnit()), TRAIL, 0.35);
   }
 
-  /** Chuck: SPEED! Straight at where the pig is right now. */
-  private dash(f: Flyer, pos: Vec3) {
+  /** Chuck stops dead in mid-air, eyes on where the pig is right now... */
+  private windUp(f: Flyer, pos: Vec3) {
     const { player } = this.ctx;
+    f.charge = 0;
+    f.dashTarget = add(player.pos, [0, 1.1, 0]);
+    f.body.rb.setGravityScale(0, true);
+    f.lastVel = scale(f.lastVel, 0.06);
+    f.body.rb.setLinvel({ x: f.lastVel[0], y: f.lastVel[1], z: f.lastVel[2] }, true);
+    f.frame = facingFrame(sub(f.dashTarget, pos), pos);
+    sound.squawk(1.6);
+    for (let i = 0; i < 6; i++) this.dust(add(pos, scale(randomUnit(), 0.5)), TRAIL, 0.4);
+  }
+
+  /** ...then SPEED! Straight at where the pig was when he stopped. */
+  private dash(f: Flyer, pos: Vec3) {
     f.dashing = true;
-    const chest = add(player.pos, [0, 1.1, 0]);
-    const dir = normalize(sub(chest, pos));
+    const dir = normalize(sub(f.dashTarget, pos));
     f.body.rb.setGravityScale(0, true);
     f.lastVel = scale(dir, DASH_SPEED);
     f.body.rb.setLinvel({ x: f.lastVel[0], y: f.lastVel[1], z: f.lastVel[2] }, true);
@@ -1164,16 +1206,17 @@ export class BirdsLevel implements Level {
     const burst = () => add(vel, add(scale(randomUnit(), rand(1.5, 4.5)), [0, rand(1, 3), 0]));
     if (b.material === 'wood' || b.material === 'tnt') {
       for (let i = 0; i < pieces; i++) {
-        const len = rand(0.2, 0.6);
-        this.emit(Kind.Splinter, inside(), burst(), [0.06, 0.06, len], rand(2.5, 4), WOOD_BITS);
+        const len = rand(0.25, 0.75);
+        this.emit(Kind.Splinter, inside(), burst(), [rand(0.07, 0.11), rand(0.05, 0.08), len], rand(2.5, 4), WOOD_BITS);
       }
-      for (let i = 0; i < 3; i++) this.dust(inside(), DUST, 0.45);
+      for (let i = 0; i < 3; i++) this.dust(inside(), DUST, 0.5);
       if (this.breakSounds < 4) sound.wood();
     } else if (b.material === 'glass') {
-      for (let i = 0; i < pieces + 2; i++) {
-        const s = rand(0.18, 0.4);
-        this.emit(Kind.Shard, inside(), burst(), [s, 0.02, s * rand(0.7, 1.3)], rand(2, 3.2), GLASS_BITS);
+      for (let i = 0; i < pieces + 3; i++) {
+        const s = rand(0.22, 0.5);
+        this.emit(Kind.Shard, inside(), burst(), [s, 0.025, s * rand(0.7, 1.3)], rand(2, 3.2), GLASS_BITS);
       }
+      for (let i = 0; i < 2; i++) this.dust(inside(), GLASS_BITS, 0.4);
       if (this.breakSounds < 4) sound.glass();
     } else {
       for (let i = 0; i < pieces; i++) {
@@ -1204,7 +1247,7 @@ export class BirdsLevel implements Level {
       if (b.broken) continue;
       const d = this.distToBlock(b, pos);
       if (d > blast.range) continue;
-      const dmg = (blast.strength * MATERIALS[b.material].blast) / Math.max(d, 0.5) ** 2;
+      const dmg = (blast.strength * MATERIALS[b.material].blast) / Math.max(d, 0.8) ** 2;
       if (b.material === 'tnt') {
         if (dmg >= 1) this.light(b, TNT_DELAY + d * 0.04);
       } else this.damage(b, dmg);
@@ -1503,6 +1546,7 @@ export class BirdsLevel implements Level {
     const list = this.labelList;
     list.length = 0;
     if (this.nameLabel.text) list.push(this.nameLabel, this.quipLabel);
+    if (this.alertLabel.text) list.push(this.alertLabel);
     for (const p of this.popups) if (p.t >= 0) list.push(p.label);
     return list;
   }

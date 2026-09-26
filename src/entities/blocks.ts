@@ -27,14 +27,14 @@ export interface MaterialDef {
   /** Damage from being hit or landed on, by the impulse (N·s) that went through it: (J - j0) / jScale. */
   j0: number;
   jScale: number;
-  /** Damage from an explosion at distance d (m): blast / max(d, 0.5)² × this. */
+  /** Damage from an explosion at distance d (m): strength / max(d, 0.8)² × this. */
   blast: number;
 }
 
 export const MATERIALS: Record<Material, MaterialDef> = {
-  wood: { density: 50, friction: 0.7, restitution: 0.1, points: 500, dv0: 4.5, dvScale: 5, j0: 40, jScale: 120, blast: 7 },
+  wood: { density: 50, friction: 0.7, restitution: 0.1, points: 500, dv0: 4.5, dvScale: 5, j0: 40, jScale: 120, blast: 5 },
   glass: { density: 60, friction: 0.5, restitution: 0.05, points: 500, dv0: 3, dvScale: 2.5, j0: 15, jScale: 40, blast: 12 },
-  stone: { density: 160, friction: 0.5, restitution: 0.02, points: 1000, dv0: 7, dvScale: 9, j0: 300, jScale: 900, blast: 2.5 },
+  stone: { density: 160, friction: 0.5, restitution: 0.02, points: 1000, dv0: 7, dvScale: 9, j0: 300, jScale: 900, blast: 0.7 },
   tnt: { density: 0, friction: 0.7, restitution: 0.1, points: 2000, dv0: 6.5, dvScale: 1, j0: 150, jScale: 60, blast: 8 },
 };
 
