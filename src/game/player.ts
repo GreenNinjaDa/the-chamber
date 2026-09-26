@@ -399,15 +399,21 @@ export class Player {
     if (this.platformVel[0] || this.platformVel[1] || this.platformVel[2]) delta = add(delta, scale(this.toLocal(this.platformVel), dt));
     this.move(delta, dt);
 
+    // Out of the obstacles (a few passes, so squeezing between two that touch doesn't work).
     const p = this.pos;
-    for (const c of obstacles) {
-      const dx = p[0] - c.x, dz = p[2] - c.z;
-      const d = Math.hypot(dx, dz);
-      const min = c.r + PLAYER_RADIUS;
-      if (d < min && d > 1e-4) {
-        p[0] = c.x + (dx / d) * min;
-        p[2] = c.z + (dz / d) * min;
+    for (let pass = 0; pass < 4; pass++) {
+      let moved = false;
+      for (const c of obstacles) {
+        const dx = p[0] - c.x, dz = p[2] - c.z;
+        const d = Math.hypot(dx, dz);
+        const min = c.r + PLAYER_RADIUS;
+        if (d < min && d > 1e-4) {
+          p[0] = c.x + (dx / d) * min;
+          p[2] = c.z + (dz / d) * min;
+          moved = true;
+        }
       }
+      if (!moved) break;
     }
 
     const hs = Math.hypot(this.vel[0], this.vel[2]);

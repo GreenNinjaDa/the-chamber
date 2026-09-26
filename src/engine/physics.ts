@@ -28,6 +28,11 @@ const DEBRIS_BIT = 0x0020; // loose clutter boulders roll straight through
 export const GROUPS_BOULDER_BRIDGE = (BRIDGE_BIT << 16) | BOULDER_BIT;
 /** A boulder: hits everything (including boulder bridges) except debris. */
 export const GROUPS_BOULDER = (BOULDER_BIT << 16) | (0xffff & ~DEBRIS_BIT);
+/**
+ * Solid only to the player's limp body (a ragdoll): for things the living player is kept out of some
+ * other way (e.g. `Level.obstacles`), so a flung corpse still bounces off them.
+ */
+export const GROUPS_RAGDOLL_ONLY = (BODY_BIT << 16) | BODY_BIT;
 /** Loose debris: like any other loose object, but boulders pass through it. */
 export const GROUPS_DEBRIS = (DEBRIS_BIT << 16) | (0xffff & ~BOULDER_BIT & ~BRIDGE_BIT);
 /** Player body parts while animated: collide with the world and props, but not each other. */

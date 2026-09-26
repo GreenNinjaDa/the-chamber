@@ -324,6 +324,14 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   OVER, naming the ghost). All pellets eaten: the maze flashes, sinks, and the exit opens; the last 3 pellets get
   purple markers. Score and an unbeatable HIGH SCORE (3,333,360) on the north wall; no looking up while the maze
   is up (keeps the camera above the walls).
+- **Level 30 — Chess** (`src/levels/chess/`): the floor is an 8 x 8 board of 3 m squares; you're a white pawn at the
+  south end ("WHITE TO MOVE" until you step off your square) and Black's whole army (`entities/chess.ts`, giant
+  primitive pieces, solid via `obstacles()` plus `GROUPS_RAGDOLL_ONLY` colliders for a flung corpse) stands at the north
+  end. Black moves by the rules on a clock (one piece a turn, two from 4 s, three from 22 s), each move shown as a
+  red square 0.95 s before the piece lifts off; whatever is on that square when it lands is captured ("CHECK." on
+  the wall when it's yours). The AI aims at your square or where you're heading, closes in otherwise, and once you're
+  in its half keeps the back row home and plugs its holes. Reach an empty square of the far row to promote (a crown);
+  the king topples over (BLACK RESIGNS), the pieces sink away and the exit opens.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -370,7 +378,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   beanbag, piano bench: `spawnFurniture`, sofas and armchairs with seat / back / arm colliders so you stand on the
   cushions; `drawRug`, `drawPainting`), `giantDuck.ts` (a 4 m rubber duck you can stand on: a fixed body the level
   moves with `moveTo`, which carries a rider along), `elevator.ts` (the chamber as an elevator car: doors, handrails,
-  LED floor indicator `FloorIndicator`, button panel `CarPanel`, crosshead and grate, the scrolling shaft). Put new
+  LED floor indicator `FloorIndicator`, button panel `CarPanel`, crosshead and grate, the scrolling shaft). `chess.ts` (chess pieces, a crown). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
@@ -406,6 +414,8 @@ Shared mechanics available to levels (via `ctx`):
 - Sound (`engine/audio.ts`): portals, buttons, levers, hits, explosions and the death trombone play by themselves.
   Levels add their own with `sfx.*`, `tone()` / `noise()`, or a `Tune` (call `start()` from update while it
   should play: starting a level and pausing stop every tune). Never rely on sound alone for a cue.
+- `Level.obstacles()` circles keep the living player out (resolved in a few passes, so there is no squeezing between
+  two that touch); give them `GROUPS_RAGDOLL_ONLY` colliders too if a flung corpse should bounce off them.
 - Jumps are buffered: pressing Space up to 0.1 s before the player can jump (`JUMP_BUFFER` in player.ts) jumps as soon
   as they can.
 - The player's movement capsule is wider than the body and never pushes things itself: walking pushes loose
