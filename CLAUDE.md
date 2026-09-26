@@ -212,51 +212,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   in them cooks you (COOKED, `player.char`). Popcorn kernels pop from 12 s (knocking you about), and the fork left
   on the plate sparks from 18 s and arcs every 1-2.5 s, zapping anyone within 4.2 m of its tines (ZAPPED). DING: the
   door (exit) opens.
-- **Level 21 — Bowling** (`src/levels/bowling/`; map in `lane.ts`): its own map (`none`), with the chamber's footprint so
-  the camera keeps its usual chamber confinement: a honey-wood lane
-  (boards, arrows, dots, pin spots), sunken gutters (2.7 m wide, 0.7 m deep) along the east and west walls, a dark pit
-  across the north end, a scoreboard on the north wall (and a small one over the hatch) with sarcastic verdicts
-  ("STRIKE! (NOT YOU)", "7-10 SPLIT", "MARK IT ZERO", "TURKEY!"...). You arrive among ten 2 m pins (27 kg): you're the
-  eleventh. A launcher behind a hatch in the south wall fires 1.25 m kinematic balls at you (contact kills, violence
-  20; pins fly for real and can knock you over): 1) straight at where you were, 2) a hook down a line 4 m to the
-  side that curves at you from 11 m out (run away from the curve), 3) two at once that close in either side of you
-  (stand dead centre), 4) a 6 m giant dropped from the sky that steers at you (only a gutter is safe; it pops and
-  flies off like a balloon at the back wall). Lane balls never enter gutters, but whoever is in a gutter when a
-  ball is fired gets a gutter ball down it. After each frame a hazard-striped sweep bar drops in front of the deck
-  and pushes everything into the pit (jump it; swept = "CLEARED"), then ten pins come down on strings onto their
-  spots (standing on one = "PINNED"). After the giant, the last ball is fired 0.8 s after the exit (east wall, in
-  the gutter halfway down the lane) opens, and more keep coming until you leave.
-- **Level 22 — Falling Blocks** (`src/levels/tetris/`): a glass-fronted well one cell deep and ten wide against the east wall,
-  seen side-on (the level's camera shot; A / D move along it). Tetrominoes fall a row at a time, steering toward
-  wherever you stand (a column every other row) and committing 4 rows up (a ghost shows where they'll land); what
-  lands is what you climb, up to the exit (open from the start, 5 m up the east wall). Full rows clear and drop
-  everything above. Crushed = GAME OVER; the stack reaching the top of the well = TOPPED OUT.
-- **Level 23 — Laser Show** (`src/levels/lasers/`; Fall Guys' Jump Club meets the Resident Evil laser hallway): the
-  lights go down (dark red) and an emitter pylon (`entities/laser.ts`, `LaserPylon`) rises out of a floor hatch.
-  A low beam (0.35 m) grows out opposite the player and sweeps round, speeding up from 5 s to 2.5 s a turn: jump it.
-  Then a mast rises and a high beam (1.6 m) joins, turning the other way at a different speed: duck it (stand still and
-  look down; a full duck tops out at 1.43 m, standing reaches 1.9 m, walking or half-looking down still gets hit).
-  Where the two cross you can't do both, so move. Then three laser walls (grids to ~3.9 m) sweep across from the side
-  further from you, each with a 2–2.4 m full-height gap you can walk to in time (the last one faster, with a low beam in
-  the gap to jump, and its gap in the west half); then the exit opens and a gapless grid comes from the west wall at
-  4.2 m/s. Any beam touching a body part (`BodySlicer`: the real part frames as slightly shrunk capsules/boxes, swept
-  in 4 cm steps so fast beams can't skip a limb) slices you: `player.kill` with violence 30 (42 for the grid) at the
-  cut. One red point light rides with the pylon, then with each wall. `?laserSkip=N` starts the show N s in.
-- **Level 24 — Pac-Man** (`src/levels/pacman/`): after the arrival the floor goes dark navy, the sun dims to a moon
-  and a 13×13-cell maze (`maze.ts`: black blocks outlined in glowing arcade blue, 1.5 m tall so you can't jump
-  onto them but the camera sees over; 2.25 m corridors; a ghost house with a pink door in the middle) rises out of
-  the floor, shoving the player out of its way, while the camera shows the whole board from above (READY!). 81
-  pellets and 4 blinking power pellets float at waist height; the player glows warm (the level's point light).
-  Four ghosts (`entities/ghost.ts`, `ghosts.ts`) leave the house one by one (0 / 2.5 / 6 / 10 s) and roam cell by
-  cell at 4 m/s with the arcade brains (Blinky chases, Pinky aims 4 cells ahead, Inky pincers through Blinky,
-  Clyde gets shy within 5 cells), alternating scatter / chase; Blinky speeds up with 20 and 8 pellets left. A power
-  pellet makes them blue, wobbly and random for 7 s (flashing the last 2): touch one to eat it (200 / 400 / 800 /
-  1600; its eyes zip home and it revives). A cherry (100) turns up under the house after 25 and 60 pellets.
-  Touching a ghost otherwise: the world freezes, the ghosts vanish, the player spins, shrinks and pops (GAME
-  OVER, naming the ghost). All pellets eaten: the maze flashes, sinks, and the exit opens; the last 3 pellets get
-  purple markers. Score and an unbeatable HIGH SCORE (3,333,360) on the north wall; no looking up while the maze
-  is up (keeps the camera above the walls).
-- **Level 25 — Hex-A-Gone** (`src/levels/hexagone/`; Fall Guys' disappearing floor): no test chamber but an 18 m white shaft
+- **Level 21 — Hex-A-Gone** (`src/levels/hexagone/`; Fall Guys' disappearing floor): no test chamber but an 18 m white shaft
   (`chamber: { none: true }`, same 24 x 24 footprint) with three floors of candy hex tiles (`entities/hexFloor.ts`,
   corner radius 0.95 m, 295 per floor, tops at 13.5 / 9 / 4.5 m: pink, yellow, blue) over glowing goo (1.2 m, with a
   green point light). You land on the top floor with six contestants; a 3-2-1-GO on the LED board on the north wall
@@ -272,6 +228,50 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   view, kept under the floor overhead and above the one underfoot wherever there are tiles (after a fall it follows
   you down through your hole); dissolved, it looks down at the splash. `?hexTime=N` sets the round length, `?hexSolo`
   leaves the contestants out.
+- **Level 22 — Bowling** (`src/levels/bowling/`; map in `lane.ts`): its own map (`none`), with the chamber's footprint so
+  the camera keeps its usual chamber confinement: a honey-wood lane
+  (boards, arrows, dots, pin spots), sunken gutters (2.7 m wide, 0.7 m deep) along the east and west walls, a dark pit
+  across the north end, a scoreboard on the north wall (and a small one over the hatch) with sarcastic verdicts
+  ("STRIKE! (NOT YOU)", "7-10 SPLIT", "MARK IT ZERO", "TURKEY!"...). You arrive among ten 2 m pins (27 kg): you're the
+  eleventh. A launcher behind a hatch in the south wall fires 1.25 m kinematic balls at you (contact kills, violence
+  20; pins fly for real and can knock you over): 1) straight at where you were, 2) a hook down a line 4 m to the
+  side that curves at you from 11 m out (run away from the curve), 3) two at once that close in either side of you
+  (stand dead centre), 4) a 6 m giant dropped from the sky that steers at you (only a gutter is safe; it pops and
+  flies off like a balloon at the back wall). Lane balls never enter gutters, but whoever is in a gutter when a
+  ball is fired gets a gutter ball down it. After each frame a hazard-striped sweep bar drops in front of the deck
+  and pushes everything into the pit (jump it; swept = "CLEARED"), then ten pins come down on strings onto their
+  spots (standing on one = "PINNED"). After the giant, the last ball is fired 0.8 s after the exit (east wall, in
+  the gutter halfway down the lane) opens, and more keep coming until you leave.
+- **Level 23 — Falling Blocks** (`src/levels/tetris/`): a glass-fronted well one cell deep and ten wide against the east wall,
+  seen side-on (the level's camera shot; A / D move along it). Tetrominoes fall a row at a time, steering toward
+  wherever you stand (a column every other row) and committing 4 rows up (a ghost shows where they'll land); what
+  lands is what you climb, up to the exit (open from the start, 5 m up the east wall). Full rows clear and drop
+  everything above. Crushed = GAME OVER; the stack reaching the top of the well = TOPPED OUT.
+- **Level 24 — Laser Show** (`src/levels/lasers/`; Fall Guys' Jump Club meets the Resident Evil laser hallway): the
+  lights go down (dark red) and an emitter pylon (`entities/laser.ts`, `LaserPylon`) rises out of a floor hatch.
+  A low beam (0.35 m) grows out opposite the player and sweeps round, speeding up from 5 s to 2.5 s a turn: jump it.
+  Then a mast rises and a high beam (1.6 m) joins, turning the other way at a different speed: duck it (stand still and
+  look down; a full duck tops out at 1.43 m, standing reaches 1.9 m, walking or half-looking down still gets hit).
+  Where the two cross you can't do both, so move. Then three laser walls (grids to ~3.9 m) sweep across from the side
+  further from you, each with a 2–2.4 m full-height gap you can walk to in time (the last one faster, with a low beam in
+  the gap to jump, and its gap in the west half); then the exit opens and a gapless grid comes from the west wall at
+  4.2 m/s. Any beam touching a body part (`BodySlicer`: the real part frames as slightly shrunk capsules/boxes, swept
+  in 4 cm steps so fast beams can't skip a limb) slices you: `player.kill` with violence 30 (42 for the grid) at the
+  cut. One red point light rides with the pylon, then with each wall. `?laserSkip=N` starts the show N s in.
+- **Level 25 — Pac-Man** (`src/levels/pacman/`): after the arrival the floor goes dark navy, the sun dims to a moon
+  and a 13×13-cell maze (`maze.ts`: black blocks outlined in glowing arcade blue, 1.5 m tall so you can't jump
+  onto them but the camera sees over; 2.25 m corridors; a ghost house with a pink door in the middle) rises out of
+  the floor, shoving the player out of its way, while the camera shows the whole board from above (READY!). 81
+  pellets and 4 blinking power pellets float at waist height; the player glows warm (the level's point light).
+  Four ghosts (`entities/ghost.ts`, `ghosts.ts`) leave the house one by one (0 / 2.5 / 6 / 10 s) and roam cell by
+  cell at 4 m/s with the arcade brains (Blinky chases, Pinky aims 4 cells ahead, Inky pincers through Blinky,
+  Clyde gets shy within 5 cells), alternating scatter / chase; Blinky speeds up with 20 and 8 pellets left. A power
+  pellet makes them blue, wobbly and random for 7 s (flashing the last 2): touch one to eat it (200 / 400 / 800 /
+  1600; its eyes zip home and it revives). A cherry (100) turns up under the house after 25 and 60 pellets.
+  Touching a ghost otherwise: the world freezes, the ghosts vanish, the player spins, shrinks and pops (GAME
+  OVER, naming the ghost). All pellets eaten: the maze flashes, sinks, and the exit opens; the last 3 pellets get
+  purple markers. Score and an unbeatable HIGH SCORE (3,333,360) on the north wall; no looking up while the maze
+  is up (keeps the camera above the walls).
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one

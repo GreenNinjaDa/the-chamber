@@ -64,11 +64,11 @@ const LEVELS: ((ctx: LevelContext) => Level)[] = [
   (ctx) => new SnakeLevel(ctx),
   (ctx) => new PinataLevel(ctx),
   (ctx) => new MicrowaveLevel(ctx),
+  (ctx) => new HexagoneLevel(ctx),
   (ctx) => new BowlingLevel(ctx),
   (ctx) => new TetrisLevel(ctx),
   (ctx) => new LaserLevel(ctx),
   (ctx) => new PacmanLevel(ctx),
-  (ctx) => new HexagoneLevel(ctx),
 ];
 const params = new URLSearchParams(location.search);
 /** `?sandbox` opens the mechanics test room; `?level=N` skips the lobby and starts at level N. */
