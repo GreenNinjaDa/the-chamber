@@ -96,7 +96,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   the gap to jump, and its gap in the west half); then the exit opens and a gapless grid comes from the west wall at
   4.2 m/s. Any beam touching a body part (`BodySlicer`: the real part frames as slightly shrunk capsules/boxes, swept
   in 4 cm steps so fast beams can't skip a limb) slices you: `player.kill` with violence 30 (42 for the grid) at the
-  cut. One red point light rides with the pylon, then with each wall.
+  cut. One red point light rides with the pylon, then with each wall. `?laserSkip=N` starts the show N s in.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one

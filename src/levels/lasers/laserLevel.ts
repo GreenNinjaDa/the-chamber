@@ -497,7 +497,7 @@ export class LaserLevel implements Level {
     this.pylon.draw(out, time);
     const p = this.pylon;
     this.drawSpinner(out, this.low, p.ringY, PYLON_RADIUS + 0.015, 1);
-    this.drawSpinner(out, this.high, p.mastRingY, MAST_RADIUS + 0.015, 0.55);
+    this.drawSpinner(out, this.high, p.mastRingY, MAST_RADIUS + 0.015, 0.3);
     if (this.skyBeamOn && p.rise > 0.5) drawBeam(out, [0, p.mastTop, 0], [0, 60, 0]);
     if (this.sweep) this.drawSweep(out, this.sweep);
     this.drawSparks(out);
