@@ -14,16 +14,16 @@ import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type Level
  * torch in your hand. The exit portal is right there... until a boulder drops out of a deep shaft
  * in the ceiling in front of it and chases you down the tunnel, over spiked pits (the widest needs
  * a vine), spikes and loose rocks. At the end a pressure plate stops the boulder, the end wall sinks
- * into the floor to reveal a second boulder, and gravity slowly rolls over onto the ceiling (the
- * camera trailing behind), rocks and all. Now the ceiling's pits and spikes are in your way, the new
+ * into the floor to reveal a second boulder, and the world freezes while your view rolls over; then
+ * gravity flips and you fall to the ceiling in a heap, rocks and all. Now the ceiling's pits and spikes are in your way, the new
  * boulder chases you home, and the first one rolls ahead of you and drops back down its shaft
  * (now a pit), which you cross on a second vine to reach the portal. Boulders kill on contact.
  *
  * Vines are physical ropes: hold E or left mouse near one to grab it wherever you reach, swing,
  * and let go to fly on. Each snaps after one use, so there's no going back.
  *
- * The map never moves: the roll turns gravity (the physics world's and the player's own) about
- * the tunnel's axis (+z), so the player really falls onto the wall and then the ceiling.
+ * The map never moves: the view turns (the player's gravity, with the world frozen), then the
+ * physics world's gravity flips to match and everything, the player included, falls to the ceiling.
  */
 
 // --- Layout (world space: floor y = 0, ceiling y = H, running along +z) ------------------------------
@@ -63,15 +63,16 @@ const CHASE_CATCHUP = 9.5;
 const ROLL_DELAY = 0.7;
 /** After the roll the first boulder rolls away toward the start faster than anyone can run. */
 const FLEE = 10.5;
-/** Once the plate is pressed, the chasing boulder stops at least this far back. */
-const STOP_SHORT = 3;
 /** How quickly the first boulder gets going again after the roll (it starts from rest). */
 const FLEE_GAIN = 0.6;
 
 const END_WAIT = 1;
 const WALL_SINK = 1;
-/** The gravity roll: one smooth half turn about the tunnel's axis. */
-const ROLL_TIME = 5;
+/** The roll: with the world frozen, the camera turns a half turn about the tunnel's axis in this long... */
+const ROLL_TIME = 4;
+/** ...and holds there this long after it's caught up; then gravity snaps over and the player falls, limp for a moment. */
+const ROLL_HOLD = 0.5;
+const FALL_STUN = 0.1;
 
 // Spikes: rows across the floor (the way out) and the ceiling (the way back), and spikes sticking
 // out of the walls. They're not solid: touching one knocks you loose for a moment.
@@ -170,6 +171,8 @@ export class TempleLevel implements Level {
   private spikeGrace = 0;
   private levelBody: RAPIER.RigidBody;
   private flipped = false;
+  /** How long the camera has sat turned over before gravity follows. */
+  private holdT = 0;
   private endWall: RAPIER.Collider;
   private wallDrop = 0;
   private plate: PressurePlate;
@@ -411,11 +414,15 @@ export class TempleLevel implements Level {
         if (this.stageT >= WALL_SINK) this.startTurn();
         break;
       case 'turn': {
-        // Gravity turns about the tunnel's axis in one smooth half turn; the player (and, a little
-        // behind, their camera) turn with it, and everything loose falls.
+        // The world is frozen and only the camera turns (a little behind its target). Once it has
+        // caught up and held for a moment, gravity snaps over and everything falls to the ceiling.
+        const { camera, player } = this.ctx;
         const k = easeInOut(clamp(this.stageT / ROLL_TIME, 0, 1));
-        this.setGravity(Math.PI * k);
-        if (this.stageT >= ROLL_TIME) this.endRoll();
+        camera.turnTarget = rotationZ(Math.PI * k);
+        if (this.stageT >= ROLL_TIME) {
+          if (!camera.aligned(player)) this.holdT = 0;
+          else if ((this.holdT += dt) >= ROLL_HOLD) this.endRoll();
+        }
         break;
       }
       case 'chaseBack':
@@ -456,11 +463,6 @@ export class TempleLevel implements Level {
     const along = this.flipped ? -1 : 1; // which way down the tunnel it chases
     const gap = (me[2] - b.rb.translation().z) * along - BOULDER_R;
     let target = gap > 14 ? CHASE_CATCHUP : gap < 4 ? CHASE_SLOW : CHASE;
-    if (this.stage === 'endWait' || this.stage === 'wallDown') {
-      // The plate stops it well short (after the roll it has to get away from you, not onto you).
-      const left = (this.stage === 'endWait' ? END_WAIT - this.stageT + WALL_SINK : WALL_SINK - this.stageT) + 0.3;
-      target = Math.min(target, Math.max(0, (gap - STOP_SHORT) / left));
-    }
     if (this.death) target = 0; // it stops, rather than bulldozing the body
     this.rollAlong(b, along, target, dt);
   }
@@ -483,13 +485,18 @@ export class TempleLevel implements Level {
     b.rb.setLinvel({ x: v.x, y: v.y, z: next }, true);
   }
 
-  /** The gravity roll. The boulders freeze where they are until it's over. */
+  /** The roll: the world freezes (freezeWorld) while the view turns. */
   private startTurn() {
-    this.parked = this.boulders.map((_, i) => this.boulderPos(i));
-    for (const b of this.boulders) b.rb.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
     this.chasing = null;
+    this.rope = null;
+    this.holdT = 0;
+    this.ctx.player.hanging = false;
     this.ctx.camera.addShake(0.3);
     this.setStage('turn');
+  }
+
+  freezeWorld() {
+    return this.stage === 'turn';
   }
 
   /** Gravity rolled by \`angle\` about the tunnel's axis (0: normal, π/2: onto a side wall, π: onto the ceiling). */
@@ -502,7 +509,10 @@ export class TempleLevel implements Level {
   private endRoll() {
     this.flipped = true;
     this.setGravity(Math.PI);
+    this.ctx.camera.turnTarget = null; // it follows the player's (now flipped) gravity again
     this.setStage('chaseBack');
+    // Everything falls to the ceiling, the player too: limp for a moment, then back on their feet.
+    this.ctx.player.knock([0, 0, 0], FALL_STUN);
     // Both boulders fall to the new floor. The first starts rolling off toward the start from rest
     // (if it's close, that's your problem); the second chases you home.
     this.release(0);

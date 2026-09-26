@@ -217,13 +217,18 @@ async function main() {
         if (finished) hud.show("THAT'S ALL, FOLKS", 'Every chamber so far. The rest are still being built. Probably.', 4);
       }
       camera.look(dt, input);
-      if (player.mode === 'control' && !player.inPortal) player.update(dt, input, camera.yaw, level.obstacles(), camera.pitch);
-      player.syncCollider();
+      const frozen = level.freezeWorld?.() ?? false;
+      if (!frozen) {
+        if (player.mode === 'control' && !player.inPortal) player.update(dt, input, camera.yaw, level.obstacles(), camera.pitch);
+        player.syncCollider();
+      }
       level.update(dt);
-      player.tickPortal(dt);
-      interaction.update(dt, input, camera, player, ctx.physics);
-      ctx.physics.step(dt);
-      player.afterPhysics();
+      if (!frozen) {
+        player.tickPortal(dt);
+        interaction.update(dt, input, camera, player, ctx.physics);
+        ctx.physics.step(dt);
+        player.afterPhysics();
+      }
       const shot = level.cameraShot();
       if (shot) camera.moveTo(shot.pos, shot.target, dt, shot.sharpness);
       else camera.follow(dt, player);

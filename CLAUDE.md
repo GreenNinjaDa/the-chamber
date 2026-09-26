@@ -72,9 +72,10 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   and the exit portal and chases them (rubber-banded: sprinting stays ahead, walking gets caught) over spiked floor
   pits (the 8 m one, too far to sprint-jump, needs a vine), past spikes (rows across the floor, spikes out of the
   walls; not solid, touching one stuns for 0.5 s) and ~70 loose rocks (debris: boulders roll straight through them).
-  A pressure plate at the end stops the boulder, the end wall sinks to reveal a second boulder, and gravity rolls a
-  smooth half turn about the tunnel's axis onto the ceiling over 5 s, rocks and all; the camera trails the turn. The
-  map never moves; gravity (the physics world's and the player's own) turns. The way back has the ceiling's own pits
+  A pressure plate at the end (the boulder keeps coming) sinks the end wall to reveal a second boulder; then the
+  world freezes (`Level.freezeWorld`) while only the camera turns upside down (`camera.turnTarget`), and 0.5 s after
+  it settles gravity snaps over: everything, the player included (stunned 0.1 s, then gets up), falls to the ceiling.
+  The map never moves. The way back has the ceiling's own pits
   and spikes; the new boulder chases, the first rolls off from rest and drops into its shaft (12 m deep, so both
   boulders fit with room to spare), crossed on a second vine to the portal. Vines are physical ropes: hold E or left
   mouse near one to hang on at that length (`player.hanging` for the pose); let go to fly on; each snaps after one

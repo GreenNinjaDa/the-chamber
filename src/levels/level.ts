@@ -63,6 +63,11 @@ export interface Level {
   trackedTargets?(): TrackedTarget[];
   /** Text to float in the world. */
   labels?(): WorldLabel[];
+  /**
+   * True to freeze the world: no physics and no player movement, while the level (and the camera)
+   * keep going, e.g. to turn the view before gravity changes.
+   */
+  freezeWorld?(): boolean;
 }
 
 export const DEFAULT_ENV: Environment = {

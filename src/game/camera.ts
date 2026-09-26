@@ -1,5 +1,5 @@
 import type { Input } from '../engine/input';
-import { add, clamp, fromQuat, lerp3, lookAt, perspective, quatSlerp, scale, sub, toQuat, transformDir, type Quat, type Vec3 } from '../engine/math';
+import { add, clamp, fromQuat, lerp3, lookAt, perspective, quatSlerp, scale, sub, toQuat, transformDir, type Mat4, type Quat, type Vec3 } from '../engine/math';
 import type { CameraView } from '../engine/renderer';
 import { CHAMBER_HALF } from './chamber';
 import type { Player } from './player';
@@ -25,11 +25,14 @@ export class ThirdPersonCamera {
   up: Vec3 = [0, 1, 0];
   /** The camera's own idea of the player's gravity: trails behind when it turns. */
   private frame: Quat = { x: 0, y: 0, z: 0, w: 1 };
+  /** Turn the view toward this orientation instead of the player's gravity (a level's camera-only roll). */
+  turnTarget: Mat4 | null = null;
 
   reset(yaw = 0) {
     this.confine = true;
     this.up = [0, 1, 0];
     this.frame = { x: 0, y: 0, z: 0, w: 1 };
+    this.turnTarget = null;
     this.yaw = yaw;
     this.pitch = -0.2;
     this.shake = 0;
@@ -50,12 +53,14 @@ export class ThirdPersonCamera {
     const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
     // Yaw and pitch are in the player's own frame, so the view turns with their gravity, a little
     // behind it so a turn is felt.
-    this.frame = quatSlerp(this.frame, toQuat(player.gravity), 1 - Math.exp(-dt * TURN_CATCH_UP));
+    this.frame = quatSlerp(this.frame, toQuat(this.turnTarget ?? player.gravity), 1 - Math.exp(-dt * TURN_CATCH_UP));
     const g = fromQuat(this.frame, [0, 0, 0]);
     const fwd = transformDir(g, [-Math.sin(this.yaw) * cp, sp, -Math.cos(this.yaw) * cp]);
     const right = transformDir(g, [Math.cos(this.yaw), 0, -Math.sin(this.yaw)]);
     this.up = transformDir(g, [0, 1, 0]);
-    const shoulder = add(add(player.pos, scale(this.up, 1.65)), scale(right, SHOULDER_OFFSET));
+    // Orbit the middle of the player's body, so a view turned on its own still frames them.
+    const middle = add(player.pos, scale(player.up, 0.9));
+    const shoulder = add(add(middle, scale(this.up, 0.75)), scale(right, SHOULDER_OFFSET));
     const desired = sub(shoulder, scale(fwd, DISTANCE));
     if (!this.confine) {
       this.moveTo(desired, add(shoulder, scale(fwd, 10)), dt, 18);
@@ -76,6 +81,13 @@ export class ThirdPersonCamera {
     const k = 1 - Math.exp(-dt * sharpness);
     this.pos = lerp3(this.pos, pos, k);
     this.target = lerp3(this.target, target, k);
+  }
+
+  /** True once the view has caught up with where it's turning to (within about a degree). */
+  aligned(player: Player): boolean {
+    const t = toQuat(this.turnTarget ?? player.gravity);
+    const f = this.frame;
+    return Math.abs(t.x * f.x + t.y * f.y + t.z * f.z + t.w * f.w) > 0.99996;
   }
 
   addShake(amount: number) {
