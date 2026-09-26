@@ -1,3 +1,4 @@
+import { note, tone } from '../../engine/audio';
 import { add, basis, clamp, mul, scaling, translation, type Vec3 } from '../../engine/math';
 import { Pattern, type DrawItem } from '../../engine/renderer';
 import { CHAMBER_HALF } from '../../game/chamber';
@@ -112,6 +113,7 @@ export class QuizLevel implements Level {
   }
 
   private ask(i: number) {
+    ['C4', 'E4', 'G4', 'C5'].forEach((n, k) => tone(note(n), 0.25, { wave: 'sawtooth', vol: 0.08, at: k * 0.07 }));
     this.index = i;
     this.phase = 'asking';
     this.phaseT = 0;
@@ -167,6 +169,9 @@ export class QuizLevel implements Level {
       case 'asking': {
         const q = this.questions[this.index];
         this.timer = clamp(1 - this.phaseT / q.time, 0, 1);
+        // The clock ticks (faster in the last third).
+        const tick = this.timer < 0.33 ? 0.5 : 1;
+        if (Math.floor(this.phaseT / tick) !== Math.floor((this.phaseT - dt) / tick)) tone(this.timer < 0.33 ? 1300 : 900, 0.05, { wave: 'square', vol: 0.06 });
         const on = this.padUnder();
         if (on !== this.stale) this.stale = -2;
         if (on === this.held && on >= 0 && on !== this.stale) this.heldFor += dt;
@@ -188,6 +193,7 @@ export class QuizLevel implements Level {
             const yaw = Math.random() * Math.PI * 2;
             if (under < 0) this.trapdoors.push({ pos: [player.pos[0], 0, player.pos[2]], t: 0 });
             player.kill([Math.sin(yaw) * 4, 22, Math.cos(yaw) * 4], { violence: 12 });
+            tone(110, 0.9, { wave: 'sawtooth', vol: 0.2 });
             camera.addShake(0.6);
             this.statusLabel.text = under < 0 ? 'NO ANSWER GIVEN' : 'WRONG';
             this.death = under < 0
@@ -195,6 +201,7 @@ export class QuizLevel implements Level {
               : { t: 0, big: 'WRONG ANSWER', small: pick(['That was not it. Thanks for playing.', 'Unlucky. Also incorrect.', 'Would you like to phone a friend? You have no friends here.']) };
           } else if (alive) {
             this.statusLabel.text = q.quip;
+            ['G4', 'C5', 'E5'].forEach((n, k) => tone(note(n), 0.3, { wave: 'triangle', vol: 0.2, at: k * 0.1 }));
           }
         }
         break;

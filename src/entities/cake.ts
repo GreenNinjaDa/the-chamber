@@ -1,3 +1,4 @@
+import { noise } from '../engine/audio';
 import { add, mul, rotationY, scale, scaling, transformPoint, translation, type Mat4, type Vec3 } from '../engine/math';
 import type { Physics, RAPIER, Usable } from '../engine/physics';
 import { Pattern, type DrawItem } from '../engine/renderer';
@@ -96,6 +97,7 @@ export class Cake {
       return;
     }
     slice.eating = true;
+    for (let k = 0; k < 4; k++) noise(0.09, { freq: 900 + Math.random() * 500, to: 300, q: 2, vol: 0.3, at: k * 0.22 });
   }
 
   /** Call every tick (eating takes a moment). */

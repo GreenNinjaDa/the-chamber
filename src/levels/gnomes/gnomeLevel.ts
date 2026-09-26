@@ -1,3 +1,4 @@
+import { noise } from '../../engine/audio';
 import { add, clamp, cross, dot, length, mul, normalize, rotateByQuat, rotationX, scale, scaling, sub, translation, type Vec3 } from '../../engine/math';
 import type { Body } from '../../engine/physics';
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
@@ -249,9 +250,12 @@ export class GnomeLevel implements Level {
     return this.light < DARK ? base * DARK_SPEED_SCALE : base;
   }
 
+  private scrapeT = 0;
+
   private updateGnomes(dt: number) {
     const { player } = this.ctx;
     const dark = this.light < DARK;
+    let scrapeNear = Infinity;
     const carried = player.carrying?.handle;
     for (const g of this.gnomes) {
       const rb = g.body.rb;
@@ -268,6 +272,7 @@ export class GnomeLevel implements Level {
       const t = rb.translation();
       const v = rb.linvel();
       const seen = !dark && this.isSeen(g);
+      if (!seen && g.state === 'moving') scrapeNear = Math.min(scrapeNear, Math.hypot(player.pos[0] - t.x, player.pos[2] - t.z));
       if (seen) {
         if (g.state === 'moving') {
           // Caught in the act: freeze. Perfectly still.
@@ -307,6 +312,12 @@ export class GnomeLevel implements Level {
         this.gotCaught(g, dark);
         return;
       }
+    }
+    // Stone on floor, somewhere behind you.
+    this.scrapeT -= dt;
+    if (scrapeNear < 10 && this.scrapeT <= 0) {
+      this.scrapeT = 0.3 + Math.random() * 0.25;
+      noise(0.22, { freq: 260 + Math.random() * 120, q: 4, type: 'bandpass', vol: 0.5 * (1 - scrapeNear / 10) });
     }
   }
 

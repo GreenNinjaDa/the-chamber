@@ -1,3 +1,4 @@
+import { noise } from '../../engine/audio';
 import {
   add, basis, clamp, cross, dot, length, lerp, mul, normalize, scale, scaling, segment, sub, translation,
   type Mat4, type Vec3,
@@ -123,6 +124,7 @@ export class SunburnLevel implements Level {
   /** Where the focused light lands this frame (null: blocked or off). */
   private spot: { pos: Vec3; normal: Vec3 } | null = null;
   private heat = 0;
+  private sizzleT = 0;
   private burning = -1;
 
   private burnables: Burnable[] = [];
@@ -332,16 +334,25 @@ export class SunburnLevel implements Level {
       }
     }
 
+    // Whatever's in the spot sizzles.
+    let sizzle = onPlayer && alive ? this.heat / IGNITE : -1;
     // Burnables in the spot heat up (and smoke), and eventually burn.
     for (const b of this.burnables) {
       if (b.burnt) continue;
       const hit = this.spot !== null && this.spotTarget === b;
+      if (hit) sizzle = Math.max(sizzle, b.heat / b.burnAt);
       b.heat = hit ? b.heat + dt : Math.max(0, b.heat - dt * 0.3);
       if (hit && Math.random() < dt * (6 + 20 * (b.heat / b.burnAt))) this.puff(this.spot!.pos, 1, 0.3 + 0.5 * (b.heat / b.burnAt));
       if (b.heat >= b.burnAt) {
         b.burnt = true;
         b.burn();
+        noise(0.8, { freq: 400, to: 2500, type: 'bandpass', q: 1, vol: 0.35 });
       }
+    }
+    this.sizzleT -= dt;
+    if (sizzle >= 0 && this.sizzleT <= 0) {
+      this.sizzleT = 0.07;
+      noise(0.09, { freq: 4000 + Math.random() * 3000, type: 'highpass', vol: 0.04 + 0.2 * Math.min(1, sizzle) });
     }
     // Anything else in the spot smokes a little, so you can see where it is.
     if (this.spot && !this.spotOnPlayer && !this.spotTarget && Math.random() < dt * 5) this.puff(this.spot.pos, 1, 0.15);

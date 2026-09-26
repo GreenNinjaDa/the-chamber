@@ -10,7 +10,7 @@ import { Hud, type ScreenLabel, type ScreenMarker } from './game/hud';
 import { Interaction } from './game/interaction';
 import { PauseMenu } from './game/pauseMenu';
 import { Player } from './game/player';
-import { settings } from './game/settings';
+import { markBeaten, settings } from './game/settings';
 import { DartsLevel } from './levels/darts/dartsLevel';
 import { CakeLevel } from './levels/cake/cakeLevel';
 import { ClawLevel } from './levels/claw/clawLevel';
@@ -36,6 +36,10 @@ import { RedLightLevel } from './levels/redLight/redLightLevel';
 import { LaserLevel } from './levels/lasers/laserLevel';
 import { GnomeLevel } from './levels/gnomes/gnomeLevel';
 import { SnakeLevel } from './levels/snake/snakeLevel';
+import { RockLevel } from './levels/rock/rockLevel';
+import { FlappyLevel } from './levels/flappy/flappyLevel';
+import { HipposLevel } from './levels/hippos/hipposLevel';
+import { ChessLevel } from './levels/chess/chessLevel';
 import { PacmanLevel } from './levels/pacman/pacmanLevel';
 import { BowlingLevel } from './levels/bowling/bowlingLevel';
 import { FloorLavaLevel } from './levels/floorLava/floorLavaLevel';
@@ -79,6 +83,10 @@ const LEVELS: ((ctx: LevelContext) => Level)[] = [
   (ctx) => new LaserLevel(ctx),
   (ctx) => new ElevatorLevel(ctx),
   (ctx) => new PacmanLevel(ctx),
+  (ctx) => new ChessLevel(ctx),
+  (ctx) => new HipposLevel(ctx),
+  (ctx) => new FlappyLevel(ctx),
+  (ctx) => new RockLevel(ctx),
   (ctx) => new BirdsLevel(ctx),
 ];
 const params = new URLSearchParams(location.search);
@@ -262,6 +270,7 @@ async function main() {
       // Through an exit portal: from the lobby to the chosen level, then straight on to the next
       // chamber (after the last, back to the lobby).
       if (level.status === 'exited' && !sandbox) {
+        if (!inLobby) markBeaten(levelIndex + 1);
         let finished = false;
         if (inLobby) {
           inLobby = false;

@@ -1,3 +1,4 @@
+import { noise, note, sfx, tone } from '../../engine/audio';
 import { clamp, length, mul, normalize, rotationY, scaling, segment, sub, toQuat, translation, type Vec3 } from '../../engine/math';
 import { GROUPS_QUERY_WORLD, RAPIER, type Body } from '../../engine/physics';
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
@@ -68,6 +69,8 @@ const OLD_MAN_CHEATS_FROM = 4;
 
 // --- The chant ---------------------------------------------------------------------------------
 const SYLLABLES = ['MU', 'GUNG', 'HWA', 'KKO', 'CHI', 'PI', 'EOT', 'SSEUM', 'NI', 'DA'];
+/** A sing-song note per syllable. */
+const MELODY = ['G4', 'G4', 'E4', 'G4', 'E4', 'A4', 'G4', 'G4', 'E4', 'C5'];
 const WORD_START = [0, 0, 0, 3, 3, 5, 5, 5, 5, 5];
 /** What's shown after each syllable: the current word so far. */
 const CHANT_TEXT = SYLLABLES.map((_, i) => {
@@ -212,6 +215,8 @@ export class RedLightLevel implements Level {
   // The chant: time into it (paused during a fake-out), its length, and when each syllable lands.
   private chantT = 0;
   private chantLen = 0;
+  /** The last syllable sung aloud. */
+  private sung = -1;
   private chantAt = new Array<number>(SYLLABLES.length).fill(0);
   private fake = -1; // time into the fake-out, or -1
   private fakeAt = -1; // chant time it starts at, or -1 for none this green
@@ -289,6 +294,7 @@ export class RedLightLevel implements Level {
       : rand(Math.max(1.5, 2.3 - 0.2 * (n - 3)), Math.max(1.9, 3.6 - 0.25 * (n - 3)));
     this.setPhase('green', len);
     this.chantT = 0;
+    this.sung = -1;
     this.chantLen = len;
     const tempo = n === 0 ? TEMPOS[0] : pick(TEMPOS);
     const total = tempo.reduce((a, b) => a + b, 0);
@@ -311,6 +317,8 @@ export class RedLightLevel implements Level {
     this.setPhase('turn', this.turnTime);
     this.bubble.text = CHANT_TEXT[SYLLABLES.length - 1];
     this.bubble.color = '#ffd23f';
+    tone(note(MELODY[SYLLABLES.length - 1]), 0.35, { wave: 'triangle', vol: 0.25 });
+    noise(0.35, { freq: 500, to: 2500, type: 'bandpass', q: 2, vol: 0.2, at: 0.2 });
     this.oldManMoved = false;
     for (const npc of this.npcs) npc.stopDelay = rand(0.05, 0.28);
   }
@@ -430,6 +438,10 @@ export class RedLightLevel implements Level {
         this.chantT += dt;
         let i = 0;
         while (i + 1 < SYLLABLES.length - 1 && this.chantT >= this.chantAt[i + 1]) i++;
+        if (i > this.sung) {
+          this.sung = i;
+          tone(note(MELODY[i]), 0.25, { wave: 'triangle', vol: 0.22 });
+        }
         if (this.announceT <= 0) {
           this.bubble.text = CHANT_TEXT[i];
           this.bubble.color = '#ffd23f';
@@ -777,6 +789,8 @@ export class RedLightLevel implements Level {
   }
 
   private fire(target: Vec3) {
+    sfx.zap();
+    tone(1400, 0.3, { to: 300, wave: 'sawtooth', vol: 0.12 });
     this.beams.push({ target: [...target], t: 0 });
   }
 

@@ -1,3 +1,4 @@
+import { Drone, note, sfx, tone } from '../../engine/audio';
 import { add, clamp, length, mul, normalize, rotationX, rotationY, scale, scaling, segment, sub, translation, type Vec3 } from '../../engine/math';
 import type { RAPIER, Usable } from '../../engine/physics';
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
@@ -147,6 +148,8 @@ export class ButtonLevel implements Level {
   }
 
   private pressed() {
+    tone(900, 0.06, { wave: 'square', vol: 0.15 });
+    tone(450, 0.2, { wave: 'square', vol: 0.12, at: 0.05 });
     this.doom('YOU PRESSED THE BUTTON', pick<Fate>(['anvil', 'piano', 'glove', 'trapdoor', 'selfdestruct']));
   }
 
@@ -159,6 +162,11 @@ export class ButtonLevel implements Level {
     const walls: Vec3[] = [[CHAMBER_HALF, 1.4, pos[2]], [-CHAMBER_HALF, 1.4, pos[2]], [pos[0], 1.4, CHAMBER_HALF], [pos[0], 1.4, -CHAMBER_HALF]];
     const from = walls.reduce((a, b) => (length(sub(a, pos)) < length(sub(b, pos)) ? a : b));
     this.fate = { kind, t: 0, pos, dir: normalize(sub([pos[0], 1.4, pos[2]], from)), from };
+    this.hum.stop();
+    if (kind === 'anvil' || kind === 'piano') tone(2200, 1.1, { to: 500, wave: 'sine', vol: 0.15, attack: 0.1 });
+    if (kind === 'glove') tone(150, 0.5, { to: 600, wave: 'triangle', vol: 0.3, at: 0.2 });
+    if (kind === 'trapdoor') tone(90, 0.6, { to: 60, wave: 'sawtooth', vol: 0.12 });
+    if (kind === 'selfdestruct') for (let k = 0; k < 6; k++) tone(k % 2 ? 660 : 880, 0.25, { wave: 'square', vol: 0.1, at: k * 0.5 });
     // You can't outrun your mistakes, not even through the exit.
     this.exit.refuse = () => true;
     const small: Record<Fate, string> = {
@@ -173,6 +181,7 @@ export class ButtonLevel implements Level {
   }
 
   private pendingDeath: { big: string; small: string } | null = null;
+  private hum = new Drone(55, { wave: 'sawtooth', vol: 0.001, wobble: 1.5 });
 
   private kill(launch: Vec3, violence: number, origin?: Vec3) {
     const { player, camera } = this.ctx;
@@ -211,6 +220,10 @@ export class ButtonLevel implements Level {
     // The escalation.
     this.main.sign.text = t < 8 ? 'DO NOT PRESS' : t < 16 ? 'PLEASE DO NOT PRESS' : t < 24 ? "IT'S JUST A BUTTON" : t < 32 ? 'DO NOT PRESS (PLEASE PRESS)' : 'DO. NOT.';
     this.main.hum = clamp((t - 14) / 6, 0, 1);
+    if (this.main.hum > 0 && this.status === 'playing' && !this.fate) {
+      this.hum.start();
+      this.hum.setVolume(0.06 * this.main.hum);
+    } else this.hum.stop();
     const lines = ['psst.', 'hey.', '...press me.', 'just once.', 'no one will know.', "i'm so lonely.", 'go on.', 'pleeease.'];
     const k = Math.floor((t - 16) / 3.5);
     if (t > 16 && k !== this.whispered) {
@@ -271,7 +284,12 @@ export class ButtonLevel implements Level {
       case 'piano': {
         // Falls from the sky right onto where you stood (you can't outrun your mistakes).
         const y = 22 - 0.5 * 30 * f.t * f.t;
-        if (y < 1.9 && !this.death) this.kill([0, -3, 0], 16, head);
+        if (y < 1.9 && !this.death) {
+          this.kill([0, -3, 0], 16, head);
+          sfx.thud(1);
+          if (f.kind === 'piano') ['C3', 'F#3', 'B3', 'F4'].forEach((n) => tone(note(n), 1.6, { wave: 'triangle', vol: 0.12 }));
+          else tone(1800, 1.2, { wave: 'sine', vol: 0.15 });
+        }
         break;
       }
       case 'glove':
@@ -283,6 +301,7 @@ export class ButtonLevel implements Level {
       case 'selfdestruct': {
         const n = 3 - Math.floor(f.t);
         this.countdown.text = f.t < 3 ? `SELF-DESTRUCT IN ${n}` : '';
+        if (f.t >= 3 && !this.death) sfx.explosion(0.8);
         if (f.t >= 3 && !this.death) this.kill([(Math.random() - 0.5) * 20, 18, (Math.random() - 0.5) * 20], 45, [0, 0.5, 0]);
         break;
       }

@@ -1,3 +1,4 @@
+import { Drone } from '../../engine/audio';
 import {
   add, basis, clamp, cross, dot, easeInOut, length, mul, normalize, rotationX, rotationY, rotationZ, scale, scaling, segment, sub, transformDir, transformPoint,
   translation, type Mat4, type Vec3,
@@ -241,6 +242,7 @@ export class TempleLevel implements Level {
   /** Seconds since the player reached the end (-1: not yet). */
   private sinceEnd = -1;
   private boulders: Body[] = [];
+  private rumble = new Drone(38, { wave: 'sawtooth', vol: 0.01, wobble: 4 });
   private boulderOpacity: number[] = [];
   /** The player is see-through (see SEE_THROUGH) while this is 'on'; it only happens once. */
   private ghost: 'before' | 'on' | 'done' = 'before';
@@ -652,7 +654,14 @@ export class TempleLevel implements Level {
   /** Rubber-banded chase: keeps pace with a sprinting player, catches a walking one. */
   private driveChase(dt: number, me: Vec3) {
     const b = this.chasing;
-    if (!b || this.rolling()) return;
+    if (!b || this.rolling() || this.status !== 'playing') {
+      this.rumble.stop();
+      return;
+    }
+    const bv = b.rb.linvel(), bt = b.rb.translation();
+    const near = clamp(1 - Math.hypot(bt.x - me[0], bt.y - me[1], bt.z - me[2]) / 35, 0, 1);
+    this.rumble.start();
+    this.rumble.setVolume(0.01 + 0.3 * near * Math.min(1, Math.hypot(bv.x, bv.y, bv.z) / CHASE));
     if (this.chaseDelay > 0) {
       this.chaseDelay -= dt;
       return;

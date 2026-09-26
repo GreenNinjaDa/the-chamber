@@ -20,8 +20,10 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   shrink into it over 0.5 s (`player.shrinkInto`, no control and invulnerable meanwhile) and grow back out of the
   entrance portal over 0.5 s (`player.growFrom`), drawn scaled about the portal's centre.
 - **Lobby** (`src/levels/lobby/`): the main menu is a chamber you walk around in (after the title screen, and via
-  the pause menu). Buttons pick the level the START portal leads to, two more change mouse speed, and a lever
-  inverts looking up/down (`src/game/settings.ts`, remembered in localStorage). Signs are floating world text
+  the pause menu). Numbered floor pads pick the level the START portal leads to (step on one; gold-rimmed ones are levels
+  you have got out of, `settings.beaten`, with a tally on the wall), and in the
+  south-west corner two buttons change mouse speed and levers invert looking up/down and turn sound off
+  (`src/game/settings.ts`, remembered in localStorage). Signs are floating world text
   (`Level.labels()`). **Pause menu** (`src/game/pauseMenu.ts`): Esc, or losing pointer lock (except by tabbing away in the lobby), opens Resume /
   Restart / Back to the lobby.
   Idle in the lobby for 20 s (alive, no input at all) and it pranks you (`lobby/afk.ts`): a fridge on the head
@@ -323,7 +325,32 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   OVER, naming the ghost). All pellets eaten: the maze flashes, sinks, and the exit opens; the last 3 pellets get
   purple markers. Score and an unbeatable HIGH SCORE (3,333,360) on the north wall; no looking up while the maze
   is up (keeps the camera above the walls).
-- **Level 30 — Angry Birds** (`src/levels/birds/`): you are the pig. You land just east of a fortress
+- **Level 30 — Chess** (`src/levels/chess/`): the floor is an 8 x 8 board of 3 m squares; you're a white pawn at the
+  south end ("WHITE TO MOVE" until you step off your square) and Black's whole army (`entities/chess.ts`, giant
+  primitive pieces, solid via `obstacles()` plus `GROUPS_RAGDOLL_ONLY` colliders for a flung corpse) stands at the north
+  end. Black moves by the rules on a clock (one piece a turn, two from 4 s, three from 22 s), each move shown as a
+  red square 0.95 s before the piece lifts off; whatever is on that square when it lands is captured ("CHECK." on
+  the wall when it's yours). The AI aims at your square or where you're heading, closes in otherwise, and once you're
+  in its half keeps the back row home and plugs its holes. Reach an empty square of the far row to promote (a crown);
+  the king topples over (BLACK RESIGNS), the pieces sink away and the exit opens.
+- **Level 31 — Hungry Hungry Hippos** (`src/levels/hippos/`): you're a marble. The floor is a plastic dome (a huge static ball
+  collider, 2 m high in the middle) that slopes down to four giant toy hippos (`entities/hippo.ts`), one poking out of a
+  hole in each wall, and 26 marbles pour in (16 more at 15 s). The slope drifts you outward (`player.platformVel`). Each hippo
+  picks the lane (aimable right round to the corners) with the most marbles, or you, lights it up on the floor for
+  0.85 s while it rears back, then shoots its neck out and CHOMPS everything in the lane: marbles, or you (swallowed,
+  chewed, burped). When the marbles are gone the winner is announced, the others doze off and the east (yellow) one
+  yawns with the exit portal in its mouth.
+- **Level 32 — Flappy** (`src/levels/flappy/`): after the arrival the camera swings to a side view (a `cameraShot` from
+  the south) and the wall says FLAP. Space flaps (the player stays in `control` mode, pinned to the lane, with
+  `gravityScale` 1.25, `airControl` 0 and a flapping `poseOverride`; plus a beak). Green pipes with a 5 m gap slide out
+  of the east wall; touching one, or the floor, is death. Ten pipes and you drop to the floor and walk to the exit.
+- **Level 33 — Rock Star** (`src/levels/rock/`; a Guitar Hero parody): the floor is a five-lane note highway, the camera
+  looks down it from behind you, and 44 coloured gems (a fixed chart at 120 bpm: single notes, sustains, two-lane chords,
+  a solo that needs a sprint) slide toward the strike line by your feet. Be in a gem's lane as it crosses (a chord: on the
+  line between its lanes) and the note plays (the lead only sounds when you hit; drums and bass run on song time). Misses
+  drain the rock meter on the north wall; the crowd down both sides cheers, bobs or boos with it. Empty it and you're
+  booed off (tomatoes, then the stage catapults you); finish the song and the exit opens for the encore.
+- **Level 34 — Angry Birds** (`src/levels/birds/`): you are the pig. You land just east of a fortress
   (`entities/blocks.ts`: wood planks and posts, glass, stone, TNT crates; a west wall, two three-storey towers, the
   pig's house with TNT in the living room, loose planks and blocks to build with). A giant slingshot rises behind
   the west wall (the view turns to it) and six birds pop up onto the wall top (`entities/birds.ts`); then "YOU ARE
@@ -332,14 +359,16 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   locked) and lets go (twang): arcs over the wall at half gravity, ~2 s, aimed at your chest with a growing lead,
   leaving white puffs until the next shot. Red (no lead), the Blues (split in three halfway, ±0.24 rad), Chuck
   (stops dead mid-air with a "!" for 0.35 s, then zooms at 27 m/s at where you were when he stopped), Bomb (2.2 s
-  fuse after landing, blast with cover), Red again (full lead, lobs over cover), Terence (1.6 m, 420 kg, through
-  everything). Birds are physical after their first hit and deadly while faster than 6 m/s (swept against every
-  body part): POPPED in green smoke. Blocks take damage from sudden speed changes and from the impulse through
-  their contacts (tunables in `MATERIALS`), darken, and break into splinters / shards / chunks and dust; TNT goes
-  off on a hard knock (chains); a fast stone block on your head or chest is SQUASHED; blasts use grenade-style
-  cover. Everything broken scores the birds points (popups; "BIRDS: 12,450" and three stars on the north wall;
-  a popped pig is 5,000). Survive all six (~60 s): the slingshot wilts, LEVEL FAILED (for the birds), the pig
-  laughs, the exit opens. `?birdShot=N` starts with the Nth bird.
+  fuse after landing, then stays put; blast with cover), Red again (full lead, lobs over cover), Terence (1.6 m,
+  420 kg, through everything, then rolls a few metres). Birds are deadly in flight (faster than 6 m/s, swept against
+  every body part; Terence also while rolling): POPPED in green smoke; once they've hit anything they're just
+  physical (they knock you, tumble, knock blocks over), so any cover in the way saves you. Blocks take damage from
+  sudden speed changes and from the impulse through their contacts (tunables in `MATERIALS`; not from being
+  carried or thrown), darken, and break into splinters / shards / chunks and dust; TNT goes off on a hard knock
+  (chains); a fast stone block on your head or chest is SQUASHED; blasts use grenade-style cover. Everything broken
+  scores the birds points (popups; "BIRDS: 12,450" and three stars on the north wall; a popped pig is 5,000).
+  Survive all six (~60 s): the slingshot wilts, LEVEL FAILED (for the birds), the pig laughs, the exit opens.
+  `?birdShot=N` starts with the Nth bird.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -386,7 +415,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   beanbag, piano bench: `spawnFurniture`, sofas and armchairs with seat / back / arm colliders so you stand on the
   cushions; `drawRug`, `drawPainting`), `giantDuck.ts` (a 4 m rubber duck you can stand on: a fixed body the level
   moves with `moveTo`, which carries a rider along), `elevator.ts` (the chamber as an elevator car: doors, handrails,
-  LED floor indicator `FloorIndicator`, button panel `CarPanel`, crosshead and grate, the scrolling shaft),
+  LED floor indicator `FloorIndicator`, button panel `CarPanel`, crosshead and grate, the scrolling shaft). `chess.ts` (chess pieces, a crown), `hippo.ts` (a toy hippo head on an extending neck),
   `blocks.ts` (Angry Birds building kit: `spawnBlock(physics, 'wood' | 'glass' | 'stone' | 'tnt', centre, size)`,
   per-material damage tunables in `MATERIALS`; the level deals the damage), `birds.ts` (`drawBird` for Red, Blue,
   Chuck, Bomb, Terence with angry brows; the giant `Slingshot` with `pullTo` / `release` / `rise` / `sag`;
@@ -426,6 +455,8 @@ Shared mechanics available to levels (via `ctx`):
 - Sound (`engine/audio.ts`): portals, buttons, levers, hits, explosions and the death trombone play by themselves.
   Levels add their own with `sfx.*`, `tone()` / `noise()`, or a `Tune` (call `start()` from update while it
   should play: starting a level and pausing stop every tune). Never rely on sound alone for a cue.
+- `Level.obstacles()` circles keep the living player out (resolved in a few passes, so there is no squeezing between
+  two that touch); give them `GROUPS_RAGDOLL_ONLY` colliders too if a flung corpse should bounce off them.
 - Jumps are buffered: pressing Space up to 0.1 s before the player can jump (`JUMP_BUFFER` in player.ts) jumps as soon
   as they can.
 - The player's movement capsule is wider than the body and never pushes things itself: walking pushes loose

@@ -174,6 +174,13 @@ export class Drone {
     tunes.add(this);
   }
 
+  /** Changes the loudness (glides there). */
+  setVolume(vol: number) {
+    if (vol === this.opts.vol) return;
+    this.opts.vol = vol;
+    if (this.gain && ctx) this.gain.gain.setTargetAtTime(Math.max(0.0001, vol), ctx.currentTime, 0.1);
+  }
+
   /** Changes the pitch (glides there). */
   setFreq(freq: number) {
     if (freq === this.freq) return;

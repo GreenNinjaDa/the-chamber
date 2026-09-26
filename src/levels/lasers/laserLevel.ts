@@ -1,3 +1,4 @@
+import { Drone } from '../../engine/audio';
 import { clamp, lerp, mul, scaling, translation, type Vec3 } from '../../engine/math';
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
 import {
@@ -240,6 +241,7 @@ export class LaserLevel implements Level {
   private exit = new ExitPortal(0);
   private pylon: LaserPylon;
   private slicer = new BodySlicer();
+  private hum = new Drone(98, { wave: 'sawtooth', vol: 0.035, wobble: 5 });
   private low = new Spinner(1, 0.3);
   private high = new Spinner(-1, 1);
   /** Seconds since the arrival finished (-1: still arriving). */
@@ -298,6 +300,8 @@ export class LaserLevel implements Level {
       this.t = SKIP;
     }
     this.t += dt;
+    if (this.status === 'playing' && !this.death) this.hum.start();
+    else this.hum.stop();
     const t = this.t;
 
     if (!this.noticeShown && t >= NOTICE_AT) {

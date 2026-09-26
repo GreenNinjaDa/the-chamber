@@ -1,3 +1,4 @@
+import { noise, sfx, tone } from '../../engine/audio';
 import { add, clamp, cross, lerp, mul, normalize, rotationX, rotationY, scale, scaling, sub, translation, type Vec3 } from '../../engine/math';
 import type { Body } from '../../engine/physics';
 import { Pattern, type DrawItem } from '../../engine/renderer';
@@ -72,6 +73,7 @@ export class DominoesLevel implements Level {
   private death: Death | null = null;
   private dust: { pos: Vec3; age: number }[] = [];
   private fell: boolean[] = [];
+  private locked: boolean[] = [];
   private labelList: WorldLabel[] = [];
   private buttonPos: Vec3 = [CHAMBER_HALF - 0.3, 1.2, 8];
 
@@ -115,20 +117,33 @@ export class DominoesLevel implements Level {
         grabbable: false,
         model: (out, m) => drawDomino(out, m, pips),
       });
+      // Can't tip over until the chain reaches it (no pushing them over by hand).
+      body.rb.lockRotations(true, false);
       body.rb.sleep();
       this.dominoes.push({ body, pos: s.pos, dir: s.dir, pips });
       this.fell.push(false);
+      this.locked.push(true);
     });
     // Arrive to one side of the line, near its middle.
     const mid = spots[Math.floor(spots.length * 0.3)];
     const side = normalize(cross(mid.dir, [0, 1, 0]));
     this.arrival = new PortalArrival(ctx, add(mid.pos, scale(side, 3.2)));
+    const lastD = this.dominoes[this.dominoes.length - 1];
+    this.buttonPos = add(lastD.pos, scale(lastD.dir, TALL * 0.92));
+    this.buttonPos[1] = 0.08;
     this.giant.root = [0, -80, 27];
     this.giant.leanTarget = this.giant.lean = 0.35;
     this.giant.rightCurl = 0.4;
     this.giant.update(0, [0, 30, 20]);
     this.labelList.push({ pos: [0, 7.5, -CHAMBER_HALF + 0.3], text: 'WORLD RECORD ATTEMPT', size: 1, color: '#ffd166' });
     this.labelList.push({ pos: [0, 6.6, -CHAMBER_HALF + 0.3], text: `${this.dominoes.length + 1} DOMINOES (ONE MISSING)`, size: 0.5, color: '#ffffff' });
+  }
+
+  /** Whether it's tipping along the chain (forward), not back. */
+  private leansForward(d: Domino) {
+    const q = d.body.rb.rotation();
+    const upX = 2 * (q.x * q.y - q.w * q.z), upZ = 2 * (q.y * q.z + q.w * q.x);
+    return upX * d.dir[0] + upZ * d.dir[2] > 0;
   }
 
   /** How far a domino has fallen over (rad). */
@@ -138,7 +153,14 @@ export class DominoesLevel implements Level {
     return Math.acos(clamp(upY, -1, 1));
   }
 
+  private unlock(i: number) {
+    if (!this.locked[i]) return;
+    this.locked[i] = false;
+    this.dominoes[i].body.rb.lockRotations(false, true);
+  }
+
   private push(d: Domino, strength = 1) {
+    this.unlock(this.dominoes.indexOf(d));
     const top = add(d.body.rb.translation() as unknown as Vec3, [0, 0, 0]);
     const p = d.body.rb.translation();
     d.body.rb.wakeUp();
@@ -184,15 +206,18 @@ export class DominoesLevel implements Level {
     // Watch the chain: dust where each one lands, and flatten anyone underneath.
     this.dominoes.forEach((d, i) => {
       const tilt = this.tilt(d);
+      if (tilt > 0.15 && i + 1 < this.dominoes.length && i + 1 !== this.gap) this.unlock(i + 1);
       if (!this.fell[i] && tilt > 1.2) {
         this.fell[i] = true;
+        tone(700 + (i % 5) * 60, 0.06, { wave: 'square', vol: 0.12 });
+        noise(0.08, { freq: 2500, to: 900, type: 'bandpass', q: 3, vol: 0.25 });
         this.lastFall = t;
         const p = d.body.rb.translation();
         this.dust.push({ pos: add([p.x, 0, p.z], scale(d.dir, TALL * 0.6)), age: 0 });
         camera.addShake(Math.max(0, 0.35 - Math.hypot(p.x - player.pos[0], p.z - player.pos[2]) * 0.03));
       }
       // Falling onto the player (outside the gap): anything between its base and its landing spot.
-      if (alive && tilt > 0.22 && tilt < 1.35 && i !== this.gap - 1) {
+      if (alive && tilt > 0.22 && tilt < 1.35 && i !== this.gap - 1 && this.leansForward(d)) {
         const rel = sub(player.pos, d.pos);
         const along = rel[0] * d.dir[0] + rel[2] * d.dir[2];
         const across = Math.abs(rel[0] * d.dir[2] - rel[2] * d.dir[0]);
@@ -209,6 +234,8 @@ export class DominoesLevel implements Level {
       const inGap = alive && Math.hypot(player.pos[0] - this.gapPos[0], player.pos[2] - this.gapPos[2]) < 0.9;
       if (inGap) {
         this.carried = true;
+        this.fingerTarget = null;
+        this.unlock(this.gap);
         player.knock([this.gapDir[0] * 5, 1, this.gapDir[2] * 5], 2.2);
         this.push(after, 1.4);
         hud.show('YOU ARE THE DOMINO', '', 2);
@@ -241,9 +268,10 @@ export class DominoesLevel implements Level {
     }
     // The last one falls on the button.
     const lastD = this.dominoes[this.dominoes.length - 1];
-    if (!this.buttonPressed && this.tilt(lastD) > 0.9) {
+    if (!this.buttonPressed && this.carried && !this.death && this.tilt(lastD) > 0.9) {
       this.buttonPressed = true;
       this.exit.openNow();
+      sfx.win();
       hud.show('NEW WORLD RECORD!', 'Timmy would like to thank the domino. You know who you are.', 3.5);
     }
   }
@@ -274,7 +302,8 @@ export class DominoesLevel implements Level {
       out.push({ mesh: 'box', model: mul(base, translation(edge), scaling([0.12, 0.01, 0.12])), color: [0.95, 0.95, 0.95], shadow: false });
     }
     // The button the last domino will fall on (on the east wall by the exit).
-    out.push({ mesh: 'cylinder', model: mul(translation(this.buttonPos), rotationX(Math.PI / 2), rotationY(0), scaling([0.4, 0.25, 0.4])), color: this.buttonPressed ? [0.2, 1.6, 0.3] : [0.9, 0.1, 0.08], pattern: this.buttonPressed ? Pattern.emissive : Pattern.plain });
+    out.push({ mesh: 'cylinder', model: mul(translation(this.buttonPos), scaling([0.75, 0.16, 0.75])), color: [0.25, 0.25, 0.28] });
+    out.push({ mesh: 'cylinder', model: mul(translation(add(this.buttonPos, [0, this.buttonPressed ? 0.06 : 0.14, 0])), scaling([0.55, 0.14, 0.55])), color: this.buttonPressed ? [0.2, 1.6, 0.3] : [0.9, 0.1, 0.08], pattern: this.buttonPressed ? Pattern.emissive : Pattern.plain });
     for (const p of this.dust) {
       const s = 0.4 + p.age * 1.2;
       out.push({ mesh: 'sphere', model: mul(translation(add(p.pos, [0, 0.2 + p.age * 0.4, 0])), scaling([s, s * 0.5, s])), color: [0.8, 0.78, 0.72], opacity: 0.6 * (1 - p.age / 1.5), shadow: false });
