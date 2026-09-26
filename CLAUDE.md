@@ -131,7 +131,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   `junk.ts` (28 pieces of household junk; `spawnJunk(physics, junk('fridge'), pos)`), `grenade.ts` (pineapple
   model), `giant.ts`, `dart.ts`, `portal.ts` (entrance / exit portals), `props.ts` (Lever, Button), `cake.ts`, `companions.ts`,
   `pressurePlate.ts`, `uselessBox.ts`, `rock.ts` (textured stone: `boulderModel`, `chunkModel`, `slabModel`, `shardModel`, `clusterModel`; `Pattern.rock`),
-  `doll.ts` (the giant doll with a swivelling head and glowing eyes, plus `drawBareTree`), `contestant.ts` (scripted
+  `doll.ts` (the giant doll with a swivelling head and glowing eyes, plus a `BareTree`), `contestant.ts` (scripted
   NPC in a tracksuit: walk/run, freeze, wobble/sneeze/cheer, dramatic death fall; `drawBody` takes a `BodyColors`
   to dress the player's body as someone else). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.

@@ -229,7 +229,8 @@ export class RedLightLevel implements Level {
   private death: Death | null = null;
   private labelList: WorldLabel[] = [];
   private bubble: WorldLabel = { pos: [DOLL_POS[0], DOLL_HEAD_Y + 1.9, DOLL_POS[2]], text: '', size: 0.75, color: '#ffd23f' };
-  private clock: WorldLabel = { pos: [5, 7.4, -CHAMBER_HALF + 0.05], text: '01:00', size: 1.6, color: '#ff3b30' };
+  private clock: WorldLabel = { pos: [5, 7.4, -CHAMBER_HALF + 0.05], text: '', size: 1.6, color: '#ff3b30' };
+  private clockShows = -1;
   private circles: Circle[] = [];
   /** The sun comes from behind the start line, so her face is lit when she turns round. */
   private env: Environment = { ...DEFAULT_ENV, sunDir: [-0.45, 1.0, 0.55], sunColor: [...DEFAULT_ENV.sunColor], skyColor: [...DEFAULT_ENV.skyColor] };
@@ -252,7 +253,7 @@ export class RedLightLevel implements Level {
       const body = spawnJunk(physics, def, [x, h / 2 + 0.01, z], rot);
       this.cover.push({ body, r: Math.hypot(def.size[0], def.size[2]) / 2 });
       if (name === 'crate') {
-        // Two crates stacked: tall enough to hide behind if you crouch.
+        // Two crates stacked: about as tall as you, so just about cover.
         const top = spawnJunk(physics, def, [x + 0.05, h * 1.5 + 0.03, z - 0.04], toQuat(rotationY(yaw + 0.4)));
         this.cover.push({ body: top, r: 0.5 });
       }
@@ -295,7 +296,8 @@ export class RedLightLevel implements Level {
     // The fake-out: she stops after "KKOCHI..." and starts to turn round. Then doesn't.
     this.fakeAt = n === FAKE_OUT_GREEN && !this.crossed ? this.chantAt[5] - 0.05 : -1;
     this.fake = -1;
-    for (const npc of this.npcs) npc.startDelay = npc.cast.number === '324' && n === 0 ? 0.15 : rand(0.1, 0.5);
+    // (The doomed runner is off like a shot.)
+    for (const npc of this.npcs) npc.startDelay = npc.cast.doom?.kind === 'runner' && n === 0 ? 0.15 : rand(0.1, 0.5);
   }
 
   private startTurn() {
@@ -379,8 +381,10 @@ export class RedLightLevel implements Level {
 
     // The clock.
     const left = Math.ceil(this.timeLeft);
-    const text = `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;
-    if (this.clock.text !== text) this.clock.text = text;
+    if (left !== this.clockShows) {
+      this.clockShows = left;
+      this.clock.text = `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;
+    }
     if (this.timeLeft <= 0 && this.phase !== 'timeUp') {
       this.turnFrom = this.doll.headYaw;
       this.setPhase('timeUp', 0);
