@@ -199,6 +199,15 @@ export class Player {
   girth = 1;
   /** Multiplies walking / sprinting speed and acceleration, for this life only. */
   speedScale = 1;
+  /** Multiplies the pull of gravity on the player (1 normal, 0 weightless); for this life only. */
+  gravityScale = 1;
+  /**
+   * Multiplies how quickly the player steers in the air (1 normal). 0 leaves the air velocity alone
+   * entirely, so they drift on their momentum (e.g. weightless, with the level doing the steering).
+   */
+  airControl = 1;
+  /** A pose the level wants drawn while in control instead of the usual animation (e.g. clinging to a rail); null = normal. */
+  poseOverride: Pose | null = null;
   private portalPivot: Vec3 = [0, 0, 0];
   private portalFrom = 1;
   private portalTo = 1;
@@ -223,6 +232,9 @@ export class Player {
     this.inPortal = false;
     this.girth = 1;
     this.speedScale = 1;
+    this.gravityScale = 1;
+    this.airControl = 1;
+    this.poseOverride = null;
     this.gravity = identity();
     this.up = [0, 1, 0];
     this.hanging = false;
@@ -364,7 +376,7 @@ export class Player {
 
     const sprint = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
     const speed = (sprint ? SPRINT_SPEED : WALK_SPEED) * (this.gettingUp ? GETUP_MOVE_SCALE : 1) * this.speedScale;
-    const accel = (this.onGround ? GROUND_ACCEL : AIR_ACCEL) * this.speedScale;
+    const accel = (this.onGround ? GROUND_ACCEL : AIR_ACCEL * this.airControl) * this.speedScale;
     const k = 1 - Math.exp(-dt * (stunned ? 3 : accel));
     this.vel[0] += (mx * speed - this.vel[0]) * k;
     this.vel[2] += (mz * speed - this.vel[2]) * k;
@@ -375,7 +387,7 @@ export class Player {
       this.onGround = false;
       this.jumpBuffer = 0;
     }
-    this.vel[1] -= GRAVITY * dt;
+    this.vel[1] -= GRAVITY * this.gravityScale * dt;
 
     const before: Vec3 = [...this.pos];
     let delta = scale(this.vel, dt);
@@ -725,6 +737,7 @@ export class Player {
     const t = this.time;
     switch (this.mode) {
       case 'control': {
+        if (this.poseOverride) return this.poseOverride;
         if (this.hanging) return hangingPose(t);
         if (this.sitting) return SIT_POSE;
         if (!this.onGround) {

@@ -68,6 +68,8 @@ export interface PixelTextOptions {
   color: number[];
   /** How far each block sticks out of the surface (m). */
   depth?: number;
+  /** Surface pattern for the blocks (e.g. Pattern.emissive for a glowing LED display). */
+  pattern?: number;
 }
 
 /** A line of block-pixel text. `reveal` (0-1) switches its pixels on in a scattered order. */
@@ -121,7 +123,7 @@ export class PixelText {
             normal[0] * depth, normal[1] * depth, normal[2] * depth, 0,
             p[0], p[1], p[2], 1,
           ]);
-          this.items.push({ mesh: 'box', model, color, spec: 0.25 });
+          this.items.push({ mesh: 'box', model, color, spec: 0.25, pattern: this.opts.pattern });
           this.order.push(hash(this.items.length * 7.13 + c * 1.7));
         }
       }

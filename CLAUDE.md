@@ -287,7 +287,29 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   4.2 m/s. Any beam touching a body part (`BodySlicer`: the real part frames as slightly shrunk capsules/boxes, swept
   in 4 cm steps so fast beams can't skip a limb) slices you: `player.kill` with violence 30 (42 for the grid) at the
   cut. One red point light rides with the pylon, then with each wall. `?laserSkip=N` starts the show N s in.
-- **Level 28 — Pac-Man** (`src/levels/pacman/`): after the arrival the floor goes dark navy, the sun dims to a moon
+- **Level 28 — Going Down** (`src/levels/elevator/`): the chamber is an elevator car (`entities/elevator.ts`: sliding doors in
+  the east wall, brass handrails round the walls at 1 m, a yellow crosshead and grate over the top (it stops anything
+  floating out) with the hoist cables up to a sheave on the roof, two amber LED floor indicators (`FloorIndicator`),
+  and the shaft, drawn sliding up past the wall tops by `drawShaft(depth, speed)`: landing doors, slabs, streaking
+  lamps, painted floor numbers). Heavy junk (piano, couch, fridge, safe, vending machine, bathtub, washer, filing
+  cabinet, bookcase, oil drum) stands against the walls in front of the rails, light junk in the middle. After the
+  arrival it dings (99, GOING DOWN) and sinks into the shaft (daylight fades to the car's strip lights), muzak notes
+  bouncing out of a speaker; a creak, one cable pings off (PING?), a groan (UH...), and 13 s after the ding TWANG
+  (UH OH): the lights flicker and it falls 13 s to B7 (floors whizz by, brake sparks, GOING DOWN / EXPRESS in red,
+  then BRACE 6..1 with flashing BRACE FOR IMPACT and red pulsing light). Everything goes weightless
+  (`physics.world.gravity` zero, a jolt up of 0.9-1.9 m/s, slow tumbling, damping 0.2) and drifts slowly toward the
+  nearest wall, so it hangs over the rails; so does the player (`player.gravityScale` 0, `airControl` 0): they drift,
+  bounce softly off things, WASD nudges them toward where they look, Space pushes off anything within reach (and
+  shoves loose things back), and E / left mouse with the chest within 1.4 m of a rail grabs it (grip and float poses
+  via `player.poseOverride`; A/D slides along it). At the bottom gravity slams back (3× for 0.6 s, everything flung
+  down): not holding a rail = SPLAT / PANCAKED; anything ≥ 40 kg still falling onto your body within 2.5 s crushes
+  you (PIANO'D, VENDED, COUCH POTATO...). Bots holding a random rail spot die ~30% of the time, ones that slide away
+  from what's overhead ~never. Survive and the doors grind open onto the exit ("DING." / "Ground floor. Mind the
+  gap.", the display says B7). A button panel by the doors has an EMERGENCY STOP (`CarPanel`) that only makes
+  sarcastic remarks. Sound: dings, a muzak `Tune` (record-scratches off at the TWANG), motor hum, creak / ping /
+  groan, brake screech, rushing wind, countdown beeps, the crash, thuds, a rail clink. `?quickRide` snaps the cable
+  4 s after the ding.
+- **Level 29 — Pac-Man** (`src/levels/pacman/`): after the arrival the floor goes dark navy, the sun dims to a moon
   and a 13×13-cell maze (`maze.ts`: black blocks outlined in glowing arcade blue, 1.5 m tall so you can't jump
   onto them but the camera sees over; 2.25 m corridors; a ghost house with a pink door in the middle) rises out of
   the floor, shoving the player out of its way, while the camera shows the whole board from above (READY!). 81
@@ -341,12 +363,13 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   `BodySlicer` to test beams against the player's body parts, `LaserPylon`), `gnome.ts` (big garden gnome:
   `spawnGnome(physics, feet, look)`, arm poses in `GNOME_POSES`, glowing eyes, and `drawGnomeHat(out, headFrame)` for
   anyone else's head), `snake.ts` (grid snake: movement, AI, colliders, model), `pixelText.ts` (5x7
-  dot-matrix text built from blocks), `apple.ts`, `ghost.ts` (arcade ghost: `drawGhost`, normal / scared / flashing / eyes only), `plush.ts` (plush toys: `spawnPlush(physics, 'alien', pos, look)`), `claw.ts` (claw-machine claw and gantry: `driveTo`, hub height `y`, prong `angle`, `distanceTo` for grabbing it), `bowling.ts` (2 m bowling pins: `spawnPin`, `pinSpots`, `uprightness`; `drawBowlingBall` with finger holes), `hexFloor.ts` (`HexFloor`: a floor of hexagonal tiles, each a
+  dot-matrix text built from blocks; `pattern: Pattern.emissive` makes glowing LEDs), `apple.ts`, `ghost.ts` (arcade ghost: `drawGhost`, normal / scared / flashing / eyes only), `plush.ts` (plush toys: `spawnPlush(physics, 'alien', pos, look)`), `claw.ts` (claw-machine claw and gantry: `driveTo`, hub height `y`, prong `angle`, `distanceTo` for grabbing it), `bowling.ts` (2 m bowling pins: `spawnPin`, `pinSpots`, `uprightness`; `drawBowlingBall` with finger holes), `hexFloor.ts` (`HexFloor`: a floor of hexagonal tiles, each a
   static collider, that flash and drop once touched; `support` / `touch` / `freeze` / `regrowFrom`; drawn with the
   chamfered `'hextile'` mesh from renderer.ts), `livingRoom.ts` (sofa / armchair in any colour, coffee table,
   beanbag, piano bench: `spawnFurniture`, sofas and armchairs with seat / back / arm colliders so you stand on the
   cushions; `drawRug`, `drawPainting`), `giantDuck.ts` (a 4 m rubber duck you can stand on: a fixed body the level
-  moves with `moveTo`, which carries a rider along). Put new
+  moves with `moveTo`, which carries a rider along), `elevator.ts` (the chamber as an elevator car: doors, handrails,
+  LED floor indicator `FloorIndicator`, button panel `CarPanel`, crosshead and grate, the scrolling shaft). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
@@ -398,6 +421,9 @@ Shared mechanics available to levels (via `ctx`):
 - `player.platformVel` — the velocity of whatever the player stands on (a raft, a conveyor), added to their movement;
   levels set it every frame.
 - `player.sitting` draws the sitting pose (`SIT_POSE` in body.ts; the level keeps them on the seat).
+- `player.gravityScale` (1; 0 = weightless) and `player.airControl` (1; 0 = the air velocity is left alone, so they
+  drift and the level steers) — this life only. `player.poseOverride` draws a level's own `Pose` while in control
+  (clinging to something, floating); null for the normal animation.
 - `player.torchArm` raises the right arm up and ahead as if holding a torch (the level draws the torch).
 - `player.resume(velocity)` puts the player back in normal control after a scripted mode; `player.partFrames()`
   gives each body part's frame (e.g. to put a torch in the right hand, `foreArmR`).

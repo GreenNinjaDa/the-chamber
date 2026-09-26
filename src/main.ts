@@ -39,6 +39,7 @@ import { SnakeLevel } from './levels/snake/snakeLevel';
 import { PacmanLevel } from './levels/pacman/pacmanLevel';
 import { BowlingLevel } from './levels/bowling/bowlingLevel';
 import { FloorLavaLevel } from './levels/floorLava/floorLavaLevel';
+import { ElevatorLevel } from './levels/elevator/elevatorLevel';
 import type { Level, LevelContext, TrackedTarget, WorldLabel } from './levels/level';
 import { LobbyLevel } from './levels/lobby/lobbyLevel';
 
@@ -75,6 +76,7 @@ const LEVELS: ((ctx: LevelContext) => Level)[] = [
   (ctx) => new BowlingLevel(ctx),
   (ctx) => new TetrisLevel(ctx),
   (ctx) => new LaserLevel(ctx),
+  (ctx) => new ElevatorLevel(ctx),
   (ctx) => new PacmanLevel(ctx),
 ];
 const params = new URLSearchParams(location.search);
