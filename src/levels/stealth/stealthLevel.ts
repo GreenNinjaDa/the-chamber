@@ -1,3 +1,4 @@
+import { note, tone } from '../../engine/audio';
 import { add, basis, clamp, mul, normalize, rotationY, scale, scaling, sub, translation, type Vec3 } from '../../engine/math';
 import { Pattern, type DrawItem } from '../../engine/renderer';
 import { CHAMBER_HALF } from '../../game/chamber';
@@ -48,6 +49,9 @@ interface Sentry {
   label: WorldLabel;
   labelT: number;
   lookAround: number;
+  /** Where they were at the last progress check, and the time since it (to spot them stuck on a crate). */
+  checkPos: Vec3;
+  checkT: number;
 }
 
 interface Death {
@@ -81,14 +85,14 @@ export class StealthLevel implements Level {
     this.arrival = new PortalArrival(ctx, [-9.5, 0, 9.5]);
     for (const [x, z] of CRATES) physics.addStaticBox([x, CRATE_H / 2, z], [CRATE, CRATE_H, CRATE]);
     const routes: Vec3[][] = [
-      [[-9.5, 0, 1.5], [9.5, 0, 1.2]],
+      [[-9.5, 0, 1.5], [5.6, 0, 1.2], [5.6, 0, 3.4], [9.5, 0, 3.4]],
       [[-9, 0, -3], [9, 0, -2.5], [9, 0, -7], [-3, 0, -7]],
       [[5, 0, 9.5], [5.5, 0, -1], [10, 0, -1], [10, 0, 9.5]],
     ];
     for (const route of routes) {
       const s: Sentry = {
         g: new Guard(route[0], 0), route, next: 1, wait: 0, state: 'patrol', suspicion: 0, lastSeen: [0, 0, 0], lost: 0,
-        label: { pos: [0, 0, 0], text: '', size: 0.55, color: '#ffffff' }, labelT: 0, lookAround: 0,
+        label: { pos: [0, 0, 0], text: '', size: 0.55, color: '#ffffff' }, labelT: 0, lookAround: 0, checkPos: [...route[0]], checkT: 0,
       };
       this.sentries.push(s);
       this.labelList.push(s.label);
@@ -179,10 +183,16 @@ export class StealthLevel implements Level {
         s.lost = 0;
         if (s.state !== 'alert') {
           s.suspicion += dt / (boxed ? SPOT_BOX : SPOT);
-          if (boxed && s.suspicion > 0.4 && s.label.text !== '?') this.say(s, '?', '#ffd166', 1.5);
+          if (boxed && s.suspicion > 0.4 && s.label.text !== '?') {
+            this.say(s, '?', '#ffd166', 1.5);
+            tone(note('C5'), 0.25, { to: note('G5'), wave: 'triangle', vol: 0.12 });
+          }
           if (s.suspicion >= 1) {
             s.state = 'alert';
             this.say(s, '!', '#ff3b3b', 99);
+            // The sting.
+            tone(note('A5'), 0.12, { wave: 'square', vol: 0.12 });
+            tone(note('E6'), 0.5, { wave: 'square', vol: 0.12, at: 0.1 });
             camera.addShake(0.15);
           }
         }
@@ -247,6 +257,20 @@ export class StealthLevel implements Level {
       }
       g.pos[0] = clamp(g.pos[0], -CHAMBER_HALF + 0.4, CHAMBER_HALF - 0.4);
       g.pos[2] = clamp(g.pos[2], -CHAMBER_HALF + 0.4, CHAMBER_HALF - 0.4);
+      // Walking into a crate and getting nowhere: give up on that spot and carry on.
+      s.checkT += dt;
+      if (s.checkT > 1.2) {
+        const moved = Math.hypot(g.pos[0] - s.checkPos[0], g.pos[2] - s.checkPos[2]);
+        if (moved < 0.35 && Math.hypot(g.vel[0], g.vel[2]) > 0.5) {
+          if (s.state === 'patrol') s.next = (s.next + 1) % s.route.length;
+          else {
+            s.state = 'search';
+            s.wait = 0;
+          }
+        }
+        s.checkT = 0;
+        s.checkPos = [g.pos[0], g.pos[1], g.pos[2]];
+      }
     }
   }
 

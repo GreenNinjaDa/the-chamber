@@ -879,7 +879,8 @@ export class ElevatorLevel implements Level {
     player.vel = scale(dir, PUSH_SPEED);
     SOUND.whoosh();
     player.onGround = false;
-    if (body) body.rb.applyImpulse(vec(scale(dir, -PUSH_SPEED * PLAYER_MASS * PUSH_BACK)), true);
+    // (Light things fly off at most at your push-off speed, not hundreds of m/s.)
+    if (body) body.rb.applyImpulse(vec(scale(dir, -Math.min(PUSH_SPEED * PLAYER_MASS * PUSH_BACK, body.rb.mass() * PUSH_SPEED))), true);
   }
 
   // --- Cargo, effects ----------------------------------------------------------------------------
