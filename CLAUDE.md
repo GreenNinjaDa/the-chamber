@@ -171,6 +171,21 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   lights die, "SKRRRT!") everyone dives for a free chair: you take one just by reaching its seat; the contestants react
   after their own delays. Whoever's left standing is catapulted out, a chair sinks away, repeat: 4 rounds (4, 3, 2,
   1 chairs). Win the last chair and the exit opens.
+- **Going Down** (`src/levels/elevator/`): the chamber is an elevator car (`entities/elevator.ts`: sliding doors in
+  the east wall, brass handrails round the walls at 1 m, a yellow crosshead and grate over the top with the hoist
+  cables, two amber LED floor indicators (`FloorIndicator`), and the shaft, drawn sliding up past the wall tops by
+  `drawShaft(depth, speed)`: landing doors, slabs, streaking lamps, painted floor numbers). Heavy junk (piano, couch,
+  fridge, safe, vending machine, bathtub, washer, filing cabinet) stands against the walls in front of the rails, light
+  junk in the middle. After the arrival it dings (99, GOING DOWN), sinks into the shaft (daylight fades to the car's
+  strip lights) with muzak notes bouncing out of a speaker; a creak, a cable pings off, a groan, and 13 s later
+  TWANG: the lights flicker and it falls 13 s to B7 (floors whizz by, brake sparks, the indicator counts down and
+  from 6 s flashes BRACE, the lights pulse red). Everything is weightless (`physics.world.gravity` zero, a jolt up,
+  slow tumbling, light damping); so is the player (`player.gravityScale` 0, `airControl` 0): they drift, bounce
+  softly off things, WASD nudges them toward where they look, Space pushes off anything within reach (and shoves
+  loose things back), and E / left mouse near a rail grabs it (`player.poseOverride` for the grip and float poses;
+  A/D slides along it). At the bottom gravity slams back (3× for 0.6 s, everything flung down): not holding a rail
+  = SPLAT / PANCAKED; anything ≥ 40 kg still falling onto your body within 2.5 s crushes you (PIANO'D, VENDED, ...).
+  Survive and the doors grind open onto the exit ("DING. GROUND FLOOR.", the display says B7).
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -210,7 +225,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   `BodySlicer` to test beams against the player's body parts, `LaserPylon`), `gnome.ts` (big garden gnome:
   `spawnGnome(physics, feet, look)`, arm poses in `GNOME_POSES`, glowing eyes, and `drawGnomeHat(out, headFrame)` for
   anyone else's head), `snake.ts` (grid snake: movement, AI, colliders, model), `pixelText.ts` (5x7
-  dot-matrix text built from blocks), `apple.ts`. Put new
+  dot-matrix text built from blocks; `pattern: Pattern.emissive` makes glowing LEDs), `apple.ts`, `elevator.ts` (the
+  chamber as an elevator car: doors, handrails, LED floor indicator, crosshead and grate, the scrolling shaft). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
@@ -258,6 +274,9 @@ Shared mechanics available to levels (via `ctx`):
 - `player.platformVel` — the velocity of whatever the player stands on (a raft, a conveyor), added to their movement;
   levels set it every frame.
 - `player.sitting` draws the sitting pose (`SIT_POSE` in body.ts; the level keeps them on the seat).
+- `player.gravityScale` (1; 0 = weightless) and `player.airControl` (1; 0 = the air velocity is left alone, so they
+  drift and the level steers) — this life only. `player.poseOverride` draws a level's own `Pose` while in control
+  (clinging to something, floating); null for the normal animation.
 - `player.torchArm` raises the right arm up and ahead as if holding a torch (the level draws the torch).
 - `player.resume(velocity)` puts the player back in normal control after a scripted mode; `player.partFrames()`
   gives each body part's frame (e.g. to put a torch in the right hand, `foreArmR`).

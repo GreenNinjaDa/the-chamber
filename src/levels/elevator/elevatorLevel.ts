@@ -45,12 +45,17 @@ const IMPACT_FLOOR = -7;
 /** The last seconds of the fall count down on the indicator (and flash BRACE FOR IMPACT). */
 const BRACE_TIME = 6;
 /** At the snap everything in the car jolts upward (m/s, a range), a little sideways, and starts to tumble (rad/s). */
-const JOLT_UP: [number, number] = [0.5, 1.8];
+const JOLT_UP: [number, number] = [0.9, 1.9];
 const JOLT_SIDE = 0.55;
 const JOLT_SPIN = 1.1;
 /** Weightless junk slows down this much (1/s), so it hangs about the car rather than all ending up on the grate. */
-const FLOAT_DAMPING = 0.12;
+const FLOAT_DAMPING = 0.2;
 const FLOAT_SPIN_DAMPING = 0.03;
+/**
+ * Weightless junk drifts slowly toward the nearest wall (m/s², as if the car were tumbling a
+ * little), so it ends up hanging over the handrails, not just in the middle of the room.
+ */
+const WALL_DRIFT = 0.15;
 /** The weightless player: thrust toward where you look (m/s²) up to a top speed (m/s); push-off speed off anything you touch. */
 const SWIM_THRUST = 3;
 const SWIM_MAX = 4;
@@ -104,7 +109,14 @@ const CARGO: [string, number, number, number, number][] = [
   ['safe', -11.45, 0, 5.5, -Math.PI / 2 + 0.2],
   ['washing machine', 11.4, 0, -6.5, Math.PI / 2],
   ['filing cabinet', 11.45, 0, 6.5, Math.PI / 2],
+  ['bookcase', 11.57, 0, -9.8, Math.PI / 2],
+  ['oil drum', -9.6, 0, 11.3, 0],
+  ['microwave', 11.4, 0.92, -6.5, Math.PI / 2 + 0.3],
+  ['pillow', 4.3, 0.82, -11.1, 0.3],
   ['anvil', 2.5, 0, 3, 1.2],
+  ['toilet', -4, 0, -7, 2.5],
+  ['mattress', 4, 0, 7, 0.4],
+  ['trash can', 8.5, 0, -4, 0],
   ['crate', -7, 0, -2.5, 0.2],
   ['crate', -7, 0.82, -2.5, 0.9],
   ['small crate', 5.6, 0, -2.6, 0.5],
@@ -128,6 +140,8 @@ const CRUSHES: Record<string, [string, string]> = {
   couch: ['COUCH POTATO', 'Mashed.'],
   'washing machine': ['SPIN CYCLE', 'Delicates: you.'],
   'filing cabinet': ['FILED AWAY', 'Your paperwork has been processed. So have you.'],
+  bookcase: ['BOOKED', 'You always said you wanted to get into a good book.'],
+  'oil drum': ['DRUMMED OUT', 'Ba-dum-tss.'],
 };
 
 const TIPS: [string, string][] = [
@@ -392,6 +406,10 @@ export class ElevatorLevel implements Level {
     }
     this.speed = RIDE_SPEED * clamp((t - 0.5) / RIDE_ACCEL_TIME, 0, 1);
     this.depth += this.speed * dt;
+    // The motor's hum.
+    if (this.once(`hum${Math.floor((t - 1) / 3.5)}`, t > 1 && t < RIDE_TIME - GROAN_BEFORE - 1)) {
+      this.say('~ hmmmmmmmm ~', [rand(-3, 3), WALL_HEIGHT - 0.8, rand(-3, 3)], 0.3, 'rgba(230,230,230,0.55)', 2.6, [0, 0.15, 0]);
+    }
     if (this.once('creak', t > CREAK_AT)) this.say('*creak*', [2, 11.5, 0], 0.45, '#cfcfcf', 1.5);
     if (this.once('ping', t > RIDE_TIME - PING_BEFORE)) {
       this.pinged = 0;
@@ -712,6 +730,13 @@ export class ElevatorLevel implements Level {
 
   private updateCargo(dt: number) {
     for (const c of this.cargo) {
+      if (this.stage === 'fall') {
+        // Drift toward the nearest wall.
+        const t = c.body.rb.translation(), v = c.body.rb.linvel();
+        const alongX = Math.abs(t.x) > Math.abs(t.z);
+        const push = WALL_DRIFT * dt;
+        c.body.rb.setLinvel({ x: v.x + (alongX ? Math.sign(t.x) * push : 0), y: v.y, z: v.z + (alongX ? 0 : Math.sign(t.z) * push) }, true);
+      }
       const v = c.body.rb.linvel();
       c.fall = Math.max(-v.y, c.fall - dt * 20, 0);
       // Heavy things landing hard kick up dust.
@@ -923,8 +948,12 @@ export class ElevatorLevel implements Level {
         if (y < WALL_HEIGHT + 0.8) continue;
         if (y > WALL_HEIGHT + 40) break;
         const east = this.landingLabels[i++], west = this.landingLabels[i++];
-        east.pos = [SHAFT_HALF - 0.1, y, DOOR_Z + 3.4];
-        west.pos = [-SHAFT_HALF + 0.1, y, 2.5];
+        east.pos[0] = SHAFT_HALF - 0.1;
+        east.pos[1] = y;
+        east.pos[2] = DOOR_Z + 3.4;
+        west.pos[0] = -SHAFT_HALF + 0.1;
+        west.pos[1] = y;
+        west.pos[2] = 2.5;
         east.text = west.text = floorLabel(n);
         list.push(east, west);
       }
