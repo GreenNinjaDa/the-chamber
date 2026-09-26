@@ -133,6 +133,8 @@ export class Physics {
   /** Points gravity along `down` (a unit vector), at the usual strength. */
   setGravityDirection(down: Vec3) {
     this.world.gravity = { x: down[0] * GRAVITY, y: down[1] * GRAVITY, z: down[2] * GRAVITY };
+    // Resting bodies are asleep and wouldn't notice: wake them all so everything loose falls.
+    for (const b of this.bodies) b.rb.wakeUp();
   }
 
   /** Static, invisible collision box (level geometry draws itself separately). */

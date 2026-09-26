@@ -6,6 +6,7 @@ import { GROUPS_BOULDER, GROUPS_BOULDER_BRIDGE, GROUPS_DEBRIS, RAPIER, type Body
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
 import { drawPortal, PORTAL_SQUEEZE_TIME, PortalArrival } from '../../entities/portal';
 import { PressurePlate } from '../../entities/pressurePlate';
+import { rockModel } from '../../entities/rock';
 import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus } from '../level';
 
 /*
@@ -136,6 +137,7 @@ interface Spikes {
 interface Spike {
   base: Vec3;
   tip: Vec3;
+  radius: number;
 }
 
 type Stage = 'start' | 'drop' | 'chase' | 'endWait' | 'wallDown' | 'turn' | 'chaseBack';
@@ -291,12 +293,16 @@ export class TempleLevel implements Level {
   }
 
   private placeSpikes() {
-    for (const [z, xs] of FLOOR_ROWS) for (const x of xs) this.pathSpikes.push({ base: [x, 0, z], tip: [x, 0.7, z] });
-    for (const [z, xs] of CEILING_ROWS) for (const x of xs) this.pathSpikes.push({ base: [x, H, z], tip: [x, H - 0.7, z] });
-    for (const [z, side, y] of WALL_SPIKES) {
-      const x = (side * W) / 2;
-      this.pathSpikes.push({ base: [x, y, z], tip: [x - side * 0.9, y, z] });
-    }
+    // Every spike a different length (0.8-1.5x) and a little off the grid, so they look hand-set.
+    const add1 = (base: Vec3, dir: Vec3, len: number) => {
+      const k = 0.8 + Math.random() * 0.7;
+      const tip = add(base, scale(dir, len * k));
+      this.pathSpikes.push({ base, tip, radius: SPIKE_R * (0.85 + k * 0.15) });
+    };
+    const jitter = () => (Math.random() - 0.5) * 0.3;
+    for (const [z, xs] of FLOOR_ROWS) for (const x of xs) add1([x + jitter(), 0, z + jitter() * 1.5], [0, 1, 0], 0.7);
+    for (const [z, xs] of CEILING_ROWS) for (const x of xs) add1([x + jitter(), H, z + jitter() * 1.5], [0, -1, 0], 0.7);
+    for (const [z, side, y] of WALL_SPIKES) add1([(side * W) / 2, y + jitter(), z + jitter() * 1.5], [-side, 0, 0], 0.9);
   }
 
   private scatterRocks() {
@@ -305,12 +311,16 @@ export class TempleLevel implements Level {
       const z = Z_START + 3 + Math.random() * (END_Z - Z_START - 5);
       const x = (Math.random() * 2 - 1) * (W / 2 - 0.5);
       const size = 0.15 + Math.random() * 0.3;
-      const shade = 0.7 + Math.random() * 0.4;
-      const opts = { mass: 60 * size * size * size * 20, color: STONE_WALL.map((c) => c * shade), grabbable: false, friction: 0.9 };
-      const body = Math.random() < 0.5
-        ? physics.addBall([x, size + 0.02, z], size, opts)
-        : physics.addBox([x, size / 2 + 0.02, z], [size * 1.6, size, size * 1.3], { ...opts, rotation: { x: 0, y: Math.sin(i), z: 0, w: Math.cos(i) } });
+      const shade = 0.75 + Math.random() * 0.35;
+      const body = physics.addBall([x, size + 0.02, z], size, {
+        mass: Math.min(50, 1200 * size * size * size),
+        grabbable: false,
+        friction: 0.9,
+        rotation: { x: 0, y: Math.sin(i), z: 0, w: Math.cos(i) },
+        model: rockModel(size, 5 + Math.floor(size * 12), STONE_WALL.map((c) => c * shade)),
+      });
       body.collider.setCollisionGroups(GROUPS_DEBRIS);
+      body.rb.setAngularDamping(3); // rough stones don't roll far
     }
   }
 
@@ -320,7 +330,7 @@ export class TempleLevel implements Level {
       friction: 1,
       restitution: 0.05,
       grabbable: false,
-      model: boulderModel,
+      model: rockModel(BOULDER_R, 26, BOULDER_COLOR),
     });
     body.collider.setCollisionGroups(GROUPS_BOULDER);
     body.rb.setAngularDamping(0);
@@ -678,7 +688,7 @@ export class TempleLevel implements Level {
     }
 
     for (const sp of this.pathSpikes) {
-      out.push({ mesh: 'cone', model: segment(sp.base, sp.tip, SPIKE_R), color: [0.55, 0.52, 0.47], spec: 0.7 });
+      out.push({ mesh: 'cone', model: segment(sp.base, sp.tip, sp.radius), color: [0.55, 0.52, 0.47], spec: 0.7 });
     }
 
     drawPortal(out, this.portalCentre(), [0, 0, 1], PORTAL_R, true);
@@ -722,19 +732,6 @@ export class TempleLevel implements Level {
 
   cameraShot(): CameraShot | null {
     return this.arrival.cameraShot();
-  }
-}
-
-/** A rough, almost-round boulder in its body frame. */
-function boulderModel(out: DrawItem[], m: Mat4) {
-  const r = BOULDER_R;
-  out.push({ mesh: 'sphere', model: mul(m, scaling([r, r * 0.95, r * 0.98])), color: BOULDER_COLOR, spec: 0.05 });
-  const lumps: [Vec3, Vec3][] = [
-    [[0.8, 0.9, 0.9], [0.9, 0.6, 0.8]], [[-0.9, -0.5, 0.7], [0.8, 0.7, 0.6]], [[0.2, -1.0, -0.9], [0.9, 0.6, 0.7]],
-    [[-0.6, 1.1, -0.6], [0.7, 0.5, 0.8]], [[1.2, -0.3, -0.6], [0.6, 0.8, 0.7]],
-  ];
-  for (const [p, s] of lumps) {
-    out.push({ mesh: 'sphere', model: mul(m, translation(p), scaling(s)), color: BOULDER_COLOR.map((c) => c * 0.9), spec: 0.05 });
   }
 }
 
