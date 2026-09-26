@@ -85,7 +85,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   controller won't climb slopes on kinematic colliders).
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
-  set `camera.confine = false` so the camera isn't kept inside the chamber). `Environment.pointLight` adds one
+  set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
   unshadowed point light (a torch). `Environment.lightFromBelow` (renderer.ts) turns the sun into a
   glowing surface at that height: it lights like a plane below (down-facing surfaces fully, walls half), fades
   with height above it, and casts very soft shadows.
@@ -155,6 +155,7 @@ Shared mechanics available to levels (via `ctx`):
 - `player.setGravity(rotation)` turns the player's gravity (from their frame, up = +y, to the world): movement,
   jumping, the capsule, the ragdoll's pose and the camera's up all follow; they pivot about their middle. Turn the
   physics world's gravity to match with `physics.setGravityDirection(down)`. `player.up` is their current up.
+- `player.torchArm` raises the right arm up and ahead as if holding a torch (the level draws the torch).
 - `player.resume(velocity)` puts the player back in normal control after a scripted mode; `player.partFrames()`
   gives each body part's frame (e.g. to put a torch in the right hand, `foreArmR`).
 - Boulders use `GROUPS_BOULDER`, and invisible `GROUPS_BOULDER_BRIDGE` colliders are floors only boulders touch

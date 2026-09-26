@@ -1,5 +1,5 @@
 import {
-  add, clamp, dot, easeInOut, length, mul, normalize, rotationX, rotationY, rotationZ, scale, scaling, segment, sub, transformDir, transformPoint,
+  add, basis, clamp, cross, dot, easeInOut, length, mul, normalize, rotationX, rotationY, rotationZ, scale, scaling, segment, sub, transformDir, transformPoint,
   translation, type Mat4, type Vec3,
 } from '../../engine/math';
 import { GROUPS_BOULDER, GROUPS_BOULDER_BRIDGE, GROUPS_DEBRIS, RAPIER, type Body } from '../../engine/physics';
@@ -59,7 +59,10 @@ const BOULDER_R = 2;
 const BOULDER2_Z = END_Z + 3.5;
 
 /** Vines: where they hang from, which way they hang (gravity when they're used), and rope length. */
-const VINE_LEN = 2.6;
+const VINE_LEN = 3.0;
+/** Vines hang this far past the edge you jump from, give or take VINE_JITTER (m), a little off centre. */
+const VINE_FROM_EDGE = 3.8;
+const VINE_JITTER: Vec3 = [0.7, 0, 0.4];
 /** Hands above the feet while holding on, and how close the hands must be to grab the rope. */
 const GRAB_HEIGHT = 2.0;
 const GRAB_REACH = 1.0;
@@ -122,6 +125,8 @@ const ROWS = {
  * turns. Boulders roll straight through them.
  */
 const ROCKS = 84;
+/** No rocks this close before a jump (m). */
+const ROCK_CLEAR = 4.5;
 const ROCK_MASS: [number, number] = [70, 140];
 const DEATH_SCREEN_DELAY = 1.6;
 
@@ -200,6 +205,8 @@ export class TempleLevel implements Level {
   private pieces: Piece[] = [];
   private spikes: Spikes[] = [];
   private pathSpikes: Spike[] = [];
+  /** Where jumps are (full spike rows), and which way you're heading when you meet them (+1 out, -1 back). */
+  private jumpRows: { z: number; dir: number }[] = [];
   private spikeGrace = 0;
   private levelBody: RAPIER.RigidBody;
   private flipped = false;
@@ -230,6 +237,9 @@ export class TempleLevel implements Level {
     hud.show(`LEVEL ${this.number}`, '', 2.5);
     hud.hint('');
     camera.confine = false;
+    // Keep the camera inside the tunnel (it never goes into the pits or through the walls).
+    camera.bounds = { min: [-W / 2 + 0.3, 0.3, Z_START + 0.4], max: [W / 2 - 0.3, H - 0.3, Z_ALCOVE_END - 0.4] };
+    player.torchArm = true;
 
     this.levelBody = physics.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
     this.build();
@@ -246,9 +256,9 @@ export class TempleLevel implements Level {
     // A vine over every wide pit, a little past its middle: from the ceiling over the floor's (for
     // the way out), from the floor over the ceiling's and the shaft (for when gravity points up).
     this.vines = [
-      ...FLOOR_PITS.filter(([a, b]) => b - a >= VINE_PIT).map(([a]): Vine => ({ pivot: [0, H, a + 4.5], back: false, hang: [0, -1, 0], used: false, fallT: 0 })),
-      ...CEILING_PITS.filter(([a, b]) => b - a >= VINE_PIT).map(([, b]): Vine => ({ pivot: [0, 0, b - 4.5], back: true, hang: [0, 1, 0], used: false, fallT: 0 })),
-      { pivot: [0, 0, LAND_Z - 0.5], back: true, hang: [0, 1, 0], used: false, fallT: 0 },
+      ...FLOOR_PITS.filter(([a, b]) => b - a >= VINE_PIT).map(([a]): Vine => ({ pivot: vineAt(H, a + VINE_FROM_EDGE), back: false, hang: [0, -1, 0], used: false, fallT: 0 })),
+      ...CEILING_PITS.filter(([a, b]) => b - a >= VINE_PIT).map(([, b]): Vine => ({ pivot: vineAt(0, b - VINE_FROM_EDGE), back: true, hang: [0, 1, 0], used: false, fallT: 0 })),
+      { pivot: vineAt(0, SHAFT[1] - VINE_FROM_EDGE), back: true, hang: [0, 1, 0], used: false, fallT: 0 },
     ];
 
     // Boulder 1 waits at the top of the shaft; boulder 2 behind the dead-end wall.
@@ -386,6 +396,7 @@ export class TempleLevel implements Level {
         while (overGap(z, gaps, margin) && z < to) z += 1;
         if (!clear(z) || overGap(z, gaps, margin)) continue;
         for (const x of xs) add1([x + jitter(), y, z + jitter() * 1.5], [0, dir, 0], 0.7, xs === ROWS.full ? FULL_ROW_LENGTH : SPIKE_LENGTH);
+        if (xs === ROWS.full) this.jumpRows.push({ z, dir });
       }
     };
     rows(FLOOR_ROW_COUNT, FLOOR_PITS, 0, 1);
@@ -414,8 +425,16 @@ export class TempleLevel implements Level {
   private scatterRocks() {
     const { physics } = this.ctx;
     const yaw = (i: number) => ({ x: 0, y: Math.sin(i * 1.7), z: 0, w: Math.cos(i * 1.7) });
+    // Never right before a jump (a pit or a full spike row) in either direction of travel: a rock
+    // in the way there hides the edge. The way back is the same z (the rocks fall straight over).
+    const beforeJump = (z: number) =>
+      FLOOR_PITS.some(([a]) => z > a - ROCK_CLEAR && z < a + 0.5) ||
+      [...CEILING_PITS, SHAFT].some(([, b]) => z > b - 0.5 && z < b + ROCK_CLEAR) ||
+      this.jumpRows.some((r) => (r.dir > 0 ? z > r.z - ROCK_CLEAR && z < r.z + 0.5 : z > r.z - 0.5 && z < r.z + ROCK_CLEAR));
     for (let i = 0; i < ROCKS; i++) {
-      const z = Z_START + 3 + Math.random() * (END_Z - Z_START - 5);
+      let z = Z_START + 3 + Math.random() * (END_Z - Z_START - 5);
+      for (let tries = 0; tries < 30 && beforeJump(z); tries++) z = Z_START + 3 + Math.random() * (END_Z - Z_START - 5);
+      if (beforeJump(z)) continue;
       const x = (Math.random() * 2 - 1) * (W / 2 - 0.5);
       const s = 0.25 + Math.random() * 0.5; // overall size
       const color = STONE_COLORS[Math.floor(Math.random() * STONE_COLORS.length)].map((c) => c * (0.85 + Math.random() * 0.3));
@@ -779,11 +798,23 @@ export class TempleLevel implements Level {
 
   // --- Torch ---------------------------------------------------------------------------------------
 
-  /** The torch in the right hand. */
+  /**
+   * The torch, gripped in the right fist: its origin at the hand, its y axis along the shaft.
+   * The shaft sits across the fist (square to the forearm) and points as near to "up" as that
+   * allows, so it stays upright whatever the arm is doing.
+   */
   private torchFrame(): Mat4 | null {
     const player = this.ctx.player;
     if (player.mode === 'hidden') return null;
-    return mul(player.partFrames().foreArmR, translation([0, -0.2, -0.09]));
+    const fore = player.partFrames().foreArmR;
+    const hand = transformPoint(fore, [0, -0.2, 0]);
+    const along = normalize(transformDir(fore, [0, 1, 0])); // hand toward elbow
+    let y = sub(player.up, scale(along, dot(player.up, along)));
+    if (length(y) < 0.2) y = transformDir(fore, [0, 0, -1]); // arm pointing straight up: lean it forward
+    y = normalize(y);
+    const x = normalize(cross(y, along));
+    const z = cross(x, y);
+    return basis(x, y, z, hand);
   }
 
   private updateTorch() {
@@ -793,7 +824,7 @@ export class TempleLevel implements Level {
       light.range = 0;
       return;
     }
-    const flame = transformPoint(f, [0, 0.62, 0]);
+    const flame = transformPoint(f, [0, 0.5, 0]);
     const flicker = 0.85 + Math.sin(this.t * 17) * 0.08 + Math.sin(this.t * 29) * 0.07;
     light.pos = add(flame, scale(this.ctx.player.up, 0.1));
     light.color = [2.8 * flicker, 1.35 * flicker, 0.45 * flicker];
@@ -858,11 +889,12 @@ export class TempleLevel implements Level {
   private drawTorch(out: DrawItem[], time: number) {
     const f = this.torchFrame();
     if (!f) return;
-    out.push({ mesh: 'cylinder', model: mul(f, translation([0, 0.25, 0]), scaling([0.03, 0.62, 0.03])), color: [0.3, 0.18, 0.08] });
-    out.push({ mesh: 'cylinder', model: mul(f, translation([0, 0.53, 0]), scaling([0.05, 0.12, 0.05])), color: [0.12, 0.08, 0.05] });
+    // Shaft through the fist (a little below it, most above), a wrapped head, and the flame.
+    out.push({ mesh: 'cylinder', model: mul(f, translation([0, 0.12, 0]), scaling([0.03, 0.62, 0.03])), color: [0.3, 0.18, 0.08] });
+    out.push({ mesh: 'cylinder', model: mul(f, translation([0, 0.4, 0]), scaling([0.05, 0.12, 0.05])), color: [0.12, 0.08, 0.05] });
     const flicker = 1 + Math.sin(time * 23) * 0.15 + Math.sin(time * 41) * 0.1;
-    out.push({ mesh: 'cone', model: mul(f, translation([0, 0.68, 0]), scaling([0.07, 0.2 * flicker, 0.07])), color: [6, 2.6, 0.5], pattern: Pattern.emissive, shadow: false });
-    out.push({ mesh: 'sphere', model: mul(f, translation([0, 0.63, 0]), scaling([0.06, 0.08, 0.06])), color: [8, 4.5, 1.2], pattern: Pattern.emissive, shadow: false });
+    out.push({ mesh: 'cone', model: mul(f, translation([0, 0.55, 0]), scaling([0.07, 0.2 * flicker, 0.07])), color: [6, 2.6, 0.5], pattern: Pattern.emissive, shadow: false });
+    out.push({ mesh: 'sphere', model: mul(f, translation([0, 0.5, 0]), scaling([0.06, 0.08, 0.06])), color: [8, 4.5, 1.2], pattern: Pattern.emissive, shadow: false });
   }
 
   environment() {
@@ -876,6 +908,11 @@ export class TempleLevel implements Level {
   cameraShot(): CameraShot | null {
     return this.arrival.cameraShot();
   }
+}
+
+/** Where a vine hangs from: around (0, y, z), a little off in x and z. */
+function vineAt(y: number, z: number): Vec3 {
+  return [(Math.random() * 2 - 1) * VINE_JITTER[0], y, z + (Math.random() * 2 - 1) * VINE_JITTER[2]];
 }
 
 function distToSegment(p: Vec3, a: Vec3, b: Vec3): number {

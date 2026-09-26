@@ -23,6 +23,8 @@ export class ThirdPersonCamera {
   confine = true;
   /** The camera's up (follows the player's gravity). */
   up: Vec3 = [0, 1, 0];
+  /** For levels with their own map: a box the camera must stay inside. */
+  bounds: { min: Vec3; max: Vec3 } | null = null;
   /** The camera's own idea of the player's gravity: trails behind when it turns. */
   private frame: Quat = { x: 0, y: 0, z: 0, w: 1 };
   /** Turn the view toward this orientation instead of the player's gravity (a level's camera-only roll). */
@@ -30,6 +32,7 @@ export class ThirdPersonCamera {
 
   reset(yaw = 0) {
     this.confine = true;
+    this.bounds = null;
     this.up = [0, 1, 0];
     this.frame = { x: 0, y: 0, z: 0, w: 1 };
     this.turnTarget = null;
@@ -63,6 +66,8 @@ export class ThirdPersonCamera {
     const shoulder = add(add(middle, scale(this.up, 0.75)), scale(right, SHOULDER_OFFSET));
     const desired = sub(shoulder, scale(fwd, DISTANCE));
     if (!this.confine) {
+      const b = this.bounds;
+      if (b) for (let k = 0; k < 3; k++) desired[k] = clamp(desired[k], b.min[k], b.max[k]);
       this.moveTo(desired, add(shoulder, scale(fwd, 10)), dt, 18);
       return;
     }

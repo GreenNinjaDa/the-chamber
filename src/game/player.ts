@@ -32,6 +32,9 @@ const CAPSULE_HALF = 0.55; // + radius = 0.9 = half the player's height
 const WALK_SPEED = 5;
 const SPRINT_SPEED = 8.5;
 const JUMP_SPEED = 7.5;
+/** The raised torch arm (see torchArm): shoulder raise and elbow bend (radians). */
+const TORCH_SHOULDER = 2.0;
+const TORCH_ELBOW = 0.5;
 /** A jump pressed this long before you can jump (still in the air, getting up...) happens as soon as you can. */
 const JUMP_BUFFER = 0.1;
 const GRAVITY = 22;
@@ -168,6 +171,8 @@ export class Player {
   up: Vec3 = [0, 1, 0];
   /** Hanging on to something overhead (a vine): arms up. The level does the holding. */
   hanging = false;
+  /** Holding a torch up and ahead in the right hand (the level draws the torch). */
+  torchArm = false;
   /** Torso fatness for this life only (1 = normal); reset() puts it back. */
   girth = 1;
   /** Multiplies walking / sprinting speed and acceleration, for this life only. */
@@ -198,6 +203,7 @@ export class Player {
     this.gravity = identity();
     this.up = [0, 1, 0];
     this.hanging = false;
+    this.torchArm = false;
   }
 
   /**
@@ -435,6 +441,10 @@ export class Player {
       this.driveVel = [0, 0, 0];
     }
     this.pose = this.computePose();
+    if (this.torchArm && !this.hanging && this.mode !== 'ragdoll') {
+      // Right arm raised up and ahead, elbow bent: holding a torch out to light the way.
+      this.pose = { ...this.pose, shoulderR: TORCH_SHOULDER, elbowR: TORCH_ELBOW };
+    }
     if (!this.collider) return;
     if (this.mode === 'control') {
       const c = this.center();
