@@ -42,7 +42,7 @@ const CHUTE_KEEP_OUT = 7.2;
 
 /** Heaps of toys: x, z and how many (the rest are scattered), settled in bins this wide. */
 const HEAPS: [number, number, number][] = [
-  [-6.8, -6, 8], [0, -6.8, 8], [5.6, -2.2, 8], [-7, 3.2, 7], [4.8, 5.8, 7], [-0.6, 0.2, 5],
+  [-6.8, -6, 8], [0, -6.8, 8], [5.6, -2.2, 8], [-7, 3.2, 8], [4.8, 5.8, 7], [-0.6, 0.2, 6],
 ];
 const HEAP_BIN = 2.3;
 
@@ -122,6 +122,13 @@ const ALIEN_TALK = '#b9ff7a';
 
 const HINT = 'Get under the claw before it comes down, and grab hold (hold E or left mouse): the claw is rigged, it WILL try to drop you. Let go over the chute.';
 const CONTROLS = 'WASD move · Space jump · Hold E or left mouse to hang on';
+
+/** What the prize flap says when you press E on it. */
+const FLAP_QUIPS: [string, string][] = [
+  ['PRIZES ONLY', 'The flap opens from the inside. You have to be won first.'],
+  ['NICE TRY', 'This is the way out. For prizes. Are you a prize? Not yet.'],
+  ['STILL NO', 'Pushing it harder does not make you more of a prize.'],
+];
 
 type DeathKind = 'dropped' | 'letgo' | 'gameover';
 const DEATHS: Record<DeathKind, { big: string; small: string[]; hint: string }> = {
@@ -253,7 +260,8 @@ export class ClawLevel implements Level {
       { pos: [-CHAMBER_HALF + 0.15, 3.3, 0], text: '*not every time', size: 0.34, color: '#f3dcff' },
       { pos: [CHAMBER_HALF - 0.15, 3.4, 2], text: 'PLEASE DO NOT TAUNT THE CLAW', size: 0.55, color: '#ff9ad5' },
       { pos: [CHUTE_IN - CHUTE_T - 0.05, 4.05, -CHUTE_IN + CHUTE_T + 0.05], text: 'PRIZES', size: 0.5, color: '#ffd23f' },
-      { pos: [CHUTE_IN - CHUTE_T - 0.03, 1.05, -10.7], text: 'NO CLIMBING', size: 0.2, color: '#202020' },
+      { pos: [CHUTE_IN - CHUTE_T - 0.05, CHUTE_H + 0.75, -10.7], text: 'NO CLIMBING', size: 0.24, color: '#ff4040' },
+      this.flapLabel,
       this.creditLabel,
       this.statusLabel,
     ];
@@ -279,7 +287,26 @@ export class ClawLevel implements Level {
     }
     // A dark lining inside, so the portal glows out of a pit.
     this.decor.push({ mesh: 'box', model: mul(translation([CHUTE_C[0], 0.02, CHUTE_C[2]]), scaling([E - I, 0.04, E - I])), color: [0.03, 0.02, 0.05], shadow: false });
+    // The prize flap at the front. It only opens from the inside, for prizes; E on it gets a lecture.
+    const flapPos: Vec3 = [CHUTE_C[0], 0.55, -I + T + 0.04];
+    this.decor.push({ mesh: 'box', model: mul(translation([flapPos[0], flapPos[1], flapPos[2] - 0.02]), scaling([1.16, 0.86, 0.04])), color: CHROME, spec: 0.9 });
+    const flapCollider = physics.addStaticBox(flapPos, [1.0, 0.7, 0.08]);
+    physics.registerUsable(flapCollider, this.flap);
+    this.flapItem = { mesh: 'box', model: mul(translation(flapPos), scaling([1.0, 0.7, 0.05])), color: [0.12, 0.12, 0.14], spec: 0.5 };
+    this.flapLabel = { pos: [flapPos[0], flapPos[1] + 0.02, flapPos[2] + 0.06], text: 'PUSH', size: 0.2, color: '#ffffff' };
   }
+
+  /** The prize flap's lectures, in order (then round again). */
+  private flapUses = 0;
+  private flap = {
+    highlight: 0,
+    use: () => {
+      const [big, small] = FLAP_QUIPS[this.flapUses++ % FLAP_QUIPS.length];
+      this.ctx.hud.show(big, small, 3);
+    },
+  };
+  private flapItem!: DrawItem;
+  private flapLabel!: WorldLabel;
 
   private buildDecor() {
     const E = CHAMBER_HALF;
@@ -342,10 +369,10 @@ export class ClawLevel implements Level {
   private spawnPrizes() {
     const bag: PlushKind[] = [];
     const add1 = (k: PlushKind, n: number) => { for (let i = 0; i < n; i++) bag.push(k); };
-    add1('alien', 26);
-    add1('teddy', 9);
+    add1('alien', 28);
+    add1('teddy', 10);
     add1('duck', 6);
-    add1('ball', 3);
+    add1('ball', 4);
     for (let i = bag.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [bag[i], bag[j]] = [bag[j], bag[i]];
@@ -621,7 +648,7 @@ export class ClawLevel implements Level {
     this.clock = 0;
     this.dropSpeed = 0;
     this.setPhase('drop');
-    this.chorusNear(this.claw.hub(), ['Ooooh...', 'Ooooooh!', 'The claaaw!', 'Ooooh...'], 4);
+    this.chorusNear(this.claw.hub(), ['Ooooh...', 'The claaaw!', 'Ooooooh!', pick(['Reach for the claaaw!', 'It comes!', 'Ooooh...'])], 4);
   }
 
   /** Picks what the prongs close on: whatever's nearest the middle, you included. */
@@ -1061,6 +1088,8 @@ export class ClawLevel implements Level {
 
   draw(out: DrawItem[], time: number) {
     for (const d of this.decor) out.push(d);
+    this.flapItem.highlight = this.flap.highlight;
+    out.push(this.flapItem);
     for (const b of this.bulbs) out.push(b.item);
     // The chute's portal, glowing up out of the pit.
     drawPortal(out, [CHUTE_C[0], PORTAL_Y, CHUTE_C[2]], [0, 1, 0], PORTAL_R * (1 + Math.sin(time * 3) * 0.02), false);

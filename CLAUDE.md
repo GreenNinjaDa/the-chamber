@@ -87,7 +87,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   torch also goes out. The map is one fixed body (not kinematic: Rapier's character
   controller won't climb slopes on kinematic colliders).
 - **Level 6 — The Claw** (`src/levels/claw/`): you're a prize in a claw machine (dark felt floor, a glass
-  front, starry backdrops, chasing marquee bulbs). 44 plush toys (`entities/plush.ts`: three-eyed aliens, teddies,
+  front, starry backdrops, chasing marquee bulbs). 48 plush toys (`entities/plush.ts`: three-eyed aliens, teddies,
   giant ducks, beach balls; light, bouncy, settled into heaps before you arrive) slow you down when you wade through
   them. The exit is the prize chute in the north-east corner (too tall to climb, a clear guard on top) with a portal
   at the bottom. An unseen kid has three credits (display over the glass: CREDITS / TIME): each one the claw
