@@ -786,8 +786,10 @@ export class QwopLevel implements Level {
     if (shot) return shot;
     switch (this.phase) {
       case 'build':
-        // Taking in the stadium.
-        return { pos: [0, 6.2, 11.6], target: [0, 2.6, -7], sharpness: 2.5 };
+        // Taking in the stadium, then a push in on the scoreboard's announcement.
+        return this.t < 1.8
+          ? { pos: [0, 6.2, 11.6], target: [0, 2.6, -7], sharpness: 2.5 }
+          : { pos: [0, 5.4, 2.5], target: [0, 6.9, -12], sharpness: 1.8 };
       case 'marks':
       case 'set':
       case 'run':
