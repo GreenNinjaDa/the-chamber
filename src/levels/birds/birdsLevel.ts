@@ -740,7 +740,9 @@ export class BirdsLevel implements Level {
     let solved = { v: [1, 0, 0] as Vec3, T };
     for (let i = 0; i < 2; i++) {
       target = add(chest, add([player.vel[0] * T * shot.lead, 0, player.vel[2] * T * shot.lead], this.aimError));
-      target[0] = clamp(target[0], -CHAMBER_HALF + 0.6, CHAMBER_HALF - 0.6);
+      // (Not right up against the west wall: no arc over it gets there. Aim a little out from it instead,
+      // so hugging the wall isn't a hiding place.)
+      target[0] = clamp(target[0], -CHAMBER_HALF + 1.8, CHAMBER_HALF - 0.6);
       target[2] = clamp(target[2], -CHAMBER_HALF + 0.6, CHAMBER_HALF - 0.6);
       solved = this.solve(from, target, shot.flight, BIRD_RADIUS[shot.bird]);
       T = solved.T;
@@ -1608,7 +1610,8 @@ export class BirdsLevel implements Level {
       if (this.loaded && this.phase !== 'load') targets.push({ pos: this.loaded.pos, radius: BIRD_RADIUS[this.loaded.bird] * 1.3 });
       for (const f of this.flyers) {
         if (f.gone) continue;
-        if (f.landed < 0 || f.fuse >= 0) {
+        const v = f.body.rb.linvel();
+        if (f.landed < 0 || f.fuse >= 0 || (f.bird === 'terence' && Math.hypot(v.x, v.y, v.z) > TERENCE_LETHAL_SPEED)) {
           const t = f.body.rb.translation();
           targets.push({ pos: [t.x, t.y, t.z], radius: f.r * 1.3 });
         }

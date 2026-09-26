@@ -623,7 +623,7 @@ export class PinballLevel implements Level {
         break;
       case 'play':
         // (New balls are dropped into the shooter lane, so not while the player is in it.)
-        if (this.ballQueue > 0 && !this.playerInLane()) {
+        if (this.ballQueue > 0 && !this.playerInBallPath()) {
           this.ballQueueT -= dt;
           if (this.ballQueueT <= 0) {
             this.ballQueue--;
@@ -940,10 +940,11 @@ export class PinballLevel implements Level {
   // --- The plunger and the flight up the lane ---------------------------------------------------------------------
 
   /** Whether the (live) player is somewhere up the shooter lane, off the plunger. */
-  private playerInLane() {
+  /** The player is somewhere a plunged ball would go: the lane (plunger included) or on up the east side to the top arc. */
+  private playerInBallPath() {
     const { player } = this.ctx;
     const p = player.pos;
-    return player.mode === 'control' && !this.death && p[0] > LANE_WALL_X + 0.15 && p[2] > LANE_TOP_Z && !this.onPlunger(p[0], p[2], p[1] - TABLE.y(p[2]));
+    return player.mode === 'control' && !this.death && p[0] > LANE_WALL_X && p[2] > -ARC_C;
   }
 
   /** Whether (x, z) is on the plunger's tip, at the bottom of the lane. */
@@ -967,7 +968,7 @@ export class PinballLevel implements Level {
       case 'idle':
         pl.pull = Math.max(0, pl.pull - dt * 6);
         // Balls wait while the player is up the lane: firing one into their back would be cheap.
-        if (armed && (playerOn || (ballsOn.length && !this.playerInLane()))) {
+        if (armed && (playerOn || (ballsOn.length && !this.playerInBallPath()))) {
           pl.loaded += dt;
           if (pl.loaded > (playerOn ? 0.5 : 0.3)) {
             pl.state = 'pull';
@@ -978,9 +979,16 @@ export class PinballLevel implements Level {
         } else pl.loaded = 0;
         break;
       case 'pull':
+        // They stepped off the plunger mid-pull: never mind.
+        if (pl.withPlayer && !playerOn) {
+          pl.state = 'idle';
+          pl.t = 0;
+          pl.loaded = 0;
+          break;
+        }
         pl.pull = Math.min(1, pl.t / 0.9);
         // Loaded with balls but the player has wandered into the lane: hold it back till they're out of the way.
-        if (pl.t > 1.05 && !playerOn && this.playerInLane()) pl.t = 1.05;
+        if (pl.t > 1.05 && !playerOn && this.playerInBallPath()) pl.t = 1.05;
         else if (pl.t > 1.05) {
           pl.state = 'fire';
           pl.t = 0;
@@ -1093,7 +1101,7 @@ export class PinballLevel implements Level {
       const p = rb.translation();
       const v = rb.linvel();
       if (b.state === 'drained') {
-        if (b.t > 1.4 && !this.playerInLane()) {
+        if (b.t > 1.4 && !this.playerInBallPath()) {
           // Ball save: back into the shooter lane.
           b.state = 'play';
           b.t = 0;
