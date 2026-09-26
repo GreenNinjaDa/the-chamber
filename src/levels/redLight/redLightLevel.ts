@@ -29,7 +29,7 @@ const SPAWN: Vec3 = [-9.5, 0, 0];
 const EXIT_Z = 5;
 /** The clock on the north wall (s), counting from the first chant. */
 const CLOCK = 60;
-/** When the first chant starts (s after the level starts), and how long it lasts. */
+/** When the first chant starts (s after the arrival is done), and how long it lasts. */
 const CHANT_START = 1.3;
 const FIRST_GREEN = 3.2;
 /**
@@ -202,6 +202,8 @@ export class RedLightLevel implements Level {
   private phase: Phase = 'wait';
   private phaseT = 0;
   private phaseLen = CHANT_START;
+  /** Level time of the first chant (-1: not yet); the clock runs from then. */
+  private firstChantAt = -1;
   /** Green lights started so far (the current one is cycle - 1), and the current / last red light. */
   private cycle = 0;
   private red = -1;
@@ -281,6 +283,7 @@ export class RedLightLevel implements Level {
   }
 
   private startGreen() {
+    if (this.firstChantAt < 0) this.firstChantAt = this.t;
     const n = this.cycle++;
     const len = n === 0 ? FIRST_GREEN : n === 1 ? 3.4 : n === 2 ? 3.0
       : rand(Math.max(1.5, 2.3 - 0.2 * (n - 3)), Math.max(1.9, 3.6 - 0.25 * (n - 3)));
@@ -332,7 +335,7 @@ export class RedLightLevel implements Level {
   }
 
   private get timeLeft() {
-    return Math.max(0, CLOCK - Math.max(0, this.t - CHANT_START));
+    return this.firstChantAt < 0 ? CLOCK : Math.max(0, CLOCK - (this.t - this.firstChantAt));
   }
 
   update(dt: number) {
@@ -406,6 +409,8 @@ export class RedLightLevel implements Level {
       case 'wait':
         doll.headYaw = 0;
         doll.eyeGlow = 0;
+        // Nothing starts while the player is still being spat out of the portal.
+        if (!this.arrival.done) this.phaseT = 0;
         if (this.phaseT >= this.phaseLen) this.startGreen();
         break;
       case 'green': {

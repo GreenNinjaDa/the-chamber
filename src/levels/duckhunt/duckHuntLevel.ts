@@ -176,8 +176,8 @@ export class DuckHuntLevel implements Level {
     const from: Vec3 = [this.aim[0], this.aim[1] + 0.4 * ((CHAMBER_HALF - 0.1 - this.aim[2]) / (GUN_Z - this.aim[2])), CHAMBER_HALF - 0.1];
     const dir = normalize(sub(this.aim, from));
     const dist = Math.hypot(this.aim[0] - from[0], this.aim[1] - from[1], this.aim[2] - from[2]);
-    const hit = physics.raycast(from, dir, dist + 0.5, player.collider ?? undefined);
-    const bush = hit ? this.bushes.find((b) => b.collider && b.collider.handle === hit.collider.handle) : undefined;
+    const hit = physics.raycast(from, dir, dist, player.collider ?? undefined);
+    const bush = hit ? this.bushes.find((b) => b.shredT < 0 && b.collider && b.collider.handle === hit.collider.handle) : undefined;
     const chest = this.chest();
     const onYou = Math.hypot(this.aim[0] - chest[0], this.aim[2] - chest[2]) < HIT_R;
     if (bush) {
@@ -212,8 +212,11 @@ export class DuckHuntLevel implements Level {
   private shred(b: Bush) {
     noise(0.5, { freq: 3000, to: 800, type: 'bandpass', q: 1, vol: 0.35 });
     b.shredT = 0;
-    if (b.collider) this.ctx.physics.world.removeCollider(b.collider, true);
-    b.collider = null;
+    // (The tree keeps its trunk to bump into; it just won't stop another shot.)
+    if (b.collider && b.r < 1.5) {
+      this.ctx.physics.world.removeCollider(b.collider, true);
+      b.collider = null;
+    }
     for (let i = 0; i < 26; i++) {
       this.leaves.push({ pos: add(b.pos, [(Math.random() - 0.5) * b.r, b.r * (0.4 + Math.random()), (Math.random() - 0.5) * b.r]), vel: [(Math.random() - 0.5) * 5, 2 + Math.random() * 4, (Math.random() - 0.5) * 5], age: 0 });
     }

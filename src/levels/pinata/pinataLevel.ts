@@ -1,3 +1,4 @@
+import { noise, sfx } from '../../engine/audio';
 import { add, clamp, lerp, length, mul, normalize, rotationX, rotationY, rotationZ, scale, scaling, segment, sub, translation, type Mat4, type Vec3 } from '../../engine/math';
 import { Pattern, type DrawItem } from '../../engine/renderer';
 import { CHAMBER_HALF } from '../../game/chamber';
@@ -63,7 +64,9 @@ export class PinataLevel implements Level {
   private t = -1;
   private balloons: Balloon[] = [];
   private noises: Noise[] = [];
-  private bat: { state: 'rest' | 'windup' | 'smash' | 'recover'; t: number; target: Vec3; hand: Vec3 } = { state: 'rest', t: 0, target: [0, 0, 0], hand: [4, 13, 12] };
+  private bat: { state: 'rest' | 'windup' | 'smash' | 'recover'; t: number; target: Vec3; hand: Vec3; atPinata: boolean } = {
+    state: 'rest', t: 0, target: [0, 0, 0], hand: [4, 13, 12], atPinata: false,
+  };
   private quiet = 0;
   private confetti: { pos: Vec3; vel: Vec3; age: number; color: number[] }[] = [];
   private pops: { pos: Vec3; age: number; color: number[] }[] = [];
@@ -112,6 +115,7 @@ export class PinataLevel implements Level {
   private pop(i: number) {
     const b = this.balloons[i];
     this.pops.push({ pos: [...b.pos], age: 0, color: b.color });
+    sfx.pop();
     this.noise(b.pos, 3);
     this.balloons.splice(i, 1);
   }
@@ -145,7 +149,7 @@ export class PinataLevel implements Level {
     this.giant.root[1] = lerp(-80, 0, 1 - (1 - rise) * (1 - rise)) - 80 * leave * leave;
     this.timmyLabel.pos = add(this.giant.headCenter(), [0, 14, 0]);
     if (t > PARTY && !this.pinataHit && this.bat.state === 'rest') {
-      this.swing([0, 3.6, -4]);
+      this.swing([0, 3.6, -4], true);
       this.timmyLabel.text = 'FOUND IT!';
     }
     if (t >= CAKE_AT && t - dt < CAKE_AT && !this.death) {
@@ -221,6 +225,7 @@ export class PinataLevel implements Level {
     if (bat.state === 'windup' && bat.t >= WIND_UP) {
       bat.state = 'smash';
       bat.t = 0;
+      noise(SMASH, { freq: 300, to: 1500, type: 'bandpass', q: 1.5, vol: 0.3 });
     }
     if (bat.state === 'smash' && bat.t >= SMASH) {
       bat.state = 'recover';
@@ -263,8 +268,8 @@ export class PinataLevel implements Level {
     }
   }
 
-  private swing(target: Vec3) {
-    this.bat = { state: 'windup', t: 0, target: [target[0], 0, target[2]], hand: this.bat.hand };
+  private swing(target: Vec3, atPinata = false) {
+    this.bat = { state: 'windup', t: 0, target: [target[0], 0, target[2]], hand: this.bat.hand, atPinata };
     this.quiet = 0;
     this.noises = [];
   }
@@ -274,8 +279,12 @@ export class PinataLevel implements Level {
     camera.addShake(Math.max(0.2, 1.2 - length(sub(p, player.pos)) * 0.08));
     for (let k = 0; k < 20; k++) this.confetti.push({ pos: add(p, [rand(-1, 1), 0.3, rand(-1, 1)]), vel: [rand(-4, 4), rand(3, 8), rand(-4, 4)], age: 0, color: pick(COLORS) });
     // The piñata, at last.
-    if (this.t > PARTY && !this.pinataHit) {
+    sfx.thud(0.9);
+    noise(0.3, { freq: 1800, to: 300, vol: 0.4 });
+    if (this.bat.atPinata && !this.pinataHit) {
       this.pinataHit = true;
+      sfx.pop();
+      sfx.win();
       for (let k = 0; k < 60; k++) this.candy.push({ pos: [rand(-0.5, 0.5), 3.6, -4 + rand(-0.5, 0.5)], vel: [rand(-6, 6), rand(2, 8), rand(-6, 6)], color: pick(COLORS) });
       return;
     }
@@ -318,8 +327,9 @@ export class PinataLevel implements Level {
     for (let i = first; i < out.length; i++) out[i].shadow = false;
     // Where he's about to swing: a shadow on the floor during the windup.
     if (this.bat.state === 'windup' || this.bat.state === 'smash') {
+      // Full size from the start (so you can tell whether you're inside it), darkening as it comes.
       const k = this.bat.state === 'smash' ? 1 : this.bat.t / WIND_UP;
-      out.push({ mesh: 'cylinder', model: mul(translation([tgt[0], 0.015, tgt[2]]), scaling([BAT_R * k, 0.01, BAT_R * k])), color: [0, 0, 0], pattern: Pattern.blob, param: 0.55, shadow: false });
+      out.push({ mesh: 'cylinder', model: mul(translation([tgt[0], 0.015, tgt[2]]), scaling([BAT_R, 0.01, BAT_R])), color: [0, 0, 0], pattern: Pattern.blob, param: 0.55, opacity: 0.3 + 0.7 * k, shadow: false });
     }
     // Noise rings.
     for (const n of this.noises) {

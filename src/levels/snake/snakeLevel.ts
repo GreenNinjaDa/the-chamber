@@ -1,3 +1,4 @@
+import { tone } from '../../engine/audio';
 import type { Vec3 } from '../../engine/math';
 import { Pattern, type DrawItem } from '../../engine/renderer';
 import { APPLE_RADIUS, spawnApple, type Apple } from '../../entities/apple';
@@ -294,6 +295,14 @@ export class SnakeLevel implements Level {
     }
     const apple = this.apple;
     apple.pop = Math.min(1, apple.pop + dt / APPLE_POP_TIME);
+    // Thrown out of the chamber (or through the floor): gone, and a new one grows back.
+    const at = apple.body.rb.translation();
+    if (Math.abs(at.x) > CHAMBER_HALF || Math.abs(at.z) > CHAMBER_HALF || at.y < -2) {
+      this.ctx.physics.remove(apple.body);
+      this.apple = null;
+      this.appleT = APPLE_RESPAWN;
+      return;
+    }
     if (s.state !== 'moving' || s.cj[0] < 0) return;
     // Eaten if the head's box reaches it.
     const p = apple.body.rb.translation();
@@ -304,6 +313,8 @@ export class SnakeLevel implements Level {
       this.appleT = APPLE_RESPAWN;
       s.eat(APPLE_MEAL);
       s.pauseFor = APPLE_GULP;
+      tone(520, 0.08, { wave: 'square', vol: 0.12 });
+      tone(780, 0.12, { wave: 'square', vol: 0.12, at: 0.08 });
       this.applesEaten++;
     }
   }

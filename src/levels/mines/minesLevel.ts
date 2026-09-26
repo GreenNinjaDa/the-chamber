@@ -180,9 +180,9 @@ export class MinesLevel implements Level {
       // Open up where the player landed, and slide the exit open on the far side.
       this.started = true;
       const spawnTile = this.tileAt(this.spawn[0], this.spawn[2]);
-      if (spawnTile) this.reveal(spawnTile);
       const here = this.tileAt(player.pos[0], player.pos[2]);
-      if (here && here.mine) this.moveMine(here);
+      if (here && here.mine && spawnTile) this.moveMine(here, spawnTile);
+      if (spawnTile) this.reveal(spawnTile);
       if (here) this.reveal(here);
       this.exit.openNow();
     }
@@ -225,11 +225,29 @@ export class MinesLevel implements Level {
   private startTime: number | undefined;
 
   /** The portal dropped you on a mine (it can happen, just): quietly move it somewhere far away. */
-  private moveMine(t: Tile) {
-    const far = this.tiles.filter((o) => !o.mine && !o.revealed && Math.hypot(o.i - t.i, o.j - t.j) > 4);
+  private moveMine(t: Tile, start: Tile) {
+    const exit: [number, number] = [N - 1, this.exitRow];
+    const far = this.tiles.filter((o) => !o.mine && Math.hypot(o.i - t.i, o.j - t.j) > 4 && !(o.i === exit[0] && o.j === exit[1]));
     if (!far.length) return;
     t.mine = false;
-    pick(far).mine = true;
+    // Somewhere that keeps the board solvable by logic, if there is one.
+    const layout = () => {
+      const m: boolean[] = new Array(N * N).fill(false);
+      for (const o of this.tiles) m[o.j * N + o.i] = o.mine;
+      return m;
+    };
+    let chosen = pick(far);
+    for (let tries = 0; tries < 40; tries++) {
+      const o = pick(far);
+      o.mine = true;
+      const ok = solvable(layout(), [start.i, start.j], exit);
+      o.mine = false;
+      if (ok) {
+        chosen = o;
+        break;
+      }
+    }
+    chosen.mine = true;
     for (const o of this.tiles) o.count = this.neighbours(o).filter((n) => n.mine).length;
   }
 

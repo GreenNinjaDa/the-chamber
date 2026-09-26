@@ -121,6 +121,8 @@ export class SimonLevel implements Level {
   private spinBody = 0;
   private pressed = false;
   private duckThrown = false;
+  /** Looked below the LOOK UP line since the step began. */
+  private lookedAway = false;
   private wasOnGround = true;
   private lastYaw = 0;
   private lastFacing = 0;
@@ -219,7 +221,11 @@ export class SimonLevel implements Level {
     const spin = simon('SPIN AROUND.', 6, () => this.spin > Math.PI * 1.8, { quip: 'WHEEE.' });
     const tricks: Step[] = [
       trap('SIMEON SAYS:', 'JUMP.', 3.5, jumped, { quip: 'SIMEON IS NOT SIMON. WELL READ.' }),
-      trap('SIMON SAID:', 'LOOK UP.', 3.5, () => camera.pitch > 0.55, { quip: 'PAST TENSE. NICE CATCH.' }),
+      trap('SIMON SAID:', 'LOOK UP.', 3.5, () => {
+        // Only a fresh look up counts: you may still be gazing at the ceiling from the real one.
+        if (camera.pitch < 0.45) this.lookedAway = true;
+        return this.lookedAway && camera.pitch > 0.55;
+      }, { quip: 'PAST TENSE. NICE CATCH.' }),
       trap('', 'PRESS THE BUTTON.', 4, () => this.pressed),
       trap("SIMON'S MUM SAYS:", 'SPIN AROUND.', 4, () => this.spin > Math.PI * 1.5, { quip: "SIMON'S MUM HAS NO AUTHORITY HERE." }),
     ];
@@ -266,6 +272,8 @@ export class SimonLevel implements Level {
 
   private begin(i: number) {
     const { player, camera } = this.ctx;
+    // A throw straight after picking the duck up (during the pause) still counts for THROW.
+    const keepThrow = this.steps[i].text === 'THROW THE DUCK.' && this.steps[this.index]?.text === 'PICK UP THE DUCK.';
     this.index = i;
     this.stepT = 0;
     this.jumps = 0;
@@ -273,9 +281,8 @@ export class SimonLevel implements Level {
     this.spinCam = 0;
     this.spinBody = 0;
     this.pressed = false;
-    // (A throw made during the pause before this step still counts.)
-    const dv = this.duck.rb.linvel();
-    this.duckThrown = !this.carryingDuck && Math.hypot(dv.x, dv.y, dv.z) > 4;
+    this.duckThrown = keepThrow && this.duckThrown;
+    this.lookedAway = camera.pitch < 0.45;
     this.lastYaw = camera.yaw;
     this.lastFacing = player.facing;
     this.startPad = this.pad;

@@ -104,8 +104,11 @@ export class Giant {
     push('sphere', mul(head, scaling([8, 9.5, 8])), SKIN, Pattern.skin);
     push('sphere', mul(head, translation([0, 2.5, 1.2]), scaling([8.5, 8, 8.4])), HAIR);
     for (const side of [-1, 1]) {
-      push('sphere', mul(head, translation([2.9 * side, 1.8, -6.9]), scaling([1.4, 1.4, 1.4])), [0.95, 0.95, 0.92]);
-      push('sphere', mul(head, translation([2.9 * side, 1.8, -8.1]), scaling([0.75, 0.75, 0.75])), [0.03, 0.03, 0.04]);
+      // (Under a blindfold the eyes would poke through it.)
+      if (!this.blindfold) {
+        push('sphere', mul(head, translation([2.9 * side, 1.8, -6.9]), scaling([1.4, 1.4, 1.4])), [0.95, 0.95, 0.92]);
+        push('sphere', mul(head, translation([2.9 * side, 1.8, -8.1]), scaling([0.75, 0.75, 0.75])), [0.03, 0.03, 0.04]);
+      }
       push('box', mul(head, translation([2.9 * side, 3.7, -7.3]), rotationZ(0.18 * side), scaling([3.4, 0.7, 0.9])), HAIR);
       push('sphere', mul(head, translation([8 * side, 0.5, 0]), scaling([1.2, 2.2, 1.4])), SKIN, Pattern.skin);
     }
