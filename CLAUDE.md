@@ -176,6 +176,12 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   wherever you stand (a column every other row) and committing 4 rows up (a ghost shows where they'll land); what
   lands is what you climb, up to the exit (open from the start, 5 m up the east wall). Full rows clear and drop
   everything above. Crushed = GAME OVER; the stack reaching the top of the well = TOPPED OUT.
+- **Dodgeball** (`src/levels/dodgeball/`): four sentry turrets (`entities/turret.ts`: white egg on a tripod, one red
+  eye, 22 kg physics bodies you can also pick up) wake one after another ("Hello?"), paint you with a red laser when
+  they can see you, and after a 0.9 s charge fire a red rubber dodgeball at where you're going. Three hits (tested
+  along each ball's path) and you're out through a trapdoor. Balls pile up everywhere: carry one, aim, right-click
+  to throw it back; a fast ball hitting a turret knocks it over (with a helping shove), and tipped past ~50° it's
+  down for good ("I don't blame you."). All four down: the exit opens.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -210,7 +216,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   `pressurePlate.ts` (round button, or `{ stone: [w, d] }` for a rock slab), `uselessBox.ts`, `rock.ts` (textured stone: `boulderModel`, `chunkModel`, `slabModel`, `shardModel`, `clusterModel`; `Pattern.rock`),
   `doll.ts` (the giant doll with a swivelling head and glowing eyes, plus a `BareTree`), `contestant.ts` (scripted
   NPC in a tracksuit: walk/run, freeze, wobble/sneeze/cheer, dramatic death fall; `drawBody` takes a `BodyColors`
-  to dress the player's body as someone else), `trapdoor.ts` (`drawTrapdoor`: the floor panel that snaps up like a catapult), `vehicles.ts` (forklift, golf cart, robot vacuum, office chair, steamroller, sports car, and door / pallet rafts),
+  to dress the player's body as someone else), `turret.ts` (`drawTurret`: the sentry turret model), `trapdoor.ts` (`drawTrapdoor`: the floor panel that snaps up like a catapult), `vehicles.ts` (forklift, golf cart, robot vacuum, office chair, steamroller, sports car, and door / pallet rafts),
   `laser.ts` (`drawBeam` / `drawBeamDot` / `drawFloorGlow`,
   `BodySlicer` to test beams against the player's body parts, `LaserPylon`), `gnome.ts` (big garden gnome:
   `spawnGnome(physics, feet, look)`, arm poses in `GNOME_POSES`, glowing eyes, and `drawGnomeHat(out, headFrame)` for
