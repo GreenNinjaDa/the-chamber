@@ -78,15 +78,13 @@ export class Snake {
   targetJ = 8;
   /** Grows one block every this many steps. */
   growEvery = 5;
-  brain: SnakeBrain = { blunder: 0.08, foresight: 0.75, pocket: 10 };
+  brain: SnakeBrain = { blunder: 0.1, foresight: 0.75, pocket: 10 };
   /** Seconds to hold still (e.g. for a gulp) before stepping on. */
   pauseFor = 0;
   /** Blocks still to be added (one per step, at the tail). */
   pendingGrowth = 0;
   /** Steps taken so far. */
   steps = 0;
-  /** Set on the step it crashed: the cell it tried to go into. */
-  crashedInto: [number, number] | null = null;
   private timer = 0;
   private slide = 1;
   private slideTime = SLIDE_TIME;
@@ -265,8 +263,6 @@ export class Snake {
 
   /** Stops dead: it has nowhere to go. */
   private crash() {
-    const d = this.dir;
-    this.crashedInto = [this.ci[0] + DI[d], this.cj[0] + DJ[d]];
     this.state = 'crashed';
     this.stateT = 0;
   }

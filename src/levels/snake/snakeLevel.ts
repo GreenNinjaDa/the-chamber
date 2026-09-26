@@ -32,12 +32,12 @@ const LEAD = 0.25;
  * many cells (Manhattan), so luring it in close is how to make it blunder into its own coils.
  */
 const GREEDY_RANGE = 4;
-const FORESIGHT_FAR = 0.85;
+const FORESIGHT_FAR = 0.7;
 const FORESIGHT_NEAR = 0.1;
 /** For this long after it comes out it always looks ahead (no early accidents). */
 const CAREFUL_FOR = 20;
 /** A bite: the player is within this of the front of the head (m), or this close to its sides (overlapping). */
-const BITE_REACH = PLAYER_RADIUS + 0.1;
+const BITE_REACH = PLAYER_RADIUS + 0.05;
 const SIDE_REACH = PLAYER_RADIUS - 0.05;
 /** Blocks gained from a player. */
 const PLAYER_MEAL = 3;
@@ -97,13 +97,6 @@ const pick = <T>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
 const pad = (n: number) => String(n).padStart(4, '0');
 const NO_OBSTACLES: Circle[] = [];
 
-interface Death {
-  t: number;
-  big: string;
-  small: string;
-  tips: [string, string][];
-}
-
 export class SnakeLevel implements Level {
   readonly number = 6;
   readonly title = 'Snake';
@@ -117,8 +110,10 @@ export class SnakeLevel implements Level {
   private huntT = 0;
   private door = 0;
   private doorOpen = false;
-  private swallowT = -1;
-  private death: Death | null = null;
+  /** Seconds since the player was eaten (-1: not yet). */
+  private eatenT = -1;
+  /** The length the score on the wall shows. */
+  private shownLength = -1;
   /** The snake died: seconds since it finished popping away (-1: not yet). */
   private overT = -1;
   private wanderI = 8;
@@ -127,6 +122,7 @@ export class SnakeLevel implements Level {
   private apple: Apple | null = null;
   /** Seconds until the next apple appears. */
   private appleT = 0;
+  /** Apples the snake has eaten (for play-testing). */
   private applesEaten = 0;
 
   private plate: DrawItem;
@@ -173,17 +169,13 @@ export class SnakeLevel implements Level {
 
     const doorX = cellCentre(DOOR_I);
     this.doorHole = { mesh: 'box', model: box([doorX, DOOR_H / 2, NORTH + 0.011], [DOOR_W - 0.04, DOOR_H, 0.02]), color: HOLE, shadow: false };
-    this.doorPanel = { mesh: 'box', model: new Float32Array(16), color: WALL, pattern: Pattern.panels, param: 2, spec: 0.15 };
+    const panel = box([doorX, DOOR_H / 2, NORTH + 0.03], [DOOR_W + 0.05, DOOR_H + 0.05, 0.06]);
+    this.doorPanel = { mesh: 'box', model: panel, color: WALL, pattern: Pattern.panels, param: 2, spec: 0.15 };
 
     this.score = new PixelText({ centre: [-8.6, 8.9, NORTH], right: [1, 0, 0], up: [0, 1, 0], pixel: 0.15, color: PIXEL_DARK });
     this.score.reveal = 0;
     this.gameOver = new PixelText({ centre: [0, 4.6, NORTH], right: [1, 0, 0], up: [0, 1, 0], pixel: 0.32, color: PIXEL_DARK, depth: 0.08 }, 'GAME OVER');
     this.gameOver.reveal = 0;
-  }
-
-  private die(big: string, small: string, tips: [string, string][]) {
-    this.ctx.hud.hide();
-    this.death = { t: 0, big, small, tips };
   }
 
   /** The head reached the player: swallowed whole. */
@@ -198,28 +190,24 @@ export class SnakeLevel implements Level {
     player.facing = Math.atan2(player.pos[0] - hx, player.pos[2] - hz);
     player.shrinkInto(mouth, SWALLOW_TIME);
     camera.addShake(0.45);
-    this.swallowT = 0;
-    this.die('GAME OVER', '', [
-      ['Hint', 'The snake is greedy and never turns back. Circle it and let it tie itself in a knot.'],
-      ['Controls', 'WASD move · Shift sprint'],
-    ]);
+    this.ctx.hud.hide();
+    this.eatenT = 0;
   }
 
   update(dt: number) {
     const { player, hud } = this.ctx;
-    const death = this.death;
-    if (death && this.status === 'playing') {
-      death.t += dt;
-      if (death.t > DEATH_SCREEN_DELAY) {
+    if (this.eatenT >= 0) {
+      this.eatenT += dt;
+      if (this.eatenT >= SWALLOW_TIME && player.mode === 'held') player.hide();
+      if (this.eatenT > DEATH_SCREEN_DELAY && this.status === 'playing') {
         this.status = 'lost';
         const score = this.snake.length + this.snake.pendingGrowth;
-        hud.show(death.big, `${pick(EATEN_QUIPS)}\nSCORE: ${pad(score)}\nPress R to try again.`);
-        hud.tips(death.tips);
+        hud.show('GAME OVER', `${pick(EATEN_QUIPS)}\nSCORE: ${pad(score)}\nPress R to try again.`);
+        hud.tips([
+          ['Hint', 'The snake is greedy and never turns back. Circle it and let it tie itself in a knot. It goes for the apple when that is nearer than you.'],
+          ['Controls', 'WASD move · Shift sprint · Hold click carry · Right-click throw'],
+        ]);
       }
-    }
-    if (this.swallowT >= 0) {
-      this.swallowT += dt;
-      if (this.swallowT >= SWALLOW_TIME && player.mode === 'held') player.hide();
     }
 
     this.arrival.update(dt);
@@ -250,14 +238,17 @@ export class SnakeLevel implements Level {
     const wasAlive = s.alive;
     s.update(dt);
     if (wasAlive && !s.alive) this.ctx.camera.addShake(0.35);
-    this.score.setText(pad(s.length));
+    if (s.length !== this.shownLength) {
+      this.shownLength = s.length;
+      this.score.setText(pad(s.length));
+    }
 
     if (s.state === 'moving' && player.mode === 'control' && !player.inPortal && s.cj[0] >= 0 && this.bitten()) this.eatPlayer();
 
     // It crashed: once it has blinked and popped away, game over (for the snake).
     if (s.state === 'gone' && this.overT < 0) {
       this.overT = 0;
-      if (!this.death) {
+      if (this.eatenT < 0) {
         this.quip.text = pick(WIN_QUIPS);
         this.exit.openNow();
       }
@@ -397,8 +388,7 @@ export class SnakeLevel implements Level {
       // The panel slides aside (east) to let it in.
       const k = this.door / DOOR_SLIDE;
       const slide = k * k * (3 - 2 * k);
-      const m = this.doorPanel.model;
-      m.set(box([cellCentre(DOOR_I) + slide * (DOOR_W + 0.1), DOOR_H / 2, NORTH + 0.03], [DOOR_W + 0.05, DOOR_H + 0.05, 0.06]));
+      this.doorPanel.model[12] = cellCentre(DOOR_I) + slide * (DOOR_W + 0.1);
       out.push(this.doorPanel);
     }
     this.snake.draw(out);
