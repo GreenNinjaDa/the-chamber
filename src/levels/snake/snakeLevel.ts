@@ -50,6 +50,8 @@ const APPLE_MEAL = 3;
 const APPLE_GULP = 0.3;
 const APPLE_RESPAWN = 3;
 const APPLE_POP_TIME = 0.35;
+/** `?noApple` leaves the apple out (to test the snake on its own). */
+const NO_APPLE = new URLSearchParams(location.search).has('noApple');
 
 // --- Timeline (seconds after the arrival is done) -------------------------------------------------
 
@@ -283,7 +285,7 @@ export class SnakeLevel implements Level {
   private updateApple(dt: number) {
     const s = this.snake;
     if (!this.apple) {
-      if (this.t < APPLE_AT || !s.alive) return;
+      if (this.t < APPLE_AT || !s.alive || NO_APPLE) return;
       this.appleT -= dt;
       if (this.appleT <= 0) this.apple = spawnApple(this.ctx.physics, this.appleSpot());
       return;
