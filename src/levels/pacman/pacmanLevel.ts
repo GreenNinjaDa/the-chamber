@@ -77,7 +77,7 @@ const FLOOR_DARK = [0.03, 0.035, 0.1];
 /** Moonlit arcade: the sun dims to a moon, the sky goes black and the glowing maze does the rest. */
 const ARCADE_ENV: Environment = {
   ...DEFAULT_ENV,
-  sunColor: [0.2, 0.2, 0.24],
+  sunColor: [0.2, 0.2, 0.22],
   skyColor: [0.025, 0.03, 0.08],
   groundColor: [0.02, 0.02, 0.05],
   fogColor: [0.006, 0.007, 0.022],

@@ -8,12 +8,12 @@ import { Pattern, type DrawItem } from '../engine/renderer';
  * are just a pair of eyes.
  */
 
-/** The classic four. */
+/** The classic four (saturated: lighting and tone mapping wash colours out). */
 export const GHOST_COLORS = {
-  blinky: [1.0, 0.04, 0.03],
-  pinky: [1.0, 0.5, 0.78],
-  inky: [0.0, 0.9, 1.0],
-  clyde: [1.0, 0.56, 0.08],
+  blinky: [1.0, 0.03, 0.02],
+  pinky: [1.0, 0.3, 0.65],
+  inky: [0.02, 0.75, 1.0],
+  clyde: [1.0, 0.3, 0.03],
 } as const;
 
 export type GhostLook = 'normal' | 'scared' | 'flash' | 'eyes';

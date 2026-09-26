@@ -37,7 +37,7 @@ const CLYDE_SHY = 5;
 const FLASH_TIME = 2;
 const REVIVE_TIME = 1.2;
 /** Ghosts are lit brighter than the moonlit room, so they stand out like the arcade sprites. */
-const GHOST_BRIGHT = 3.5;
+const GHOST_BRIGHT = 5.5;
 
 /** Up (north), left, down, right: the arcade's tie-break order. */
 const DIRS: [number, number][] = [[0, -1], [-1, 0], [0, 1], [1, 0]];
