@@ -6,7 +6,7 @@ import { GRAVITY, type Body } from '../../engine/physics';
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
 import {
   addCarColliders, CABLE_OFFSETS, cableTop, CarPanel, carRails, DOOR_Z, drawCarTop, drawDoors, drawRails, drawShaft, floorAt, floorLabel, FloorIndicator,
-  FLOOR_H, HITCH, landingY, RAIL_Y, railNearest, railPoint, SHAFT_HALF, STOP_BUTTON, TOP_FLOOR, type Rail,
+  FLOOR_H, HITCH, landingY, railNearest, railPoint, SHAFT_HALF, STOP_BUTTON, TOP_FLOOR, type Rail,
 } from '../../entities/elevator';
 import { junk, spawnJunk } from '../../entities/junk';
 import { drawPortal, ExitPortal, PortalArrival } from '../../entities/portal';
@@ -33,7 +33,7 @@ const DING_DELAY = 0.8;
 /** Riding down normally: top speed (m/s), time to reach it (s), and how long until the cable snaps (s after the ding). */
 const RIDE_SPEED = 2.5;
 const RIDE_ACCEL_TIME = 1.5;
-const RIDE_TIME = 13;
+const RIDE_TIME = new URLSearchParams(location.search).has('quickRide') ? 4 : 13; // ?quickRide: straight to the snap, for testing
 /** Foreshadowing: a creak, then one cable pinging off (s before the snap), then a groan. */
 const CREAK_AT = 4.5;
 const PING_BEFORE = 3.2;
