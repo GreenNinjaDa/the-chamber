@@ -70,11 +70,11 @@ interface Persona {
 const CAST: Persona[] = [
   // Old 001 shuffles. The floor does not wait for him.
   { look: { number: '001', hair: [0.86, 0.86, 0.83], old: true }, speed: 1.5, sprint: 1.5, jump: 0, power: 0.5, hop: 0, panic: 0, cheer: 0, noise: 0.3 },
-  { look: { number: '067', hair: [0.1, 0.07, 0.05] }, speed: 5.0, sprint: 7.0, jump: 0.95, power: 1, hop: 0.6, panic: 0.02, cheer: 0, noise: 0.4 },
+  { look: { number: '067', hair: [0.1, 0.07, 0.05] }, speed: 5.0, sprint: 7.0, jump: 0.95, power: 1, hop: 1.2, panic: 0.02, cheer: 0, noise: 0.4 },
   { look: { number: '218', hair: [0.35, 0.2, 0.1] }, speed: 7.2, sprint: 8, jump: 0.55, power: 1, hop: 0.1, panic: 0.15, cheer: 0, noise: 0.9 },
   { look: { number: '324', hair: [0.8, 0.65, 0.3], girth: 1.3 }, speed: 4.0, sprint: 4.6, jump: 0.45, power: 0.75, hop: 0, panic: 0.06, cheer: 0.2, noise: 0.6 },
-  { look: { number: '101', hair: [0.05, 0.05, 0.05] }, speed: 4.7, sprint: 6.2, jump: 0.8, power: 1, hop: 0.2, panic: 0.03, cheer: 0.85, noise: 0.5 },
-  { look: { number: '456', hair: [0.12, 0.1, 0.08] }, speed: 4.9, sprint: 6.5, jump: 0.85, power: 1, hop: 0.35, panic: 0.04, cheer: 0.1, noise: 0.5 },
+  { look: { number: '101', hair: [0.05, 0.05, 0.05] }, speed: 4.7, sprint: 6.2, jump: 0.8, power: 1, hop: 0.35, panic: 0.03, cheer: 0.85, noise: 0.5 },
+  { look: { number: '456', hair: [0.12, 0.1, 0.08] }, speed: 4.9, sprint: 6.5, jump: 0.85, power: 1, hop: 0.7, panic: 0.04, cheer: 0.1, noise: 0.5 },
 ];
 
 type Air = 'ground' | 'jump' | 'fall';
@@ -115,6 +115,8 @@ interface Death {
   t: number;
   big: string;
   small: string;
+  /** Where they went into the goo. */
+  splash?: Vec3;
 }
 
 const pick = <T>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
@@ -144,10 +146,17 @@ export class HexagoneLevel implements Level {
   private countColor = [...LED];
   private shown = '';
   private statics: DrawItem[] = [];
+  /** How far the player walked in the first seconds of the round (for the death quip). */
+  private travelled = 0;
+  private lastPos: Vec3 = [0, 0, 0];
   /** Dev: why each contestant fell. */
   private fallLog: string[] = [];
+  private sign = new PixelText({ centre: [0, 15.9, H - 0.02], right: [-1, 0, 0], up: [0, 1, 0], pixel: 0.16, color: [0.1, 0.1, 0.12], depth: 0.05 }, 'NO LOITERING');
   private env: Environment = {
     ...DEFAULT_ENV,
+    // Brighter, more neutral shade, so tiles under the floor above stay candy rather than olive.
+    skyColor: [0.4, 0.42, 0.5],
+    groundColor: [0.34, 0.3, 0.3],
     pointLight: { pos: [0, GOO_TOP + 1.2, 0], color: [0.5, 2.2, 0.35], range: 17 },
   };
 
@@ -278,25 +287,28 @@ export class HexagoneLevel implements Level {
       }
     }
     // Into the goo.
+    if (this.phase === 'round' && this.roundT < 6) {
+      this.travelled += Math.hypot(p[0] - this.lastPos[0], p[2] - this.lastPos[2]);
+    }
+    this.lastPos = [p[0], p[1], p[2]];
     if (p[1] < GOO_TOP + 0.05) {
-      this.splash([p[0], GOO_TOP, p[2]], 1.3);
+      const splash: Vec3 = [p[0], GOO_TOP, p[2]];
+      this.splash(splash, 1.3);
       player.kill([0, 0.5, 0], { violence: 0 });
       camera.addShake(0.4);
       const others = this.runners.filter((r) => r.out === 'no').length;
-      const oldTimer = this.runners.find((r) => r.p.look.old);
-      this.death = {
-        t: 0,
-        big: 'DISSOLVED',
-        small: others === CAST.length && oldTimer?.out === 'no'
-          ? 'First one out. Old 001 is still up there. He has a walking frame.'
-          : pick([
-            'You were eliminated. By gravity.',
-            'Three floors, and you used all of them.',
-            'The goo thanks you for your contribution.',
-            'You have been eliminated. Please do not drink the goo on your way out.',
-            'Hex-A-Gone? More like Hex-A-Goner.',
-          ]),
-      };
+      const old = this.runners.find((r) => r.p.look.old);
+      let small = pick([
+        'You were eliminated. By gravity.',
+        'Floor one: gone. Floor two: gone. Floor three: gone. You: gone.',
+        'The goo thanks you for your contribution.',
+        'You have been eliminated. Please do not drink the goo on your way out.',
+        'You fell for it. Three times.',
+      ]);
+      if (this.travelled < 2) small = 'You stood still. The floor did not.';
+      else if (others === CAST.length && old?.out === 'no') small = 'First one out. Old 001 is still up there, and he shuffles.';
+      else if (others === 1) small = `So close. ${this.runners.find((r) => r.out === 'no')!.p.look.number} would like to thank you for the floor.`;
+      this.death = { t: 0, big: 'DISSOLVED', small, splash };
     }
   }
 
@@ -456,6 +468,7 @@ export class HexagoneLevel implements Level {
           r.gapRoll = null;
           return;
         }
+        if (import.meta.env.DEV && r.air === 'jump' && i === r.layer) this.fallLog.push(`${r.p.look.number} L${i} t${this.roundT.toFixed(1)} missed landing`);
       }
     }
     if (r.y < GOO_TOP) this.eliminate(r);
@@ -524,8 +537,7 @@ export class HexagoneLevel implements Level {
     for (let d = 0.45; d < 1.6 && ahead === here; d += 0.3) ahead = floor.tileAt(x + dx * d, z + dz * d);
     const aheadOk = !!ahead && (ahead.state === 'solid' || (ahead.state === 'armed' && ahead.t < 0.15));
     const reach = speed * ((2 * NPC_JUMP * p.power) / NPC_GRAVITY);
-    const landing = floor.tileAt(x + dx * reach, z + dz * reach);
-    const landingOk = floor.fresh(landing);
+    const landingOk = this.canLand(floor, x, z, dx, dz, reach);
     if (!aheadOk) {
       if (r.gapRoll === null) r.gapRoll = Math.random() < p.jump;
       if (r.gapRoll && landingOk) return this.jumpAt(r, dx, dz, speed);
@@ -540,6 +552,13 @@ export class HexagoneLevel implements Level {
       return this.jumpAt(r, dx, dz, speed);
     }
     c.vel = [dx * speed, 0, dz * speed];
+  }
+
+  /** Somewhere fresh to land a jump of `reach` metres that way (with a little slack either side). */
+  private canLand(floor: HexFloor, x: number, z: number, dx: number, dz: number, reach: number) {
+    if (!floor.fresh(floor.tileAt(x + dx * reach, z + dz * reach))) return false;
+    return floor.fresh(floor.tileAt(x + dx * (reach - 0.45), z + dz * (reach - 0.45))) ||
+      floor.fresh(floor.tileAt(x + dx * (reach + 0.45), z + dz * (reach + 0.45)));
   }
 
   private jumpAt(r: Runner, dx: number, dz: number, speed: number) {
@@ -577,10 +596,18 @@ export class HexagoneLevel implements Level {
     let best = r.heading, bestScore = -Infinity;
     const goalAngle = r.goal ? Math.atan2(r.goal[1] - z, r.goal[0] - x) : 0;
     const slot = Math.floor(this.time * 1.5);
+    const reach = p.speed * ((2 * NPC_JUMP * p.power) / NPC_GRAVITY);
+    const here = floor.tileAt(x, z);
     for (let k = 0; k < N; k++) {
       const h = (k / N) * Math.PI * 2;
       const dx = Math.cos(h), dz = Math.sin(h);
       let s = 0;
+      // The next tile that way: missing is fine if they can jump it, and a dead end if not.
+      let next = here;
+      for (let d = 0.45; d < 1.6 && next === here; d += 0.3) next = floor.tileAt(x + dx * d, z + dz * d);
+      if (!next || !(next.state === 'solid' || (next.state === 'armed' && next.t < ARM_TIME - 0.25))) {
+        s -= p.jump > 0 && this.canLand(floor, x, z, dx, dz, reach) ? 0.5 : 4;
+      }
       for (let i = 1; i <= 5; i++) {
         const d = i * 0.85, w = 1.8 - i * 0.28;
         const px = x + dx * d, pz = z + dz * d;
@@ -590,7 +617,7 @@ export class HexagoneLevel implements Level {
         }
         const t = floor.tileAt(px, pz);
         if (t && t.state === 'solid') s += w;
-        else if (t && t.state === 'armed') s += i === 1 ? 0.2 * w : -0.3 * w;
+        else if (t && t.state === 'armed') s += i === 1 && t.t < ARM_TIME - 0.25 ? 0.1 * w : -0.6 * w;
         else s -= 0.9 * w;
       }
       s += 1.1 * Math.cos(h - r.heading);
@@ -703,8 +730,21 @@ export class HexagoneLevel implements Level {
     return false;
   }
 
+  /** Dissolved: look down at the splash from a little way back and up (under the bottom floor). */
+  private deathShot(): CameraShot | null {
+    const death = this.death;
+    if (!death?.splash) return null;
+    const { camera } = this.ctx;
+    const s = death.splash;
+    const back: Vec3 = [Math.sin(camera.yaw), 0, Math.cos(camera.yaw)];
+    const pos: Vec3 = [clamp(s[0] + back[0] * 3.2, -H + 0.5, H - 0.5), 0, clamp(s[2] + back[2] * 3.2, -H + 0.5, H - 0.5)];
+    const under = this.tilesNear(this.floors[TOPS.length - 1], pos[0], pos[2]) ? TOPS[TOPS.length - 1] - TILE_T - 0.4 : GOO_TOP + 4.5;
+    pos[1] = Math.min(GOO_TOP + 3, under);
+    return { pos, target: [s[0], GOO_TOP + 0.2, s[2]], sharpness: 3 };
+  }
+
   cameraShot(): CameraShot | null {
-    return this.arrival.cameraShot() ?? this.followShot();
+    return this.arrival.cameraShot() ?? this.deathShot() ?? this.followShot();
   }
 
   // --- Drawing ------------------------------------------------------------------------------------------
@@ -723,6 +763,7 @@ export class HexagoneLevel implements Level {
       out[i].pattern = Pattern.emissive;
       out[i].shadow = false;
     }
+    this.sign.draw(out);
 
     for (const b of this.bubbles) {
       const r = 0.08 + b.age * 0.14;
@@ -734,18 +775,22 @@ export class HexagoneLevel implements Level {
   /** A goo splash: a ring spreading out and a crown of droplets thrown up. */
   private drawSplash(out: DrawItem[], s: Splash) {
     const t = s.t, k = s.size;
-    const ring = (0.4 + t * 2.4) * k;
     const fade = Math.max(0, 1 - t / 1.2);
-    if (fade > 0) {
-      out.push({ mesh: 'tube', model: mul(translation([s.pos[0], GOO_TOP + 0.02, s.pos[2]]), scaling([ring, 0.05, ring])), color: [GOO_GLOW[0] * fade, GOO_GLOW[1] * fade, GOO_GLOW[2] * fade], pattern: Pattern.emissive, shadow: false });
+    // Two rings spreading out over the surface.
+    for (const [delay, grow] of [[0, 2.6], [0.25, 1.8]]) {
+      const tt = t - delay;
+      if (tt <= 0 || fade <= 0) continue;
+      const ring = (0.5 + tt * grow) * k;
+      out.push({ mesh: 'tube', model: mul(translation([s.pos[0], GOO_TOP + 0.02, s.pos[2]]), scaling([ring, 0.06, ring])), color: [0.2, 0.9, 0.12], pattern: Pattern.emissive, shadow: false, opacity: fade });
     }
-    for (let i = 0; i < 14; i++) {
+    // A crown of droplets.
+    for (let i = 0; i < 22; i++) {
       const a = i * 2.39996 + s.pos[0];
-      const up = (5 + (i % 4) * 1.6) * k, out_ = (1.2 + (i % 3) * 0.7) * k;
+      const up = (4 + (i % 5) * 1.3) * k, out_ = (0.8 + (i % 4) * 0.55) * k;
       const y = GOO_TOP + up * t - 11 * t * t;
       if (y < GOO_TOP - 0.1) continue;
-      const r = (0.13 + (i % 3) * 0.05) * k;
-      out.push({ mesh: 'sphere', model: mul(translation([s.pos[0] + Math.cos(a) * out_ * t, y, s.pos[2] + Math.sin(a) * out_ * t]), scaling([r, r * 1.3, r])), color: GOO_GLOW, pattern: Pattern.emissive, shadow: false });
+      const r = (0.05 + (i % 3) * 0.025) * k;
+      out.push({ mesh: 'sphere', model: mul(translation([s.pos[0] + Math.cos(a) * out_ * t, y, s.pos[2] + Math.sin(a) * out_ * t]), scaling([r, r * 1.4, r])), color: GOO_GLOW, pattern: Pattern.emissive, shadow: false });
     }
   }
 
