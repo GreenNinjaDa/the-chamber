@@ -336,8 +336,9 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   0.5 s), onto the highest one in reach. The cursor places a ladder (purple marker) a swim away and deletes it
   when you get within 3.8 m (or after 9 s): "+§50", "Nooboo!", a thought bubble of a crossed-out ladder. Then it
   drops in a fridge (sinks) and a couch (floats, with a seat and back to stand on), and circles overhead. ENERGY
-  drains only in the water (55 s; the plumbob goes yellow then red, strokes slow, the head dips): at 0 the Sim
-  drowns (sinks slowly, bubbles), the Grim Reaper floats down with his scythe and clipboard ("*scribble
+  drains only in the water (55 s, 1.8x sprinting; the plumbob goes yellow then red, strokes slow, the head dips; at
+  42% the cursor goes and taps the gauge: "Hm. Still going down."): at 0 the Sim
+  drowns (sinks slowly, bubbles), the lights go down, the Grim Reaper floats in with his scythe and clipboard ("*scribble
   scribble*", "Drowned. Classic.") and it's SIM DIED. Way out: a crate (or the couch) pushed against the side and
   jumped from (a pallet or the air mattress alone is too low; a crate on the pallet works in two jumps). Out on
   the deck, the cursor flies to the exit, "DELETE DOOR?", hesitates... "...nah." and the exit opens.

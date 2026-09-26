@@ -39,6 +39,8 @@ const FLOAT_SPRING = 30;
 const FLOAT_DAMP = 7;
 /** Seconds of swimming from full ENERGY to nothing (then you drown). */
 const ENERGY_TIME = 55;
+/** Sprint-swimming uses energy this many times faster. */
+const SPRINT_DRAIN = 1.8;
 /** A hop in the water (m/s up), and climbing onto something floating: its top at most this far over the water, this far away, taking this long. */
 const HOP_SPEED = 3.4;
 const CLAMBER_MAX = 0.9;
@@ -97,7 +99,7 @@ const DROWN_LINES = [
 ];
 
 const TIPS: [string, string][] = [
-  ['Hint', 'Push the floating stuff against the side and climb it (Space, right next to it). Stack it if you have to: a crate on the pallet, or the couch. Your energy drops while you swim.'],
+  ['Hint', 'Push the floating stuff against the side and climb it (Space, right next to it). Stack it if you have to: a crate on the pallet, or the couch. Your energy drops while you swim (faster if you sprint).'],
   ['Controls', 'WASD swim / move · Space hop, or climb onto something floating · Hold click carry · Right-click throw'],
 ];
 
@@ -578,7 +580,9 @@ export class PoolLevel implements Level {
       player.onGround = false; // no proper jumping out of water
       const moving = Math.hypot(player.vel[0], player.vel[2]) / 2;
       player.poseOverride = swimPose(this.time, moving, tired);
-      this.energy = Math.max(0, this.energy - dt / ENERGY_TIME);
+      // Racing about (sprinting) tires you out faster.
+      const racing = (input.isDown('ShiftLeft') || input.isDown('ShiftRight')) && moving > 0.5;
+      this.energy = Math.max(0, this.energy - (dt / ENERGY_TIME) * (racing ? SPRINT_DRAIN : 1));
       for (const level of [0.3, 0.15]) {
         if (this.energy < level && !this.warned.has(level)) {
           this.warned.add(level);
