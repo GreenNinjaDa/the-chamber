@@ -15,12 +15,13 @@ import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type Level
 
 /*
  * Katamari. The chamber is a mess of stuff, from pencils to pianos. After the arrival a royal beam
- * drops off a very small prince with a very sticky ball, and the King (unseen, loud) wants it made
- * into a star: 5 metres, against the clock. The ball rolls up anything less than half its size,
- * growing as it goes, so feeding it (carry or throw junk in, or lure it through the big stuff)
- * is the only way to get there in time. Trouble is, once it's twice your size you count as stuff
- * too, and the prince stops looking for furniture. 5 m and it's launched into the sky as a star
- * and the exit opens; out of time and the King zaps you; touched once it's big enough: rolled up.
+ * drops off a very small prince with a very sticky ball, and the King (an enormous crowned head
+ * over the north wall) wants it made into a star: 5 metres, against the clock. The ball rolls up
+ * anything up to half its size, growing as it goes, and on his own the prince is too slow: feeding
+ * it (carry or throw junk in, or lead it through the big stuff) is how it gets there in time.
+ * Trouble is, once it's twice your size you count as stuff too, and the prince stops looking for
+ * furniture. 5 m and it floats up into the sky as a star and the exit opens; out of time and the
+ * King zaps you; touched once it's big enough: rolled up.
  */
 
 // --- Tunables -------------------------------------------------------------------------------------
@@ -195,7 +196,7 @@ export class KatamariLevel implements Level {
   private delivered = 0;
   private deliveryIn = 4;
   private delivery: { spot: Vec3; t: number; name: string } | null = null;
-  /** Size milestones already announced. */
+  /** One-off moments (lines, sounds, milestones) already done. */
   private said = new Set<string>();
   private lastCarried: Body | null = null;
   private lastCarriedT = 99;
@@ -206,7 +207,6 @@ export class KatamariLevel implements Level {
   /** Rolled up: which way the player sticks out of the ball (in its frame) and their head's direction. */
   private riderDir: Vec3 = [0, 1, 0];
   private riderUp: Vec3 = [1, 0, 0];
-  private riderTime = 0;
   /** The star it becomes: where it ends up in the sky. */
   private starFrom: Vec3 = [0, 0, 0];
   private starPos: Vec3 = [0, 80, -60];
@@ -320,7 +320,7 @@ export class KatamariLevel implements Level {
       this.addThing(spawnJunk(physics, def, [x, standing(def), z], q(yaw)), name);
     }
 
-    // Medium stuff scattered about: the rest of the junk pile, some teddies, a few apples.
+    // Medium stuff scattered about: the rest of the junk pile, and three teddies.
     const medium: string[] = [
       'rubber duck', 'garden gnome', 'beach ball', 'traffic cone', 'pillow', 'pillow', 'cardboard box', 'cardboard box',
       'microwave', 'small crate', 'small crate', 'trash can', 'potted plant', 'potted plant', 'tire', 'tire',
@@ -338,8 +338,7 @@ export class KatamariLevel implements Level {
     };
     for (const name of medium) {
       const def = junk(name);
-      const [a] = bigTwo(def.shape === 'box' ? def.size : [def.size[0] * 2, def.size[1], def.size[0] * 2]);
-      const [x, z] = place(a * 0.6);
+      const [x, z] = place(bigTwo(dimsOfDef(def))[0] * 0.6);
       this.addThing(spawnJunk(physics, def, [x, standing(def), z], q(rand(0, Math.PI * 2))), name);
     }
     const look = { eyeGlow: 0 };
@@ -1018,7 +1017,6 @@ export class KatamariLevel implements Level {
   }
 
   private updateEaten(dt: number) {
-    this.riderTime += dt;
     // The prince doesn't even notice. Onward.
     this.chooseTarget(dt);
     this.drive(dt);
