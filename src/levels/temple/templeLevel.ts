@@ -127,6 +127,8 @@ const ROWS = {
 const ROCKS = 84;
 /** No rocks this close before a jump (m). */
 const ROCK_CLEAR = 4.5;
+/** The round rocks (lumps and clusters) are never bigger than this radius (m). */
+const LUMP_MAX_R = 0.45;
 const ROCK_MASS: [number, number] = [70, 140];
 const DEATH_SCREEN_DELAY = 1.6;
 
@@ -442,9 +444,11 @@ export class TempleLevel implements Level {
       const opts = { mass, grabbable: false, friction: 1, rotation: yaw(i) };
       let body: Body;
       switch (Math.floor(Math.random() * 5)) {
-        case 0: // a chipped lump
-          body = physics.addBall([x, s + 0.02, z], s, { ...opts, model: boulderModel(s, color, 9 + Math.floor(Math.random() * 5)) });
+        case 0: { // a chipped lump (kept small: big round ones look like mini boulders)
+          const r = Math.min(s, LUMP_MAX_R);
+          body = physics.addBall([x, r + 0.02, z], r, { ...opts, model: boulderModel(r, color, 9 + Math.floor(Math.random() * 5)) });
           break;
+        }
         case 1: { // a flat slab
           const size: Vec3 = [s * (1.4 + Math.random() * 0.8), s * (0.35 + Math.random() * 0.25), s * (1.1 + Math.random() * 0.7)];
           body = physics.addBox([x, size[1] / 2 + 0.02, z], size, { ...opts, model: slabModel(size, color) });
@@ -456,9 +460,11 @@ export class TempleLevel implements Level {
           body = physics.addCone([x, r + 0.05, z], r, h, { ...opts, rotation: lie, model: shardModel(r, h, color) });
           break;
         }
-        case 3: // a lumpy cluster
-          body = physics.addBall([x, s + 0.02, z], s, { ...opts, model: clusterModel(s, color) });
+        case 3: { // a lumpy cluster (round too, so kept as small as the lumps)
+          const r = Math.min(s, LUMP_MAX_R);
+          body = physics.addBall([x, r + 0.02, z], r, { ...opts, model: clusterModel(r, color) });
           break;
+        }
         default: { // a knobbly chunk
           const size: Vec3 = [s * (0.9 + Math.random() * 0.8), s * (0.6 + Math.random() * 0.5), s * (0.8 + Math.random() * 0.7)];
           body = physics.addBox([x, size[1] / 2 + 0.02, z], size, { ...opts, model: chunkModel(size, color) });
