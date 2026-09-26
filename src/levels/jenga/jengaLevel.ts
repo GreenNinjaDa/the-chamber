@@ -196,6 +196,10 @@ export class JengaLevel implements Level {
       this.fence.push(physics.world.createCollider(RAPIER.ColliderDesc.cuboid(i < 2 ? 0.2 : BLOCK_L / 2 + 0.4, 2, i < 2 ? BLOCK_L / 2 + 0.4 : 0.2)));
     }
     this.placeFence();
+    // Nobody jumps from the top onto (or over) the chamber walls.
+    for (const [x, z, w, d] of [[CHAMBER_HALF + 0.5, 0, 1, 26], [-CHAMBER_HALF - 0.5, 0, 1, 26], [0, CHAMBER_HALF + 0.5, 26, 1], [0, -CHAMBER_HALF - 0.5, 26, 1]]) {
+      physics.world.createCollider(RAPIER.ColliderDesc.cuboid(w / 2, 3, d / 2).setTranslation(x, 13, z));
+    }
     // The finale's ledge, tucked into the east wall until then.
     this.ledge = physics.world.createCollider(
       RAPIER.ColliderDesc.cuboid(LEDGE_DEPTH / 2, 0.2, (LEDGE_Z[1] - LEDGE_Z[0]) / 2).setTranslation(CHAMBER_HALF + LEDGE_DEPTH / 2 + 0.05, LEDGE_Y - 0.2, (LEDGE_Z[0] + LEDGE_Z[1]) / 2),
@@ -418,9 +422,9 @@ export class JengaLevel implements Level {
     this.lastVy = player.vel[1];
 
     // Timmy's turn.
-    if (t >= this.nextPullAt && !this.pull && this.pullsDone < PULLS && !tower.collapsed && this.finaleT < 0) this.startPull();
+    if (t >= this.nextPullAt && !this.pull && this.pullsDone < PULLS && !tower.collapsed && this.finaleT < 0 && !this.death) this.startPull();
     if (this.pull && !tower.collapsed) this.updatePull(dt);
-    if (this.pullsDone >= PULLS && !this.pull && this.finaleT < 0 && t >= this.nextPullAt && !tower.collapsed) this.startFinale();
+    if (this.pullsDone >= PULLS && !this.pull && this.finaleT < 0 && t >= this.nextPullAt && !tower.collapsed && !this.death) this.startFinale();
     if (this.finaleT >= 0) this.updateFinale(dt);
 
     tower.update(dt);
@@ -451,13 +455,13 @@ export class JengaLevel implements Level {
     if (this.fence.length) this.placeFence();
 
     // Too far: it goes over.
-    if (!tower.collapsed && this.finaleT < 0 && tower.leanAmount() > PHI_MAX) this.topple();
+    if (!tower.collapsed && this.finaleT < 0 && !this.death && tower.leanAmount() > PHI_MAX) this.topple();
     // Fell off.
     if (alive && !this.death) {
       const floorOfTop = LAYERS * BLOCK_H + tower.rise - FALL_DEPTH;
       if (player.pos[1] < floorOfTop && tower.rise >= 0 && !(this.ledgeOut > 0.5 && player.pos[0] > CHAMBER_HALF - LEDGE_DEPTH - 0.6 && player.pos[1] > LEDGE_Y - 0.6)) {
         player.kill([0, 0, 0], { violence: 8 });
-        this.die('fall', pick(['SPLAT', 'MIND THE GAP', 'GRAVITY: 1, YOU: 0']), pick([
+        this.die(this.finaleT >= 0 ? 'finale' : 'fall', pick(['SPLAT', 'MIND THE GAP', 'GRAVITY: 1, YOU: 0']), pick([
           'The top was the only safe bit. Emphasis on top.',
           'It’s a long way down, and you found all of it.',
           'Timmy says that counts as your turn.',
@@ -684,10 +688,10 @@ export class JengaLevel implements Level {
       const inHeight = loc[1] > -0.4 && loc[1] < BLOCK_H - 0.05;
       if (inLength && inHeight && dAcross < BLOCK_W / 2 + 0.15) {
         this.squash(b, rest);
-      } else if (inLength && inHeight && dAcross < BLOCK_W / 2 + 0.6) {
-        // Clipped by its edge: shoved away from it.
+      } else if (inLength && inHeight && dAcross < BLOCK_W / 2 + 0.35) {
+        // Clipped by its edge: shoved away from it (gently).
         const side = Math.sign(across - off) || 1;
-        const push = to.layer % 2 === 0 ? [side * 4, 1.5, 0] : [0, 1.5, side * 4];
+        const push = to.layer % 2 === 0 ? [side * 1.8, 1, 0] : [0, 1, side * 1.8];
         player.knock(push as Vec3, 0.5);
       }
     }
@@ -761,7 +765,9 @@ export class JengaLevel implements Level {
       if (tower.tip >= TIP_BREAK) this.breakUp();
     }
     // Made it to the ledge?
-    if (!this.escaped && player.mode === 'control' && this.ledgeOut > 0.5 && player.pos[0] > CHAMBER_HALF - LEDGE_DEPTH - 0.4 && player.pos[1] > LEDGE_Y - 0.5) {
+    if (!this.escaped && player.mode === 'control' && player.onGround && !this.riding && this.ledgeOut > 0.5 &&
+      Math.abs(player.pos[1] - LEDGE_Y) < 0.3 && player.pos[0] > CHAMBER_HALF - LEDGE_DEPTH - 0.4 &&
+      player.pos[2] > LEDGE_Z[0] - 0.3 && player.pos[2] < LEDGE_Z[1] + 0.3) {
       this.escaped = true;
     }
   }
@@ -771,7 +777,7 @@ export class JengaLevel implements Level {
     const { player, camera } = this.ctx;
     const tower = this.tower;
     // Still up there (not mid-jump for the ledge, or already on it)?
-    const onIt = !this.escaped && this.playerOnTop() !== null;
+    const onIt = !this.escaped && (this.playerOnTop() !== null || this.riding !== null);
     // It snaps as it hits: faster than it was falling, and coming apart.
     this.pull = null;
     this.predicted = null;
