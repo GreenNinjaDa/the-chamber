@@ -5,6 +5,7 @@ import {
 import { GROUPS_BOULDER, GROUPS_BOULDER_BRIDGE, GROUPS_DEBRIS, RAPIER, type Body } from '../../engine/physics';
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
 import { drawPortal, PORTAL_SQUEEZE_TIME, PortalArrival } from '../../entities/portal';
+import { PressurePlate } from '../../entities/pressurePlate';
 import { boulderModel, chunkModel, clusterModel, shardModel, slabModel, STONE_COLORS } from '../../entities/rock';
 import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus } from '../level';
 
@@ -32,9 +33,13 @@ const WALL_T = 1;
 const Z_START = -24;
 const Z_ALCOVE_END = 169;
 const END_Z = 162; // the dead-end wall that sinks away
-/** Reaching the last few metres before the dead end (anywhere across the tunnel) starts the ending. */
+/**
+ * A stone pressure plate fills the last few metres before the dead end (all but a sliver of the
+ * tunnel's width, so there's no way past it): stepping on it starts the ending.
+ */
 const END_ZONE = 3;
 const END_ZONE_Z = END_Z - END_ZONE;
+const PLATE_SIZE: [number, number] = [W - 0.6, END_ZONE];
 const PORTAL_Z = -21;
 const PORTAL_R = 2;
 const SPAWN_Z = -2;
@@ -146,6 +151,8 @@ const DEATH_SCREEN_DELAY = 1.6;
 const SEE_THROUGH = 0.4;
 /** The player turns solid (and the torch goes out) this far before the shaft's edge on the way back. */
 const LAST_JUMP_LEAD = 5;
+/** ...fading back in over this long (s). */
+const FADE_IN = 2;
 
 // --- Looks ---------------------------------------------------------------------------------------
 const STONE_FLOOR = [0.3, 0.25, 0.19];
@@ -238,6 +245,9 @@ export class TempleLevel implements Level {
   /** The player is see-through (see SEE_THROUGH) while this is 'on'; it only happens once. */
   private ghost: 'before' | 'on' | 'done' = 'before';
   private torchOut = false;
+  /** Seconds since the torch went out (the player fades back in over FADE_IN). */
+  private sinceTorchOut = 0;
+  private plate: PressurePlate;
   /** Boulders parked (kinematic) at a position until they're let go. */
   private parked: (Vec3 | null)[] = [];
   private chasing: Body | null = null;
@@ -266,6 +276,12 @@ export class TempleLevel implements Level {
     this.levelBody = physics.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
     this.build();
     this.endWall = this.solid([0, H / 2, END_Z + 0.5], [W, H, 1], STONE_WALL, false);
+    this.plate = new PressurePlate(physics, [0, 0, END_ZONE_Z + END_ZONE / 2], [], player, (down) => {
+      if (down && this.stage === 'chase' && player.mode === 'control') {
+        this.setStage('endWait');
+        this.sinceEnd = 0;
+      }
+    }, { stone: PLATE_SIZE });
     this.placeSpikes();
     this.scatterRocks();
 
@@ -448,8 +464,8 @@ export class TempleLevel implements Level {
       [...CEILING_PITS, SHAFT].some(([, b]) => z > b - 0.5 && z < b + ROCK_CLEAR) ||
       this.jumpRows.some((r) => (r.dir > 0 ? z > r.z - ROCK_CLEAR && z < r.z + 0.5 : z > r.z - 0.5 && z < r.z + ROCK_CLEAR));
     for (let i = 0; i < ROCKS; i++) {
-      let z = Z_START + 3 + Math.random() * (END_Z - Z_START - 5);
-      for (let tries = 0; tries < 30 && beforeJump(z); tries++) z = Z_START + 3 + Math.random() * (END_Z - Z_START - 5);
+      let z = Z_START + 3 + Math.random() * (END_ZONE_Z - 1 - Z_START - 3);
+      for (let tries = 0; tries < 30 && beforeJump(z); tries++) z = Z_START + 3 + Math.random() * (END_ZONE_Z - 1 - Z_START - 3);
       if (beforeJump(z)) continue;
       const x = (Math.random() * 2 - 1) * (W / 2 - 0.5);
       const s = 0.25 + Math.random() * 0.5; // overall size
@@ -551,6 +567,7 @@ export class TempleLevel implements Level {
     this.t += dt;
     this.stageT += dt;
     this.arrival.update(dt);
+    this.plate.update(dt);
     const me = player.pos;
 
     if (this.sinceEnd >= 0) {
@@ -583,12 +600,7 @@ export class TempleLevel implements Level {
         }
         break;
       case 'chase':
-        // Until you reach the end of the tunnel.
-        if (player.mode === 'control' && me[2] > END_ZONE_Z) {
-          this.setStage('endWait');
-          this.sinceEnd = 0;
-        }
-        break;
+        break; // until you step on the plate at the end
       case 'endWait': {
         // The world freezes for the turn once the first boulder is nearly into the end zone (its
         // edge within a metre of it), or after a couple of seconds, whichever comes first.
@@ -618,7 +630,7 @@ export class TempleLevel implements Level {
     this.checkSpikes(dt);
     this.checkDeaths();
     this.checkExit(dt);
-    this.updateSeeThrough(me);
+    this.updateSeeThrough(me, dt);
     this.updateTorch();
 
     const death = this.death;
@@ -857,7 +869,7 @@ export class TempleLevel implements Level {
   }
 
   /** Boulders go see-through with the camera inside them; the player for most of the chase. */
-  private updateSeeThrough(me: Vec3) {
+  private updateSeeThrough(me: Vec3, dt: number) {
     const cam = this.ctx.camera.pos;
     this.boulders.forEach((b, i) => {
       const c = b.rb.translation();
@@ -871,7 +883,10 @@ export class TempleLevel implements Level {
       this.ghost = 'done';
       this.torchOut = true;
     }
-    this.ctx.player.opacity = this.ghost === 'on' ? SEE_THROUGH : 1;
+    if (this.torchOut) this.sinceTorchOut += dt;
+    this.ctx.player.opacity = this.ghost === 'on'
+      ? SEE_THROUGH
+      : this.ghost === 'done' ? SEE_THROUGH + (1 - SEE_THROUGH) * clamp(this.sinceTorchOut / FADE_IN, 0, 1) : 1;
   }
 
   private updateTorch() {

@@ -74,8 +74,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   to sprint-jump, have vines), past spikes (rows across the floor, full rows kept short and at least 5 m from any pit;
   ~50 out of the walls at all heights; random singles; none within 8.5 m of the spawn; not solid, touching one knocks you loose for 0.01 s, then you recover) and ~84 loose rocks of mixed shapes (70-140 kg: pushed slowly, not kicked; they fall when
   gravity flips; debris, so boulders roll straight through them).
-  Reaching the last 3 m of the tunnel (the boulder keeps coming) sinks the end wall 1 s later to reveal a second
-  boulder; the world freezes as soon as the first boulder is within 1 m of that zone or 2 s have passed (`Level.freezeWorld`) while only the camera turns upside down (`camera.turnTarget`), and 0.5 s after
+  A stone pressure plate filling the last 3 m of the tunnel (the boulder keeps coming) sinks the end wall 1 s later to
+  reveal a second boulder; the world freezes as soon as the first boulder is within 1 m of the plate or 2 s have passed (`Level.freezeWorld`) while only the camera turns upside down (`camera.turnTarget`), and 0.5 s after
   it settles gravity snaps over: everything, the player included (stunned 0.1 s, then immune to knocks for 1 s so landing head first doesn't
   stun them again), falls to the ceiling.
   The map never moves. The way back has the ceiling's own pits
@@ -85,7 +85,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   mouse near one to hang on at that length (`player.hanging` for the pose); let go to fly on; each snaps after one
   use. Boulders kill on contact with a small push. Boulders go 60% see-through with the camera inside them, and so
   does the player from when the first boulder starts rolling until 5 m before the last jump (over the shaft), when the
-  torch also goes out. The map is one fixed body (not kinematic: Rapier's character
+  torch goes out and they fade back in over 2 s. The map is one fixed body (not kinematic: Rapier's character
   controller won't climb slopes on kinematic colliders).
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
@@ -118,7 +118,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
 - `src/entities/` — things that can appear in more than one level (or the lobby / sandbox), each with its model:
   `junk.ts` (28 pieces of household junk; `spawnJunk(physics, junk('fridge'), pos)`), `grenade.ts` (pineapple
   model), `giant.ts`, `dart.ts`, `portal.ts` (entrance / exit portals), `props.ts` (Lever, Button), `cake.ts`, `companions.ts`,
-  `pressurePlate.ts`, `uselessBox.ts`, `rock.ts` (textured stone: `boulderModel`, `chunkModel`, `slabModel`, `shardModel`, `clusterModel`; `Pattern.rock`). Put new
+  `pressurePlate.ts` (round button, or `{ stone: [w, d] }` for a rock slab), `uselessBox.ts`, `rock.ts` (textured stone: `boulderModel`, `chunkModel`, `slabModel`, `shardModel`, `clusterModel`; `Pattern.rock`). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
