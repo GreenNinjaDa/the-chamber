@@ -816,7 +816,7 @@ export class ElevatorLevel implements Level {
         vel: [rand(-2.2, 2.2), rand(0.2, 1.2), rand(-2.2, 2.2)],
         age: 0,
         life: rand(1.0, 2.0),
-        size: rand(0.12, 0.26),
+        size: rand(0.18, 0.34),
       });
     }
   }
@@ -952,8 +952,8 @@ export class ElevatorLevel implements Level {
     for (const p of this.puffs) {
       const k = p.age / p.life;
       if (k >= 1) continue;
-      const size = p.size * (1 + k * 2.5);
-      out.push({ mesh: 'sphere', model: mul(translation(p.pos), scaling([size, size * 0.8, size])), color: DUST, opacity: 0.75 * (1 - k) * (1 - k), shadow: false });
+      const size = p.size * (1 + k * 3.5);
+      out.push({ mesh: 'sphere', model: mul(translation(p.pos), scaling([size, size * 0.8, size])), color: DUST, opacity: 0.55 * (1 - k) * (1 - k), shadow: false });
     }
     for (const s of this.sparks) {
       if (s.age >= s.life) continue;
