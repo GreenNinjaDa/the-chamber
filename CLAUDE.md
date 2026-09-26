@@ -295,7 +295,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   smoke, flames); every new touch costs at least 0.05 s, so hopping across only goes so far. Rules: the floor (the
   rug is floor); the couches (armchairs aren't; a pillow on a couch isn't a couch); the floor and the crates; the
   ceiling (there isn't one); everything blue, and the floor; the floor and whatever you're standing on; the floor,
-  rising to 1 m (high ground: the piano, the fridge from the washing machine, the crate stairs in the south corners).
+  rising to 1 m (a 5 s count; high ground: the piano, the fridge from the washing machine, the crate stairs in the
+  south corners).
   Finale: "EVERYTHING IS LAVA EXCEPT..." a giant rubber duck (`entities/giantDuck.ts`) drops out of the sky (purple
   marker; landing on you is QUACKED), 5 s to get on it; everything else melts and sinks into lava rising to 0.55 m,
   "THE DUCK IS A BOAT NOW." and it sails you to the exit ("THE EXIT IS NOT LAVA. PROBABLY."). ~95 s in all.

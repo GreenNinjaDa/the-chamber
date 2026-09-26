@@ -28,6 +28,7 @@ const EXIT_FLOOR = 0.9;
 /** Countdown before a rule takes effect (s). */
 const COUNT = 3;
 const FINALE_COUNT = 5;
+const RISING_COUNT = 5;
 /** Touching lava for this long (in total, since last standing somewhere safe) burns you. */
 const GRACE = 0.25;
 /** Every new touch costs at least this much of the grace, so hopping across lava only goes so far. */
@@ -551,18 +552,20 @@ export class FloorLavaLevel implements Level {
         if (t >= COUNT + 0.9 + step.revealTime) this.begin(this.index + 1);
         break;
       case 'rising': {
-        const drainAt = COUNT + RISE_TIME + HOLD_TIME, end = drainAt + DRAIN_TIME;
-        if (t < COUNT) {
-          this.countdown(Math.ceil(COUNT - t), rule());
-          this.floorWarn = t / COUNT;
+        // A longer count: the high ground is all in the corners.
+        const count = RISING_COUNT;
+        const drainAt = count + RISE_TIME + HOLD_TIME, end = drainAt + DRAIN_TIME;
+        if (t < count) {
+          this.countdown(Math.ceil(count - t), rule());
+          this.floorWarn = t / count;
         }
-        if (this.at(COUNT, dt)) {
+        if (this.at(count, dt)) {
           this.countdown(0, '');
           hud.show('LAVA!', '', 0.8);
           this.meltFloor();
         }
-        if (t >= COUNT) {
-          const rise = smooth((t - COUNT) / RISE_TIME), drain = smooth((t - drainAt) / DRAIN_TIME);
+        if (t >= count) {
+          const rise = smooth((t - count) / RISE_TIME), drain = smooth((t - drainAt) / DRAIN_TIME);
           this.tide = HIGH_TIDE * rise * (1 - drain);
         }
         if (this.at(drainAt, dt)) this.show('', step.after[0], step.after[1]);
@@ -984,7 +987,8 @@ export class FloorLavaLevel implements Level {
   private isCounting() {
     const step = this.step;
     if (!step) return false;
-    if (step.kind === 'rule' || step.kind === 'rising') return this.stepT < COUNT;
+    if (step.kind === 'rule') return this.stepT < COUNT;
+    if (step.kind === 'rising') return this.stepT < RISING_COUNT;
     if (step.kind === 'finale') return this.duckLandT >= 0 && this.moltenT < 0;
     return false;
   }
