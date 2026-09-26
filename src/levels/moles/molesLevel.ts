@@ -153,6 +153,8 @@ export class MolesLevel implements Level {
   private roundT = ROUND_TIME;
   private breakT = 0;
   private wonT = 0;
+  /** Time since Timmy started sinking away in a sulk (after the win). */
+  private sulkT = 0;
   private score = 0;
   private collected = 0;
   private carrots: Carrot[] = [];
@@ -195,6 +197,8 @@ export class MolesLevel implements Level {
     { pos: [H - 0.2, 1.52, -6.5], text: 'for crimes against moles', size: 0.09, color: '#5a2a10' },
   ];
   private labelList: WorldLabel[] = [];
+  /** A message flashed on the board for a moment (WHACK!, MISS!). */
+  private flash = { text: '', t: 0 };
   private obstacleList: Circle[] = [];
   private lifts: number[] = HOLES.map(() => 0);
   private glows: number[][] = HOLES.map(() => [...PAD_IDLE]);
@@ -338,9 +342,10 @@ export class MolesLevel implements Level {
     const g = this.g;
     // Timmy rises over the south wall, and at the end sinks away in a sulk.
     const rise = clamp((g - 0.3) / 2.2, 0, 1);
-    const sulk = this.phase === 'won' ? clamp((this.wonT - 6.5) / 3, 0, 1) : 0;
+    if (this.phase === 'won' && this.ms.state === 'away') this.sulkT += dt;
+    const sulk = clamp(this.sulkT / 3, 0, 1);
     this.giant.root[1] = lerp(-80, 0, 1 - (1 - rise) * (1 - rise)) - 80 * sulk * sulk;
-    this.giant.headShake = this.phase === 'won' && this.wonT > 1.2 && this.wonT < 6.5 ? 1 : 0;
+    this.giant.headShake = this.phase === 'won' && this.wonT > 1.2 && this.sulkT === 0 ? 1 : 0;
     this.timmyLabel.pos = add(this.giant.headCenter(), [0, 14, 0]);
     this.timmyT -= dt;
     if (this.timmyT <= 0) this.timmyLabel.text = '';
@@ -375,8 +380,12 @@ export class MolesLevel implements Level {
       this.tune.bpm = 168 + this.heat() * 40;
       if (!this.death) this.tune.start();
       else this.tune.stop();
-      if (this.roundT < ROUND_TIME - 1.5 && board.on >= 1) board.setMessage(this.roundT < 5.5 ? 'HURRY UP!' : this.score > 0 && this.ms.hitMole ? 'WHACK!' : 'WHACK-A-MOLE!');
-      board.blink = this.roundT < 5.5;
+      this.flash.t -= dt;
+      let msg = this.flash.t > 0 ? this.flash.text : this.roundT < 5.5 ? 'HURRY UP!' : Math.floor(this.t / 3.5) % 3 === 2 ? 'HI-SCORE: TIMMY' : 'WHACK-A-MOLE!';
+      if (this.roundT > ROUND_TIME - 1.5) msg = 'GO!';
+      if (this.death) msg = 'BONUS 1000!';
+      board.setMessage(msg);
+      board.blink = this.death !== null || this.roundT < 5.5;
       if (this.roundT <= 0) {
         this.phase = 'break';
         this.breakT = 0;
@@ -415,7 +424,7 @@ export class MolesLevel implements Level {
         this.timmySay('MOOOM! THE MOLE CHEATED!', 2.6);
       }
       if (this.wonT >= 2.2 && this.wonT - dt < 2.2) this.ms.tantrum = 6;
-      if (this.wonT >= 6.8 && this.wonT - dt < 6.8) this.timmySay("I'M TELLING!", 2);
+      if (this.sulkT > 0 && this.sulkT - dt <= 0) this.timmySay("I'M TELLING!", 2.5);
     }
   }
 
@@ -592,6 +601,16 @@ export class MolesLevel implements Level {
     this.phase = 'won';
     this.wonT = 0;
     this.tune.stop();
+    this.cabinet.tilt = true;
+    this.board.tilt = true;
+    // Timmy freezes in disbelief (a swing already coming down still lands).
+    const ms = this.ms;
+    if (ms.state === 'travel' || ms.state === 'windup') {
+      ms.state = 'idle';
+      ms.t = 0;
+      ms.hole = -1;
+    }
+    this.timmySay('WHAT?!', 1);
     tone(90, 0.9, { wave: 'sawtooth', vol: 0.18 });
     tone(94, 0.9, { wave: 'sawtooth', vol: 0.18 });
     this.jingle(['C5', 'E5', 'G5', 'C6', 'G5', 'C6'], 0.1);
@@ -638,8 +657,6 @@ export class MolesLevel implements Level {
     this.timmySay(pick(['GOLDEN MOLE!!', 'MOM! I GOT THE BIG ONE!', '1000 POINTS!!']), 2.2);
     sfx.laugh(0.4);
     this.tune.stop();
-    this.board.setMessage('BONUS 1000!');
-    this.board.blink = true;
     let small: string;
     if (into) small = 'You popped up under a falling mallet. Bold. Wrong, but bold.';
     else if (holding) small = 'So close. The carrot survived. You did not.';
@@ -929,11 +946,11 @@ export class MolesLevel implements Level {
 
     switch (ms.state) {
       case 'away': {
-        // Held up behind the south wall while Timmy rises.
-        mal.aim = [2, DECK_TOP, 15];
+        // Held up behind the south wall while Timmy rises (or sinks away in a sulk at the end).
+        aimTo([2, DECK_TOP, 15], 10);
         mal.swing += (0.8 - mal.swing) * k(4);
-        mal.lift = 4 + this.giant.root[1];
-        if (mallAlive && this.giant.root[1] > -1) {
+        mal.lift += (4 + this.giant.root[1] - mal.lift) * k(8);
+        if (mallAlive && this.giant.root[1] > -1 && this.phase !== 'won') {
           ms.state = 'idle';
           ms.t = 0;
         }
@@ -957,6 +974,15 @@ export class MolesLevel implements Level {
           const options = HOLES.map((_, h) => h).filter((h) => h !== this.pop?.hole || ms.tantrum < 3);
           this.commit(pick(options));
           ms.tantrum--;
+          break;
+        }
+        if (this.phase === 'won') {
+          // Stunned, then (after the tantrum) off to sulk.
+          aimTo(wander, 3);
+          if (this.wonT > 6.2) {
+            ms.state = 'away';
+            ms.t = 0;
+          }
           break;
         }
         if (best) {
@@ -1127,6 +1153,7 @@ export class MolesLevel implements Level {
       hit = true;
     }
     this.ms.hitMole = hit;
+    if (!this.death) this.flash = hit ? { text: pick(['WHACK!', 'BONK!', 'GOT ONE!']), t: 0.9 } : { text: 'MISS!', t: 0.7 };
     if (!this.death) {
       if (hit) {
         if (Math.random() < 0.6) this.timmySay(pick(['GOT ONE!', 'HEHEHE', 'BONK!', 'TAKE THAT!', '100 POINTS!']), 1.2);
@@ -1154,8 +1181,10 @@ export class MolesLevel implements Level {
   private spawnCarrot() {
     const pop = this.pop;
     const taken = new Set(this.carrots.map((c) => c.hole));
-    const options = HOLES.map((_, h) => h).filter((h) => !taken.has(h) && h !== pop?.hole && h !== SPAWN_HOLE &&
-      this.carrots.every((c) => Math.abs((c.hole % HOLE_COLS) - (h % HOLE_COLS)) + Math.abs(Math.floor(c.hole / HOLE_COLS) - Math.floor(h / HOLE_COLS)) > 1));
+    const steps = (a: number, b: number) => Math.abs((a % HOLE_COLS) - (b % HOLE_COLS)) + Math.abs(Math.floor(a / HOLE_COLS) - Math.floor(b / HOLE_COLS));
+    // Spread out, and the first ones not right by where you land (no grabbing one before Timmy's even up).
+    const options = HOLES.map((_, h) => h).filter((h) => !taken.has(h) && h !== pop?.hole &&
+      (this.phase !== 'intro' || steps(h, SPAWN_HOLE) > 1) && this.carrots.every((c) => steps(c.hole, h) > 1));
     const pool = options.length ? options : HOLES.map((_, h) => h).filter((h) => !taken.has(h) && h !== pop?.hole);
     const hole = pick(pool);
     // Point it away from the nearest wall (so it's easy to see from the middle).

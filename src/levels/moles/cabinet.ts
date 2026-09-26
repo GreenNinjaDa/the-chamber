@@ -65,9 +65,16 @@ export class Cabinet {
   private statics: DrawItem[] = [];
   /** Arcade trim on the walls, shown once the deck boots. */
   private trim: DrawItem[] = [];
+  /** Reused draw items (only their colours change): bulbs along the deck edge, the rims once up, and the pads at rest. */
+  private bulbs: { item: DrawItem; band: number; lit: number[]; dim: number[] }[] = [];
+  private rims: DrawItem[][] = [];
+  private padBase: DrawItem[][] = [];
+  private padRest: DrawItem[][] = [];
   private lidColliders: RAPIER.Collider[] = [];
   /** 0 = shut, 1 = open. */
   lidOpen = 0;
+  /** The machine has TILTed: every bulb flashes red. */
+  tilt = false;
   private opening = false;
   /** Seconds since each band booted (for the rims popping up). */
   private bootAge: number[] = [];
@@ -116,6 +123,32 @@ export class Cabinet {
       this.bootAge.push(0);
     }
     this.buildBurrow();
+    this.buildReusable();
+  }
+
+  private buildReusable() {
+    let k = 0;
+    for (let side = 0; side < 4; side++) {
+      for (let i = 0; i < 15; i++, k++) {
+        const t = -H + 1 + i * ((H * 2 - 2) / 14);
+        const d = H - 0.3;
+        const p: Vec3 = side === 0 ? [t, 0, -d] : side === 1 ? [d, 0, t] : side === 2 ? [-t, 0, d] : [-d, 0, -t];
+        const c = BULB_COLORS[k % 4];
+        const item: DrawItem = { mesh: 'sphere', model: mul(translation([p[0], DECK_TOP + 0.14, p[2]]), scaling([0.14, 0.14, 0.14])), color: c, pattern: Pattern.emissive, shadow: false };
+        this.bulbs.push({ item, band: this.bandAt(p[2]), lit: c, dim: [c[0] * 0.25, c[1] * 0.25, c[2] * 0.25] });
+      }
+    }
+    for (const [x, , z] of HOLES) {
+      this.rims.push([
+        { mesh: 'tube', model: mul(translation([x, DECK_TOP + RIM_H / 2, z]), scaling([RIM_OUT, RIM_H, RIM_OUT])), color: RIM, spec: 0.45 },
+        { mesh: 'tube', model: mul(translation([x, DECK_TOP + 0.012, z]), scaling([RIM_OUT + 0.12, 0.02, RIM_OUT + 0.12])), color: RIM_EDGE, spec: 0.4 },
+      ]);
+      this.padBase.push([
+        { mesh: 'cylinder', model: mul(translation([x, 0.03, z]), scaling([0.49, 0.06, 0.49])), color: [0.12, 0.12, 0.14], spec: 0.4 },
+        { mesh: 'tube', model: mul(translation([x, 0.035, z]), scaling([1.0, 0.07, 1.0])), color: [0, 0, 0], pattern: Pattern.emissive, shadow: false },
+      ]);
+      this.padRest.push(padTop(x, 0, z));
+    }
   }
 
   /** A ring of boxes round a hole, filling its plate square (so bodies can fall through the hole but not the plate). */
@@ -249,11 +282,14 @@ export class Cabinet {
       const [x, , z] = HOLES[i];
       const band = 1 + 2 * Math.floor(i / HOLE_COLS);
       const age = this.booted[band] ? this.bootAge[band] : -1;
-      if (age >= 0) {
+      if (age >= 0.35) {
+        for (const it of this.rims[i]) out.push(it);
+      } else if (age >= 0) {
+        // Popping up out of the deck, with a little overshoot.
         const pop = Math.min(1, age / 0.18);
-        const h = RIM_H * pop * (1 + 0.6 * Math.sin(Math.min(1, age / 0.35) * Math.PI));
+        const h = RIM_H * pop * (1 + 0.6 * Math.sin((age / 0.35) * Math.PI));
         out.push({ mesh: 'tube', model: mul(translation([x, DECK_TOP + h / 2, z]), scaling([RIM_OUT, h, RIM_OUT])), color: RIM, spec: 0.45 });
-        out.push({ mesh: 'tube', model: mul(translation([x, DECK_TOP + 0.012, z]), scaling([RIM_OUT + 0.12, 0.02, RIM_OUT + 0.12])), color: RIM_EDGE, spec: 0.4 });
+        out.push(this.rims[i][1]);
       }
       const lid = 1 - this.lidOpen;
       if (lid > 0.01) {
@@ -269,26 +305,12 @@ export class Cabinet {
       }
     }
     // Chasing bulbs along the foot of the walls on the deck.
-    if (this.booted[0]) {
-      const chase = Math.floor(time * 7);
-      let k = 0;
-      for (let side = 0; side < 4; side++) {
-        for (let i = 0; i < 15; i++, k++) {
-          const t = -H + 1 + i * ((H * 2 - 2) / 14);
-          const d = H - 0.3;
-          const p: Vec3 = side === 0 ? [t, 0, -d] : side === 1 ? [d, 0, t] : side === 2 ? [-t, 0, d] : [-d, 0, -t];
-          if (!this.booted[this.bandAt(p[2])]) continue;
-          const lit = (k + chase) % 4 === 0;
-          const c = BULB_COLORS[k % 4];
-          out.push({
-            mesh: 'sphere',
-            model: mul(translation([p[0], DECK_TOP + 0.14, p[2]]), scaling([0.14, 0.14, 0.14])),
-            color: lit ? c : [c[0] * 0.25, c[1] * 0.25, c[2] * 0.25],
-            pattern: Pattern.emissive,
-            shadow: false,
-          });
-        }
-      }
+    const chase = Math.floor(time * 7);
+    for (let k = 0; k < this.bulbs.length; k++) {
+      const b = this.bulbs[k];
+      if (!this.booted[b.band]) continue;
+      b.item.color = this.tilt ? (Math.sin(time * 14) > 0 ? BULB_COLORS[0] : b.dim) : (k + chase) % 4 === 0 ? b.lit : b.dim;
+      out.push(b.item);
     }
   }
 
@@ -300,22 +322,31 @@ export class Cabinet {
     for (let i = 0; i < HOLES.length; i++) {
       const [x, , z] = HOLES[i];
       const y = lift[i];
-      out.push({ mesh: 'cylinder', model: mul(translation([x, 0.03, z]), scaling([0.49, 0.06, 0.49])), color: [0.12, 0.12, 0.14], spec: 0.4 });
-      out.push({ mesh: 'tube', model: mul(translation([x, 0.035, z]), scaling([1.0, 0.07, 1.0])), color: glow[i], pattern: Pattern.emissive, shadow: false });
-      if (y > 0.04) {
-        // A telescopic piston.
-        const radii = [0.24, 0.18, 0.13];
-        for (let k = 0; k < 3; k++) {
-          const top = Math.min(y, (y * (k + 1)) / 3 + 0.05);
-          out.push({ mesh: 'cylinder', model: mul(translation([x, top / 2, z]), scaling([radii[k], top, radii[k]])), color: CHROME, spec: 0.9 });
-        }
+      const base = this.padBase[i];
+      base[1].color = glow[i];
+      out.push(base[0], base[1]);
+      if (y <= 0.04) {
+        for (const it of this.padRest[i]) out.push(it);
+        continue;
       }
-      out.push({ mesh: 'cylinder', model: mul(translation([x, y + 0.05, z]), scaling([0.7, 0.1, 0.7])), color: METAL, spec: 0.7 });
-      // Hazard stripes round the edge of the pad's top.
-      out.push({ mesh: 'tube', model: mul(translation([x, y + 0.102, z]), scaling([0.66, 0.006, 0.66])), color: [0.62, 0.62, 0.58], spec: 0.6, shadow: false });
-      out.push({ mesh: 'cylinder', model: mul(translation([x, y + 0.103, z]), scaling([0.3, 0.004, 0.3])), color: [0.2, 0.2, 0.22], shadow: false });
+      // Up: a telescopic piston under it.
+      const radii = [0.24, 0.18, 0.13];
+      for (let k = 0; k < 3; k++) {
+        const top = Math.min(y, (y * (k + 1)) / 3 + 0.05);
+        out.push({ mesh: 'cylinder', model: mul(translation([x, top / 2, z]), scaling([radii[k], top, radii[k]])), color: CHROME, spec: 0.9 });
+      }
+      for (const it of padTop(x, y, z)) out.push(it);
     }
   }
+}
+
+/** A pad's top at height `y`: a metal disc with a ring and a dark centre. */
+function padTop(x: number, y: number, z: number): DrawItem[] {
+  return [
+    { mesh: 'cylinder', model: mul(translation([x, y + 0.05, z]), scaling([0.7, 0.1, 0.7])), color: METAL, spec: 0.7 },
+    { mesh: 'tube', model: mul(translation([x, y + 0.102, z]), scaling([0.66, 0.006, 0.66])), color: [0.62, 0.62, 0.58], spec: 0.6, shadow: false },
+    { mesh: 'cylinder', model: mul(translation([x, y + 0.103, z]), scaling([0.3, 0.004, 0.3])), color: [0.2, 0.2, 0.22], shadow: false },
+  ];
 }
 
 function box(x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, color: number[]): DrawItem {
