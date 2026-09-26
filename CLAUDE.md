@@ -332,9 +332,9 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   the wall when it's yours). The AI aims at your square or where you're heading, closes in otherwise, and once you're
   in its half keeps the back row home and plugs its holes. Reach an empty square of the far row to promote (a crown);
   the king topples over (BLACK RESIGNS), the pieces sink away and the exit opens.
-- **Level 99 — Hungry Hungry Hippos** (): you're a marble. The floor is a plastic dome (a huge static ball
-  collider, 2 m high in the middle) that slopes down to four giant toy hippos (), one poking out of a
-  hole in each wall, and 26 marbles pour in (16 more at 15 s). The slope drifts you outward (). Each hippo
+- **Level 31 — Hungry Hungry Hippos** (`src/levels/hippos/`): you're a marble. The floor is a plastic dome (a huge static ball
+  collider, 2 m high in the middle) that slopes down to four giant toy hippos (`entities/hippo.ts`), one poking out of a
+  hole in each wall, and 26 marbles pour in (16 more at 15 s). The slope drifts you outward (`player.platformVel`). Each hippo
   picks the lane (aimable right round to the corners) with the most marbles, or you, lights it up on the floor for
   0.85 s while it rears back, then shoots its neck out and CHOMPS everything in the lane: marbles, or you (swallowed,
   chewed, burped). When the marbles are gone the winner is announced, the others doze off and the east (yellow) one
