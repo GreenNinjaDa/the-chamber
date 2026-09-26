@@ -29,7 +29,8 @@ export class PressurePlate {
     private physics: Physics,
     private pos: Vec3,
     private pressers: Body[],
-    private onPress?: () => void,
+    /** Called with true when something presses it, false when the last thing leaves. */
+    private onChange?: (pressed: boolean) => void,
   ) {
     physics.addStaticCylinder(add(pos, [0, 0.03, 0]), RADIUS + 0.2, 0.06);
     this.plate = physics.addStaticCylinder(this.plateCentre(RAISED), RADIUS, 0.1);
@@ -56,10 +57,8 @@ export class PressurePlate {
     if (down !== this.pressed) {
       this.pressed = down;
       this.plate.setTranslation(vec(this.plateCentre(down ? SUNK : RAISED)));
-      if (down && !this.everPressed) {
-        this.everPressed = true;
-        this.onPress?.();
-      }
+      if (down) this.everPressed = true;
+      this.onChange?.(down);
     }
     const target = this.pressed ? 1 : 0;
     this.depth += (target - this.depth) * Math.min(1, dt * 14);

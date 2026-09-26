@@ -130,12 +130,13 @@ const WALL = [0.86, 0.87, 0.88];
 
 /**
  * An exit portal in the east wall, hidden behind a wall panel until `openNow()` slides the panel
- * aside. Walking into it sets `entered`.
+ * aside (`closeNow()` slides it back). Walking into it sets `entered`.
  */
 export class ExitPortal {
   /** Set once the player has been sucked all the way in. */
   entered = false;
   private isOpen = false;
+  /** How far the panel has slid aside, in seconds of sliding (0 = shut, PANEL_SLIDE_TIME = open). */
   private openT = 0;
   /** Seconds since the player touched it (-1: not yet). */
   private sucking = -1;
@@ -153,6 +154,11 @@ export class ExitPortal {
     this.isOpen = true;
   }
 
+  /** Slides the panel back over it (unless the player is already on the way through). */
+  closeNow() {
+    if (this.sucking < 0) this.isOpen = false;
+  }
+
   /** Open from the start, with the panel already out of the way. */
   openAlready() {
     this.isOpen = true;
@@ -160,8 +166,8 @@ export class ExitPortal {
   }
 
   update(dt: number, player: Player) {
+    this.openT = clamp(this.openT + (this.isOpen ? dt : -dt), 0, PANEL_SLIDE_TIME);
     if (!this.isOpen) return;
-    this.openT += dt;
     if (this.sucking >= 0) {
       this.sucking += dt;
       if (this.sucking >= PORTAL_SQUEEZE_TIME) this.entered = true;
@@ -177,8 +183,8 @@ export class ExitPortal {
   }
 
   draw(out: DrawItem[]) {
-    // Until it opens there's nothing to see: the plain wall hides it.
-    if (!this.isOpen) return;
+    // While shut there's nothing to see: the plain wall hides it.
+    if (this.openT <= 0) return;
     drawPortal(out, this.centre, [-1, 0, 0], EXIT_RADIUS, true);
     // A wall panel slides aside to reveal it.
     const slide = easeInOut(clamp(this.openT / PANEL_SLIDE_TIME, 0, 1));

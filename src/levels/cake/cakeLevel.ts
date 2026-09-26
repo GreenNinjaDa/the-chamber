@@ -86,7 +86,11 @@ export class CakeLevel implements Level {
       this.companions.push(spawnCompanion(physics, shape, pos, tip));
     }
 
-    this.plate = new PressurePlate(physics, PLATE_POS, this.companions, () => this.exit.openNow());
+    this.plate = new PressurePlate(physics, PLATE_POS, this.companions, (down) => {
+      // The exit is only open while something sits on the button.
+      if (down) this.exit.openNow();
+      else this.exit.closeNow();
+    });
   }
 
   private ate(n: number) {
