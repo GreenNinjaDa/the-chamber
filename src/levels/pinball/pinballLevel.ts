@@ -114,6 +114,8 @@ const TARGETS: { p: P2; yaw: number; letter: string }[] = [
 ];
 const TARGET_COLORS = [[0.95, 0.75, 0.1], [0.95, 0.35, 0.08], [0.95, 0.12, 0.3], [0.2, 0.75, 0.95]];
 const LETTER_LIT = [[2.4, 1.8, 0.2], [2.4, 0.8, 0.12], [2.4, 0.3, 0.7], [0.4, 1.6, 2.4]];
+/** The general illumination cycles through these during a light show. */
+const SHOW_COLORS = [[2.6, 0.4, 1.6], [2.4, 1.9, 0.3], [0.4, 1.8, 2.6], [2.6, 0.5, 0.2], [0.6, 2.4, 0.8]];
 const EXIT_Z = -5.6;
 
 const SPAWN: Vec3 = [LANE_X, TABLE.y(6.0), 6.0];
@@ -144,7 +146,7 @@ const DEATHS: Record<DeathKind, { big: string; small: string[]; hint: string }> 
       'The steel balls have ball save. You do not.',
       'You were the ball. Balls drain. That is the whole game.',
     ],
-    hint: "The table slopes toward the flippers: keep walking uphill (sprint with Shift). Anything that ends up between the flippers drains. Hit the E, X, I and T targets to light the exit.",
+    hint: "The table slopes toward the flippers: keep walking uphill (sprint with Shift). Anything that ends up between the flippers drains. Knock the targets down in order, E, X, I, T (the blinking arrows point at the next one), to light the exit.",
   },
   outlane: {
     big: 'OUTLANE',
@@ -241,6 +243,11 @@ export class PinballLevel implements Level {
   private bulbColors: number[][] = [];
   /** The table's general illumination bulbs (shared by every bulb, dimmed with the power). */
   private giColor = [0, 0, 0];
+  /** Seconds left of a light show (jackpot, multiball), and its last step. */
+  private lightShow = 0;
+  private showStep = -1;
+  /** The coin door's lit slots. */
+  private coinColor = [1.6, 0.1, 0.05];
   private staticDraws: DrawItem[] = [];
   private labelList: WorldLabel[];
   private popups: Popup[] = [];
@@ -320,6 +327,8 @@ export class PinballLevel implements Level {
       { pos: [-7.2, 9.3, wallZ + 0.3], text: 'SPACE CADAVER', size: 0.62, color: PINK },
       { pos: [7.2, 9.3, wallZ + 0.3], text: '1 PLAYER · 25¢', size: 0.5, color: CYAN },
       { pos: [0, TABLE.y(DRAIN_Z) + 0.9, DRAIN_Z + 1.0], text: 'DRAIN', size: 0.5, color: '#ff4a3a' },
+      { pos: [CX - 0.7, 3.62, H - 0.3], text: '25¢', size: 0.16, color: '#ff4a3a' },
+      { pos: [CX + 0.7, 3.62, H - 0.3], text: '25¢', size: 0.16, color: '#ff4a3a' },
     ];
   }
 
@@ -399,6 +408,16 @@ export class PinballLevel implements Level {
       d.push({ mesh: 'box', model: mul(t.frame(x, DRAIN_Z), translation([0, -0.35, 0.06]), rotationZ(-0.6), scaling([0.9, 0.18, 0.02])), color: [0.95, 0.7, 0.05], spec: 0.3 });
       d.push({ mesh: 'box', model: mul(t.frame(x + 0.6, DRAIN_Z), translation([0, -0.35, 0.06]), rotationZ(0.6), scaling([0.9, 0.18, 0.02])), color: [0.95, 0.7, 0.05], spec: 0.3 });
     }
+    // The coin door, on the front of the machine (the south wall, below the drain).
+    const door: Vec3 = [CX, 3.4, H - 0.06];
+    d.push({ mesh: 'box', model: mul(translation(door), scaling([3.2, 3.6, 0.1])), color: [0.1, 0.1, 0.12], spec: 1.1 });
+    d.push({ mesh: 'box', model: mul(translation([door[0], door[1], door[2] - 0.06]), scaling([2.9, 3.3, 0.04])), color: [0.18, 0.18, 0.2], spec: 1.4 });
+    for (const sx of [-0.7, 0.7]) {
+      d.push({ mesh: 'box', model: mul(translation([door[0] + sx, door[1] + 0.5, door[2] - 0.1]), scaling([0.6, 0.9, 0.05])), color: [0.75, 0.73, 0.68], spec: 1.6 });
+      d.push({ mesh: 'box', model: mul(translation([door[0] + sx, door[1] + 0.62, door[2] - 0.13]), scaling([0.07, 0.36, 0.02])), color: [0.02, 0.02, 0.02] });
+      d.push({ mesh: 'box', model: mul(translation([door[0] + sx, door[1] + 0.2, door[2] - 0.13]), scaling([0.34, 0.14, 0.02])), color: this.coinColor, pattern: Pattern.emissive, shadow: false });
+    }
+    d.push({ mesh: 'cylinder', model: mul(translation([door[0], door[1] - 0.9, door[2] - 0.1]), rotationX(Math.PI / 2), scaling([0.12, 0.05, 0.12])), color: CHROME, spec: 1.8 });
     // The pit floor: dark, with a sullen red glow.
     d.push({ mesh: 'box', model: mul(translation([(LANE_WALL_X - 0.15 - H) / 2, 0.02, (DRAIN_Z + H) / 2]), scaling([LANE_WALL_X - 0.15 + H, 0.03, H - DRAIN_Z])), color: [0.25, 0.02, 0.02], pattern: Pattern.emissive, shadow: false });
 
@@ -437,13 +456,15 @@ export class PinballLevel implements Level {
     // general-illumination bulbs along the bottom.
     const band = 2.4;
     const STRIPES = [[0.9, 0.15, 0.6], [0.95, 0.75, 0.1], [0.1, 0.7, 0.9]];
-    for (const [x, z0, z1] of [[-H + 0.02, -H, DRAIN_Z], [H - 0.02, -H, H]] as const) {
+    // (The east wall's band stops either side of the exit, so it never covers the portal.)
+    const gap = 1.8;
+    for (const [x, z0, z1] of [[-H + 0.02, -H, DRAIN_Z], [H - 0.02, -H, EXIT_Z - gap], [H - 0.02, EXIT_Z + gap, H]] as const) {
       const zc = (z0 + z1) / 2, len = (z1 - z0) / t.cos;
       const f = t.frame(x, zc);
       d.push({ mesh: 'box', model: mul(f, translation([0, band / 2 - 0.2, 0]), scaling([0.04, band + 0.4, len])), color: [0.07, 0.02, 0.13], spec: 0.5 });
       d.push({ mesh: 'box', model: mul(f, translation([0, band, 0]), scaling([0.09, 0.08, len])), color: CHROME, spec: 1.4 });
       const side = x < 0 ? 1 : -1;
-      for (let z = z0 + 1.2; z < z1 - 1; z += 3.6) {
+      for (let z = z0 + 1.2; z < z1 - 2.2; z += 3.6) {
         STRIPES.forEach((c, k) => {
           const fs = t.frame(x + side * 0.02, z + k * 0.6);
           d.push({ mesh: 'box', model: mul(fs, translation([0, band / 2, 0]), rotationX(0.65), scaling([0.02, band / Math.cos(0.65) - 0.2, 0.3])), color: c, spec: 0.4, shadow: false });
@@ -452,6 +473,16 @@ export class PinballLevel implements Level {
       for (let z = z0 + 0.8; z < z1 - 0.3; z += 1.6) {
         d.push({ mesh: 'sphere', model: mul(t.frame(x + side * 0.14, z, 0, 0.3), scaling([0.1, 0.1, 0.1])), color: this.giColor, pattern: Pattern.emissive, shadow: false });
       }
+    }
+    // The same band across the front of the machine (the south wall, behind the drain).
+    const top = 4.8;
+    d.push({ mesh: 'box', model: mul(translation([0, top / 2, H - 0.02]), scaling([H * 2, top, 0.04])), color: [0.07, 0.02, 0.13], spec: 0.5 });
+    d.push({ mesh: 'box', model: mul(translation([0, top, H - 0.04]), scaling([H * 2, 0.08, 0.09])), color: CHROME, spec: 1.4 });
+    for (let x = -H + 1.0; x < H - 1; x += 3.6) {
+      if (Math.abs(x - CX) < 2.4) continue; // the coin door
+      STRIPES.forEach((c, k) => {
+        d.push({ mesh: 'box', model: mul(translation([x + k * 0.6, top / 2, H - 0.045]), rotationZ(0.5), scaling([0.3, top / Math.cos(0.5) - 0.3, 0.02])), color: c, spec: 0.4, shadow: false });
+      });
     }
   }
 
@@ -802,6 +833,7 @@ export class PinballLevel implements Level {
         this.ballQueue += 1;
         this.ballQueueT = 1.2;
         this.showMsg('MULTIBALL!', 3);
+        this.lightShow = 1.6;
         pinSfx.multiball();
       }
       if (down === 4) this.jackpot();
@@ -822,6 +854,7 @@ export class PinballLevel implements Level {
     this.exit.openNow();
     this.addScore(1000000);
     this.showMsg('JACKPOT!', 2.5);
+    this.lightShow = 2.6;
     pinSfx.jackpot();
     pinSfx.knocker();
     this.ctx.camera.addShake(0.3);
@@ -880,6 +913,13 @@ export class PinballLevel implements Level {
 
   // --- The plunger and the flight up the lane ---------------------------------------------------------------------
 
+  /** Whether the (live) player is somewhere up the shooter lane, off the plunger. */
+  private playerInLane() {
+    const { player } = this.ctx;
+    const p = player.pos;
+    return player.mode === 'control' && !this.death && p[0] > LANE_WALL_X + 0.15 && p[2] > LANE_TOP_Z && !this.onPlunger(p[0], p[2], p[1] - TABLE.y(p[2]));
+  }
+
   /** Whether (x, z) is on the plunger's tip, at the bottom of the lane. */
   private onPlunger(x: number, z: number, above: number) {
     return x > LANE_WALL_X + 0.15 && z > PLUNGER_Z - 1.9 && z < HOUSING_Z && above < 0.9;
@@ -900,7 +940,8 @@ export class PinballLevel implements Level {
     switch (pl.state) {
       case 'idle':
         pl.pull = Math.max(0, pl.pull - dt * 6);
-        if (armed && (playerOn || ballsOn.length)) {
+        // Balls wait while the player is up the lane: firing one into their back would be cheap.
+        if (armed && (playerOn || (ballsOn.length && !this.playerInLane()))) {
           pl.loaded += dt;
           if (pl.loaded > (playerOn ? 0.5 : 0.3)) {
             pl.state = 'pull';
@@ -1201,11 +1242,25 @@ export class PinballLevel implements Level {
         for (let k = 0; k < 3; k++) col[k] = (base + bright * 1.6) * LETTER_LIT[i][k] * 0.6 * pw + 0.02;
       });
     });
-    // The general illumination: warm, with the odd flicker.
-    const gi = (0.08 + 0.92 * pw) * (Math.random() < 0.02 ? 0.7 : 1);
-    this.giColor[0] = 2.0 * gi;
-    this.giColor[1] = 1.45 * gi;
-    this.giColor[2] = 0.7 * gi;
+    // The general illumination: warm, with the odd flicker; a light show strobes it through colours
+    // and fires the bumpers and slingshots in turn.
+    this.lightShow = Math.max(0, this.lightShow - dt);
+    if (this.lightShow > 0 && pw > 0) {
+      const step = Math.floor(this.t * 10);
+      const c = SHOW_COLORS[step % SHOW_COLORS.length];
+      const on = step % 2 === 0 ? 1 : 0.15;
+      for (let k = 0; k < 3; k++) this.giColor[k] = c[k] * on;
+      if (step !== this.showStep) {
+        this.showStep = step;
+        this.bumpers[step % this.bumpers.length].kick();
+        if (step % 3 === 0) this.slings[Math.floor(step / 3) % 2].kick();
+      }
+    } else {
+      const gi = (0.08 + 0.92 * pw) * (Math.random() < 0.02 ? 0.7 : 1);
+      this.giColor[0] = 2.0 * gi;
+      this.giColor[1] = 1.45 * gi;
+      this.giColor[2] = 0.7 * gi;
+    }
     // Chasing bulbs round the backglass.
     const n = 24;
     if (!this.bulbColors.length) for (let i = 0; i < n * 2; i++) this.bulbColors.push([0, 0, 0]);
@@ -1233,10 +1288,10 @@ export class PinballLevel implements Level {
     for (const ins of this.inserts) ins.draw(out);
     TARGETS.forEach((t, i) => {
       this.chevronColors[i].forEach((c, j) => {
-        const dist = 2.9 + j * 0.8;
+        const dist = 2.9 + j * 1.0;
         const x = t.p[0] + Math.sin(t.yaw) * dist, z = t.p[1] + Math.cos(t.yaw) * dist * TABLE.cos;
         // Pointing back at the target.
-        drawChevron(out, mul(TABLE.frame(x, z, t.yaw + Math.PI / 2, 0.012)), 0.9, c, { pattern: Pattern.emissive });
+        drawChevron(out, TABLE.frame(x, z, t.yaw + Math.PI / 2, 0.012), 1.25, c, { pattern: Pattern.emissive });
       });
     });
     // The plunger.
