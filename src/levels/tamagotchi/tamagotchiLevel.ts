@@ -1157,6 +1157,7 @@ export class TamagotchiLevel implements Level {
   private startEvolve() {
     this.evolveT = 0;
     sound.evolve();
+    this.ctx.hud.show('WHAT?', 'Your test subject is evolving!', 1.8);
     for (const p of this.poops) {
       this.burst(add(p.pos, [0, 0.4, 0]), 6, [[1.5, 1.4, 0.6]], 2, 0.1, true);
       p.gone = true;
@@ -1171,7 +1172,7 @@ export class TamagotchiLevel implements Level {
     const { hud, player, camera } = this.ctx;
     const at = (x: number) => before < x && t >= x;
     if (at(1.9)) {
-      hud.show('YOUR PET HAS EVOLVED INTO:', 'A SLIGHTLY OLDER TEST SUBJECT', 4.5);
+      hud.show('EVOLVED!', 'Your pet has evolved into: A SLIGHTLY OLDER TEST SUBJECT.\nIt learned MOUSTACHE.', 4.5);
       sfx.win();
       this.burst(add(player.pos, [0, 1.2, 0]), 24, [[1.8, 1.6, 0.6], [1.6, 0.8, 1.4], [0.8, 1.4, 1.8]], 4, 0.12, true);
     }
@@ -1338,10 +1339,10 @@ export class TamagotchiLevel implements Level {
     }
     const up = this.peekT < 0 ? 0 : smooth(Math.min(this.peekT / 0.9, (this.peekDur - this.peekT) / 0.9));
     this.giant.time += dt;
-    this.giant.root[1] = lerp(-75, -43.5, up);
+    this.giant.root[1] = lerp(-75, -39.5, up);
     this.giant.lookTarget = this.death ? add(player.pos, [0, 0.5, 0]) : add(player.pos, [0, 1.2, 0]);
     this.giant.update(dt, [10, -40, 30]);
-    this.timmyLine.pos = add(this.giant.headCenter(), [0, 10.5, -3]);
+    this.timmyLine.pos = add(this.giant.headCenter(), [0, 9.5, -4]);
 
     for (const b of this.bits) {
       b.t += dt;
