@@ -41,6 +41,11 @@ const BLINK_PERIOD = 0.2;
 const POP_GAP_MAX = 0.08;
 const POP_TOTAL = 2.6;
 const POP_TIME = 0.14;
+/** Little pixel crumbs flying off each popped block: how many, their size (m) and lifetime (s). */
+const CRUMBS_PER_POP = 5;
+const MAX_CRUMBS = 80;
+const CRUMB = 0.26;
+const CRUMB_LIFE = 1.1;
 /** A swallowed lump travels down the body this fast (segments/s) and swells it this much. */
 const BULGE_SPEED = 14;
 const BULGE_SWELL = 0.3;
@@ -99,6 +104,9 @@ export class Snake {
   private depth = new Int16Array(SNAKE_GRID * SNAKE_GRID);
   private seen = new Uint32Array(SNAKE_GRID * SNAKE_GRID);
   private stamp = 0;
+  /** Crumbs: x, y, z, vx, vy, vz, age for each (a ring buffer). */
+  private crumbs = new Float32Array(MAX_CRUMBS * 7).fill(CRUMB_LIFE);
+  private crumbNext = 0;
   // Draw pool: items and their matrices are reused every frame.
   private pool: DrawItem[] = [];
   private used = 0;
@@ -184,10 +192,59 @@ export class Snake {
       // Pop blocks from the head down; each one's collider goes as it vanishes.
       while (this.popped < this.length && this.stateT >= this.popped * gap + POP_TIME) {
         this.physics.world.removeCollider(this.colliders[this.popped], false);
-        this.setOcc(this.ci[this.popped], this.cj[this.popped], 0);
+        const i = this.ci[this.popped], j = this.cj[this.popped];
+        this.setOcc(i, j, 0);
+        if (j >= 0) for (let c = 0; c < CRUMBS_PER_POP; c++) this.emitCrumb(cellCentre(i), cellCentre(j));
         this.popped++;
       }
       if (this.popped >= this.length) this.state = 'gone';
+    }
+    this.updateCrumbs(dt);
+  }
+
+  // --- Crumbs: little pixels that fly off a popping block -------------------------------------------
+
+  private emitCrumb(x: number, z: number) {
+    const k = this.crumbNext;
+    this.crumbNext = (k + 1) % MAX_CRUMBS;
+    const c = this.crumbs, o = k * 7;
+    const a = Math.random() * Math.PI * 2, out = 1.5 + Math.random() * 2.5;
+    c[o] = x + Math.cos(a) * 0.4;
+    c[o + 1] = 0.4 + Math.random() * 1.1;
+    c[o + 2] = z + Math.sin(a) * 0.4;
+    c[o + 3] = Math.cos(a) * out;
+    c[o + 4] = 3 + Math.random() * 4;
+    c[o + 5] = Math.sin(a) * out;
+    c[o + 6] = 0; // age
+  }
+
+  private updateCrumbs(dt: number) {
+    const c = this.crumbs;
+    for (let k = 0; k < MAX_CRUMBS; k++) {
+      const o = k * 7;
+      if (c[o + 6] >= CRUMB_LIFE) continue;
+      c[o + 6] += dt;
+      c[o + 4] -= 20 * dt;
+      c[o] += c[o + 3] * dt;
+      c[o + 1] += c[o + 4] * dt;
+      c[o + 2] += c[o + 5] * dt;
+      if (c[o + 1] < CRUMB / 2) {
+        // Bounce once or twice on the floor, losing most of the speed.
+        c[o + 1] = CRUMB / 2;
+        c[o + 4] = Math.abs(c[o + 4]) * 0.3;
+        c[o + 3] *= 0.6;
+        c[o + 5] *= 0.6;
+      }
+    }
+  }
+
+  private drawCrumbs(out: DrawItem[]) {
+    const c = this.crumbs;
+    for (let k = 0; k < MAX_CRUMBS; k++) {
+      const o = k * 7, age = c[o + 6];
+      if (age >= CRUMB_LIFE) continue;
+      const size = CRUMB * Math.min(1, (CRUMB_LIFE - age) / 0.3);
+      this.put(out, 'box', BODY, 0.2, c[o], c[o + 1], c[o + 2], age * 5, size, size, size);
     }
   }
 
@@ -390,6 +447,7 @@ export class Snake {
 
   draw(out: DrawItem[]) {
     this.used = 0;
+    this.drawCrumbs(out);
     if (this.state === 'gone') return;
     // The death blink: the whole snake flicks off and on.
     if (this.state === 'crashed' && Math.floor(this.stateT / BLINK_PERIOD) % 2 === 1) return;
