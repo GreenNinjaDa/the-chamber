@@ -82,6 +82,7 @@ const TILE = [0.62, 0.86, 0.92];
 const TILE_DRY = [0.78, 0.92, 0.95];
 const TILE_BAND = [0.08, 0.2, 0.5];
 const LANE = [0.06, 0.16, 0.45];
+const HAZE = [0.03, 0.2, 0.32];
 const BUILD_BLUE = [0.35, 0.75, 1.6];
 
 const SIMLISH_HI = ['Sul sul!', 'Sul sul!', 'Dag dag... wait, sul sul!'];
@@ -1231,11 +1232,18 @@ export class PoolLevel implements Level {
     out.push({ mesh: 'bevelbox', model: mul(translation([0, -0.05, Z_HALF + c / 2 - 0.06]), scaling([X_HALF * 2 + c * 2, 0.14, c + 0.12])), color: COPING, spec: 0.3 });
     out.push({ mesh: 'bevelbox', model: mul(translation([-X_HALF - c / 2 + 0.06, -0.05, 0]), scaling([c + 0.12, 0.14, Z_HALF * 2])), color: COPING, spec: 0.3 });
     out.push({ mesh: 'bevelbox', model: mul(translation([X_HALF + c / 2 - 0.06, -0.05, 0]), scaling([c + 0.12, 0.14, Z_HALF * 2])), color: COPING, spec: 0.3 });
-    // The water.
+    // The water, and a blue haze further down so the deep end looks deep.
     out.push({
       mesh: 'box', model: mul(translation([0, this.water.level - 0.02, 0]), scaling([X_HALF * 2 - 0.01, 0.04, Z_HALF * 2 - 0.01])),
       color: [1, 1, 1], pattern: Pattern.lava, param: 3, opacity: 0.5, shadow: false,
     });
+    const haze = Math.min(this.water.level - 1.75, (this.water.level + this.slabTop) / 2);
+    if (haze > this.slabTop + 0.2) {
+      out.push({
+        mesh: 'box', model: mul(translation([0, haze, 0]), scaling([X_HALF * 2 - 0.02, 0.02, Z_HALF * 2 - 0.02])),
+        color: HAZE, pattern: Pattern.emissive, opacity: 0.28, shadow: false,
+      });
+    }
   }
 
   /** Build mode: the blue rectangle being dragged out, with a grid, while the mouse is held. */
