@@ -64,6 +64,16 @@ interface Floater {
 }
 
 const FACE_AXES: Vec3[] = [[1, 0, 0], [0, 0, 1]];
+const SCRATCH: Vec3 = [0, 0, 0];
+
+/** Rotates `v` by the unit quaternion `q` into `out` (no allocation: this runs for every float point, every physics step). */
+function rotateInto(out: Vec3, q: Quat, v: Vec3): Vec3 {
+  const tx = 2 * (q.y * v[2] - q.z * v[1]), ty = 2 * (q.z * v[0] - q.x * v[2]), tz = 2 * (q.x * v[1] - q.y * v[0]);
+  out[0] = v[0] + q.w * tx + q.y * tz - q.z * ty;
+  out[1] = v[1] + q.w * ty + q.z * tx - q.x * tz;
+  out[2] = v[2] + q.w * tz + q.x * ty - q.y * tx;
+  return out;
+}
 
 /** The 8 octant centres of a box of this size (sample points for Water). */
 export function boxPoints(size: Vec3): Vec3[] {
@@ -172,7 +182,7 @@ export class Water {
       const n = f.points.length;
       let under = 0;
       for (const p of f.points) {
-        const r = rotateByQuat(q as Quat, p);
+        const r = rotateInto(SCRATCH, q, p);
         const x = t.x + r[0], y = t.y + r[1], z = t.z + r[2];
         if (!this.contains(x, z)) continue;
         const k = clamp((this.surfaceAt(x, z) - y) / (2 * f.half) + 0.5, 0, 1);
