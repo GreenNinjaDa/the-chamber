@@ -19,6 +19,8 @@ export interface ChamberOptions {
   hole?: { x: number; y: number; radius: number };
   /** The light comes from below (e.g. lava): the floor and ground mustn't shadow everything above them. */
   litFromBelow?: boolean;
+  /** No test chamber at all: the level builds its own map. */
+  none?: boolean;
 }
 
 interface WallBox {
@@ -30,6 +32,7 @@ interface WallBox {
 
 /** The chamber's boxes: ground, floor and walls (the north wall split around the hole, if any). */
 function chamberBoxes(opts: ChamberOptions): WallBox[] {
+  if (opts.none) return [];
   const size = CHAMBER_HALF * 2;
   const h = WALL_HEIGHT;
   const bottom = -0.2, top = h;

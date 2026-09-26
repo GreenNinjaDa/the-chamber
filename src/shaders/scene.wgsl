@@ -7,6 +7,8 @@ struct Frame {
   groundColor: vec4f,
   fogColor: vec4f,    // w: fog density
   camPos: vec4f,      // w: time
+  pointPos: vec4f,    // a point light (torch): xyz position, w: range (0: none)
+  pointColor: vec4f,
 };
 
 struct Object {
@@ -254,10 +256,17 @@ fn fs(in: VsOut) -> @location(0) vec4f {
     groundLight *= falloff;
   }
   let hemi = mix(groundLight, frame.skyColor.rgb, n.y * 0.5 + 0.5);
+  var pointLight = vec3f(0.0);
+  if (frame.pointPos.w > 0.0) {
+    let toLight = frame.pointPos.xyz - in.worldPos;
+    let d = length(toLight);
+    let fade = clamp(1.0 - d / frame.pointPos.w, 0.0, 1.0);
+    pointLight = frame.pointColor.rgb * max(dot(n, toLight / max(d, 0.0001)), 0.0) * fade * fade / (1.0 + d * d * 0.08);
+  }
   let v = normalize(camPos - in.worldPos);
   let h = normalize(l + v);
   let spec = pow(max(dot(n, h), 0.0), 48.0) * obj.params.z * step(0.0, dot(n, l));
-  var col = albedo * (frame.sunColor.rgb * ndl * sh + hemi) + frame.sunColor.rgb * spec * sh;
+  var col = albedo * (frame.sunColor.rgb * ndl * sh + hemi + pointLight) + frame.sunColor.rgb * spec * sh;
   if (obj.params.w > 0.0) {
     // Pulsing glow on whatever the crosshair is targeting.
     let pulse = 0.65 + 0.35 * sin(frame.camPos.w * 6.0);

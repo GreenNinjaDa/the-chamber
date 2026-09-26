@@ -67,8 +67,18 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   a 50% chance of only 0.2 s. Hazards: a wrecking ball swings across the long jump between the 4th and 5th rocks
   (a hit to the head or chest knocks you into the lava), and the 3rd rock from the end sinks 1.8 m and back over
   10 s, carrying you. Lava death is a plain collapse.
+- **Level 5 — Raiders of the Lost Chamber** (`src/levels/temple/`, work in progress): its own map, no test chamber. A
+  dark sloping stone tunnel lit by a torch in the player's hand. A boulder drops from a ceiling shaft between the
+  player and the exit portal and chases them (rubber-banded: sprinting stays ahead, walking gets caught) over four
+  spiked pits (the wide one has a vine: jump into it and it swings you across). At the dead end the wall sinks to
+  reveal a second boulder and the whole temple flips upside down (the map rotates 180° about a horizontal axis
+  through the player, so the player's physics never goes upside down). The new boulder chases them back; the first
+  rolls ahead and drops down its shaft, now a pit, crossed on a second vine to reach the portal. Boulders kill on
+  contact. The map is built flat in "track" space on one kinematic body; the level matrix tilts and flips it.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
-  or `litFromBelow` (the floor casts no shadows). `Environment.lightFromBelow` (renderer.ts) turns the sun into a
+  `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
+  set `camera.confine = false` so the camera isn't kept inside the chamber). `Environment.pointLight` adds one
+  unshadowed point light (a torch). `Environment.lightFromBelow` (renderer.ts) turns the sun into a
   glowing surface at that height: it lights like a plane below (down-facing surfaces fully, walls half), fades
   with height above it, and casts very soft shadows.
 
@@ -132,7 +142,11 @@ Shared mechanics available to levels (via `ctx`):
 - The upper body aims at the camera: the torso twists toward where you look and looking down bends you over
   (and crouches you when standing still), which physically lowers the head and chest, so ducking behind low
   cover works against anything that checks body parts (e.g. grenade blasts). Tunables: `AIM_*` in player.ts.
-- In scripted modes (`held`, `flying`, `stuck`, `splat`) the physical body is switched off and the pose is drawn
+- `player.resume(velocity)` puts the player back in normal control after a scripted mode; `player.partFrames()`
+  gives each body part's frame (e.g. to put a torch in the right hand, `foreArmR`).
+- Boulders use `GROUPS_BOULDER`, and invisible `GROUPS_BOULDER_BRIDGE` colliders are floors only boulders touch
+  (so they roll over pits the player has to jump).
+- In scripted modes (`held`, `flying`, `stuck`, `splat`, `swinging`) the physical body is switched off and the pose is drawn
   directly; in `control` and `ragdoll` the body is drawn from physics.
 
 ## Testing without a visible browser

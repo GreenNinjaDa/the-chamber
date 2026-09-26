@@ -44,6 +44,8 @@ export interface Environment {
    * from it (point sunDir downward), fades with height above it, and casts very soft shadows.
    */
   lightFromBelow?: number;
+  /** A point light (e.g. a torch): position, colour, and the range it fades out over (m). No shadows. */
+  pointLight?: { pos: Vec3; color: Vec3; range: number };
   sunColor: Vec3;
   skyColor: Vec3;
   groundColor: Vec3;
@@ -86,7 +88,7 @@ export class Renderer {
   private meshes: Record<MeshName, GpuMesh>;
   private frameBuffer: GPUBuffer;
   private objBuffer: GPUBuffer;
-  private frameData = new Float32Array(56);
+  private frameData = new Float32Array(64);
   private objData = new Float32Array(MAX_DRAWS * OBJ_FLOATS);
   private mainPipeline: GPURenderPipeline;
   private shadowPipeline: GPURenderPipeline;
@@ -302,6 +304,9 @@ export class Renderer {
     f.set([...env.groundColor, 0], 44);
     f.set([...env.fogColor, env.fogDensity], 48);
     f.set([...cam.pos, time], 52);
+    const point = env.pointLight;
+    f.set(point ? [...point.pos, point.range] : [0, 0, 0, 0], 56);
+    f.set(point ? [...point.color, 0] : [0, 0, 0, 0], 60);
     device.queue.writeBuffer(this.frameBuffer, 0, f);
 
     const encoder = device.createCommandEncoder();

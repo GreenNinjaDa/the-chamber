@@ -17,8 +17,11 @@ export class ThirdPersonCamera {
   target: Vec3 = [0, 3, 0];
   fov = (70 * Math.PI) / 180;
   private shake = 0;
+  /** Keep the camera inside the test chamber (levels with their own map turn this off). */
+  confine = true;
 
   reset(yaw = 0) {
+    this.confine = true;
     this.yaw = yaw;
     this.pitch = -0.2;
     this.shake = 0;
@@ -41,6 +44,10 @@ export class ThirdPersonCamera {
     const right: Vec3 = [Math.cos(this.yaw), 0, -Math.sin(this.yaw)];
     const shoulder = add(add(player.pos, [0, 1.65, 0]), scale(right, SHOULDER_OFFSET));
     const desired = sub(shoulder, scale(fwd, DISTANCE));
+    if (!this.confine) {
+      this.moveTo(desired, add(shoulder, scale(fwd, 10)), dt, 18);
+      return;
+    }
     // Keep the camera inside the chamber; when a wall pushes it in, lift it over the shoulder instead.
     const lim = CHAMBER_HALF - 0.3;
     const cx = clamp(desired[0], -lim, lim);

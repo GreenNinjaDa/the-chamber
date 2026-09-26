@@ -21,16 +21,22 @@ const ROLLING_DAMPING = 1.2;
 // Collision groups: (membership << 16) | filter. Everything else uses the default (all/all).
 const BODY_BIT = 0x0002; // the player's physical body parts
 const CAPSULE_BIT = 0x0004; // the player's movement capsule
+const BRIDGE_BIT = 0x0008; // invisible floors only boulders use (e.g. over pits the player must jump)
+const BOULDER_BIT = 0x0010; // rolling boulders
+/** An invisible surface that only boulders touch. */
+export const GROUPS_BOULDER_BRIDGE = (BRIDGE_BIT << 16) | BOULDER_BIT;
+/** A boulder: hits everything, including boulder bridges. */
+export const GROUPS_BOULDER = (BOULDER_BIT << 16) | 0xffff;
 /** Player body parts while animated: collide with the world and props, but not each other. */
-export const GROUPS_PLAYER_BODY = (BODY_BIT << 16) | (0xffff & ~BODY_BIT & ~CAPSULE_BIT);
+export const GROUPS_PLAYER_BODY = (BODY_BIT << 16) | (0xffff & ~BODY_BIT & ~CAPSULE_BIT & ~BRIDGE_BIT);
 /** Player body parts while limp: also collide with each other (jointed pairs have contacts off). */
-export const GROUPS_PLAYER_BODY_LIMP = (BODY_BIT << 16) | (0xffff & ~CAPSULE_BIT);
+export const GROUPS_PLAYER_BODY_LIMP = (BODY_BIT << 16) | (0xffff & ~CAPSULE_BIT & ~BRIDGE_BIT);
 /** Movement capsule: takes part in no contacts at all; only the character controller queries use it. */
 export const GROUPS_PLAYER_CAPSULE = CAPSULE_BIT << 16;
 /** For queries that should also hit the player's body parts (but not the movement capsule). */
-export const GROUPS_QUERY_WITH_PLAYER = (0xffff << 16) | (0xffff & ~CAPSULE_BIT);
+export const GROUPS_QUERY_WITH_PLAYER = (0xffff << 16) | (0xffff & ~CAPSULE_BIT & ~BRIDGE_BIT);
 /** For queries that should see the world and props but not the player. */
-export const GROUPS_QUERY_WORLD = (0xffff << 16) | (0xffff & ~BODY_BIT & ~CAPSULE_BIT);
+export const GROUPS_QUERY_WORLD = (0xffff << 16) | (0xffff & ~BODY_BIT & ~CAPSULE_BIT & ~BRIDGE_BIT);
 
 
 

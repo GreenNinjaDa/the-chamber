@@ -5,7 +5,7 @@ import {
 } from '../engine/math';
 import { GROUPS_PLAYER_CAPSULE, GROUPS_QUERY_WORLD, RAPIER, type Body, type Physics } from '../engine/physics';
 import type { DrawItem } from '../engine/renderer';
-import { crouchLegs, drawBody, PART_NAMES, PhysBody, poseFrames, REST_POSE, standingRoot, type PartName, type Pose } from './body';
+import { crouchLegs, drawBody, PART_NAMES, PhysBody, poseFrames, REST_POSE, standingRoot, type Frames, type PartName, type Pose } from './body';
 
 /**
  * control: walking around under player control (pos = feet); the physical body follows the
@@ -14,8 +14,9 @@ import { crouchLegs, drawBody, PART_NAMES, PhysBody, poseFrames, REST_POSE, stan
  * flying / stuck / splat: body along `flightDir` (pos = body centre)
  * ragdoll: dead and limp; pos follows the body (≈ feet) so cameras keep working
  * hidden:  not in the level yet (waiting inside an entrance portal)
+ * swinging: hanging from a vine by both hands (pos = feet); the level moves them
  */
-export type PlayerMode = 'control' | 'held' | 'flying' | 'stuck' | 'splat' | 'ragdoll' | 'hidden';
+export type PlayerMode = 'control' | 'held' | 'flying' | 'stuck' | 'splat' | 'ragdoll' | 'hidden' | 'swinging';
 
 export interface Circle {
   x: number;
@@ -513,6 +514,30 @@ export class Player {
     this.knock(scale(normalize(hit.rel), Math.min(9, hit.momentum / 12)), STUN_MIN + (STUN_MAX - STUN_MIN) * hit.severity);
   }
 
+  /**
+   * Back to normal control from a scripted mode (held, swinging...): standing at `pos` (feet),
+   * moving at `velocity`, with the physical body switched back on in a standing pose.
+   */
+  resume(velocity: Vec3 = [0, 0, 0]) {
+    this.mode = 'control';
+    this.vel = [...velocity];
+    this.onGround = false;
+    const body = this.body;
+    if (body) {
+      body.teleport(poseFrames(standingRoot(this.pos, this.facing), REST_POSE));
+      body.setEnabled(true);
+    }
+    this.driveFeet = [...this.pos];
+    this.syncCollider();
+  }
+
+  /** Where each body part is right now (from physics, or the scripted pose), e.g. to put things in a hand. */
+  partFrames(): Frames {
+    const body = this.body;
+    if (body && body.isEnabled && (this.mode === 'control' || this.mode === 'ragdoll')) return body.frames();
+    return poseFrames(this.scriptedRoot(), this.pose);
+  }
+
   /** Takes the player out of the level (e.g. while an entrance portal opens). */
   hide() {
     this.mode = 'hidden';
@@ -633,6 +658,12 @@ export class Player {
           elbowL: 0.6 + Math.sin(t * 11) * 0.5, elbowR: 0.6 + Math.cos(t * 12) * 0.5,
           hipL: Math.sin(t * 16) * 0.7, hipR: -Math.sin(t * 16) * 0.7,
           kneeL: -0.7 - Math.sin(t * 15) * 0.5, kneeR: -0.7 + Math.sin(t * 15) * 0.5,
+        };
+      case 'swinging':
+        // Both hands up on the vine, legs together and swaying a little.
+        return {
+          lean: 0, headPitch: 0.15, shoulderL: Math.PI - 0.1, shoulderR: Math.PI - 0.1, armOut: 0.05, elbowL: 0.1, elbowR: 0.1,
+          hipL: 0.35 + Math.sin(t * 4) * 0.15, hipR: 0.3 + Math.sin(t * 4 + 0.4) * 0.15, kneeL: -0.5, kneeR: -0.45,
         };
       case 'flying':
         return {
