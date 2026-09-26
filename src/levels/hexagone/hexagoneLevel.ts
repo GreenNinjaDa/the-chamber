@@ -728,7 +728,14 @@ export class HexagoneLevel implements Level {
     for (let i = TOPS.length - 1; i >= 0; i--) {
       const under = TOPS[i] - TILE_T;
       if (under > feet[1] + 0.2 && this.tilesNear(this.floors[i], pos[0], pos[2])) {
-        pos[1] = Math.min(pos[1], under - 0.35);
+        if (camera.pos[1] > under - 0.1) {
+          // They've just fallen through and the camera is still up there: follow them down
+          // through their hole (over their head) rather than through the tiles.
+          pos[0] = feet[0] + (pos[0] - feet[0]) * 0.15;
+          pos[2] = feet[2] + (pos[2] - feet[2]) * 0.15;
+        } else {
+          pos[1] = Math.min(pos[1], under - 0.35);
+        }
         break;
       }
     }
