@@ -50,6 +50,7 @@ import { PinballLevel } from './levels/pinball/pinballLevel';
 import { KatamariLevel } from './levels/katamari/katamariLevel';
 import { PoolLevel } from './levels/pool/poolLevel';
 import { ImpostorLevel } from './levels/impostor/impostorLevel';
+import { QwopLevel } from './levels/qwop/qwopLevel';
 import type { Level, LevelContext, TrackedTarget, WorldLabel } from './levels/level';
 import { LobbyLevel } from './levels/lobby/lobbyLevel';
 
@@ -95,6 +96,7 @@ const LEVELS: [string, (ctx: LevelContext) => Level][] = [
   ['pinball', (ctx) => new PinballLevel(ctx)],
   ['bowling', (ctx) => new BowlingLevel(ctx)],
   ['tetris', (ctx) => new TetrisLevel(ctx)],
+  ['qwop', (ctx) => new QwopLevel(ctx)],
   ['laser', (ctx) => new LaserLevel(ctx)],
   ['elevator', (ctx) => new ElevatorLevel(ctx)],
   ['pacman', (ctx) => new PacmanLevel(ctx)],

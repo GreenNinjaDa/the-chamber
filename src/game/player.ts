@@ -7,7 +7,9 @@ import {
 } from '../engine/math';
 import { GROUPS_PLAYER_CAPSULE, GROUPS_QUERY_WORLD, RAPIER, type Body, type Physics } from '../engine/physics';
 import type { DrawItem } from '../engine/renderer';
-import { crouchLegs, drawBody, PART_NAMES, PhysBody, poseFrames, REST_POSE, SIT_POSE, standingRoot, type Frames, type PartName, type Pose } from './body';
+import {
+  crouchLegs, drawBody, PART_NAMES, PhysBody, poseFrames, REST_POSE, SIT_POSE, standingRoot, type Frames, type JointStrengths, type PartName, type Pose,
+} from './body';
 
 /**
  * control: walking around under player control (pos = feet); the physical body follows the
@@ -17,8 +19,10 @@ import { crouchLegs, drawBody, PART_NAMES, PhysBody, poseFrames, REST_POSE, SIT_
  * ragdoll: dead and limp; pos follows the body (≈ feet) so cameras keep working
  * hidden:  not in the level yet (waiting inside an entrance portal)
  * swinging: hanging from a vine by both hands (pos = feet); the level moves them
+ * puppet:  QWOP-style (startPuppet): the level drives the body's joints and nothing else holds it
+ *          up; pos follows the pelvis (≈ feet), like a ragdoll
  */
-export type PlayerMode = 'control' | 'held' | 'flying' | 'stuck' | 'splat' | 'ragdoll' | 'hidden' | 'swinging';
+export type PlayerMode = 'control' | 'held' | 'flying' | 'stuck' | 'splat' | 'ragdoll' | 'hidden' | 'swinging' | 'puppet';
 
 export interface Circle {
   x: number;
@@ -208,6 +212,13 @@ export class Player {
   airControl = 1;
   /** A pose the level wants drawn while in control instead of the usual animation (e.g. clinging to a rail); null = normal. */
   poseOverride: Pose | null = null;
+  /**
+   * Puppet mode (startPuppet): the joint angles the body's motors chase, per-joint strength
+   * multipliers (0 = limp), and the overall muscle strength. The level sets them every frame.
+   */
+  puppetPose: Pose = { ...REST_POSE };
+  puppetJoints: JointStrengths = {};
+  puppetStrength = MUSCLE_STRENGTH;
   private portalPivot: Vec3 = [0, 0, 0];
   private portalFrom = 1;
   private portalTo = 1;
@@ -235,6 +246,9 @@ export class Player {
     this.gravityScale = 1;
     this.airControl = 1;
     this.poseOverride = null;
+    this.puppetPose = { ...REST_POSE };
+    this.puppetJoints = {};
+    this.puppetStrength = MUSCLE_STRENGTH;
     this.gravity = identity();
     this.up = [0, 1, 0];
     this.hanging = false;
@@ -525,6 +539,12 @@ export class Player {
       body.drive(h, poseFrames(this.root(this.pos, this.facing), this.pose), [0, 0, 0], this.pose);
       return;
     }
+    if (this.mode === 'puppet') {
+      // Only the joints: balancing is the level's (and the poor player's) problem.
+      body.strength = this.puppetStrength;
+      body.driveJoints(this.pose, this.puppetJoints);
+      return;
+    }
     if (this.mode !== 'control') {
       body.setEnabled(false); // scripted poses are drawn directly
       return;
@@ -654,9 +674,57 @@ export class Player {
 
   /** Where each body part is right now (from physics, or the scripted pose), e.g. to put things in a hand. */
   partFrames(): Frames {
-    const body = this.body;
-    if (body && body.isEnabled && (this.mode === 'control' || this.mode === 'ragdoll')) return body.frames();
+    if (this.physical()) return this.body!.frames();
     return poseFrames(this.scriptedRoot(), this.pose);
+  }
+
+  /** True when the body is drawn from (and is) physics rather than a scripted pose. */
+  private physical() {
+    const body = this.body;
+    return !!body && body.isEnabled && (this.mode === 'control' || this.mode === 'ragdoll' || this.mode === 'puppet');
+  }
+
+  /**
+   * QWOP-style puppet mode: the level drives the joints (`puppetPose`, `puppetJoints`,
+   * `puppetStrength`, e.g. from keys) and nothing else holds the body up, so it falls over unless
+   * it's balanced. The body is put in `pose`, standing at `pos` facing `facing`, and kept to the
+   * vertical x-y plane (face along ±x), like the original. No knocks meanwhile. stopPuppet() (or
+   * kill()) ends it.
+   */
+  startPuppet(pose: Pose = REST_POSE) {
+    const body = this.body;
+    if (!body) return;
+    this.mode = 'puppet';
+    this.vel = [0, 0, 0];
+    this.stun = 0;
+    this.gettingUp = false;
+    this.puppetPose = { ...pose };
+    this.pose = this.puppetPose;
+    body.teleport(poseFrames(this.root(this.pos, this.facing), pose));
+    body.setEnabled(true);
+    body.muscle = 1;
+    body.setPlanar(true);
+    this.collider?.setEnabled(false);
+  }
+
+  /** Back to normal control from puppet mode: the body scrambles up from however it ended up. */
+  stopPuppet() {
+    const body = this.body;
+    if (this.mode !== 'puppet' || !body) return;
+    body.setPlanar(false);
+    // Feet on whatever is under the pelvis.
+    const pelvis = body.position('pelvis');
+    const ground = this.physics?.raycast(pelvis, scale(this.up, -1), 3);
+    this.pos = ground ? ground.point : sub(pelvis, scale(this.up, 0.98));
+    this.mode = 'control';
+    this.vel = [0, 0, 0];
+    this.onGround = false;
+    this.collider?.setEnabled(true);
+    body.muscle = Math.min(body.muscle, 0.2);
+    this.gettingUp = true;
+    this.getUpTime = 0;
+    this.driveFeet = [...this.pos];
+    this.syncCollider();
   }
 
   /** Takes the player out of the level (e.g. while an entrance portal opens). */
@@ -703,7 +771,7 @@ export class Player {
 
   /** Call once per tick after the physics step. */
   afterPhysics() {
-    if (this.mode === 'ragdoll' && this.body) {
+    if ((this.mode === 'ragdoll' || this.mode === 'puppet') && this.body) {
       this.pos = sub(this.body.position('pelvis'), scale(this.up, 0.98));
     }
   }
@@ -715,10 +783,11 @@ export class Player {
   kill(launch: Vec3 = [0, 0, 0], opts: { violence?: number; origin?: Vec3 } = {}) {
     const body = this.body;
     if (!body || this.mode === 'ragdoll' || this.inPortal) return;
-    if (!body.isEnabled || this.mode !== 'control') {
+    if (!body.isEnabled || (this.mode !== 'control' && this.mode !== 'puppet')) {
       body.teleport(poseFrames(this.scriptedRoot(), this.pose));
       body.setEnabled(true);
     }
+    if (this.mode === 'puppet') body.setPlanar(false);
     body.muscle = 0;
     sfx.oof(1);
     if ((opts.violence ?? length(launch)) >= 18) sfx.splat();
@@ -790,6 +859,8 @@ export class Player {
         };
       case 'swinging':
         return hangingPose(t);
+      case 'puppet':
+        return this.puppetPose;
       case 'flying':
         return {
           lean: 0, headPitch: 0.3, shoulderL: Math.PI, shoulderR: Math.PI, armOut: 0.05, elbowL: 0, elbowR: 0,
@@ -806,9 +877,8 @@ export class Player {
   draw(out: DrawItem[], _time: number) {
     if (this.mode === 'hidden' || this.portalScale < 0.01) return;
     const start = out.length;
-    const body = this.body;
-    if (body && body.isEnabled && (this.mode === 'control' || this.mode === 'ragdoll')) {
-      drawBody(out, body.frames(), this.girth);
+    if (this.physical()) {
+      drawBody(out, this.body!.frames(), this.girth);
     } else {
       drawBody(out, poseFrames(this.scriptedRoot(), this.pose), this.girth);
     }
