@@ -57,7 +57,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   (`ExitPortal.refuse`).
   Companion shapes (`entities/companions.ts`: sphere, cylinder, cone, capsule, wheel — never a cube; ~1 m like the
   real cube, 25 kg) lie around;
-  the exit is open only while one sits on the floor button (`entities/pressurePlate.ts`); take it off and the
+  the exit is open only while one (or the player) is on the floor button (`entities/pressurePlate.ts`); take it off and the
   panel slides shut again.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall.
 

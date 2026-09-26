@@ -1,10 +1,12 @@
 import { add, mul, scaling, translation, type Vec3 } from '../engine/math';
 import type { Body, Physics, RAPIER } from '../engine/physics';
 import type { DrawItem } from '../engine/renderer';
+import type { Player } from '../game/player';
 
 /*
- * A big round floor button in the Portal style: a red plate in a dark ring. Only the objects it is
- * given (e.g. companion shapes) press it; while one sits on it the plate sinks and `pressed` is set.
+ * A big round floor button in the Portal style: a red plate in a dark ring. The objects it is given
+ * (e.g. companion shapes) press it, and so does the player (or their corpse) standing on it; while
+ * something is on it the plate sinks and `pressed` is set.
  */
 
 const RING = [0.22, 0.23, 0.25];
@@ -29,6 +31,7 @@ export class PressurePlate {
     private physics: Physics,
     private pos: Vec3,
     private pressers: Body[],
+    private player: Player | null,
     /** Called with true when something presses it, false when the last thing leaves. */
     private onChange?: (pressed: boolean) => void,
   ) {
@@ -41,10 +44,19 @@ export class PressurePlate {
     return add(this.pos, [0, top - 0.05, 0]);
   }
 
+  /** The player's movement capsule never makes contacts, so check where their feet (or body) are. */
+  private playerOnIt() {
+    const p = this.player;
+    if (!p || p.mode === 'hidden' || p.inPortal) return false;
+    const at = p.mode === 'control' || p.mode === 'ragdoll' ? p.pos : null;
+    if (!at) return false;
+    return Math.hypot(at[0] - this.pos[0], at[2] - this.pos[2]) < RADIUS + 0.1 && at[1] - this.pos[1] < 0.45;
+  }
+
   /** Call every tick. */
   update(dt: number) {
     const world = this.physics.world;
-    let touching = false;
+    let touching = this.playerOnIt();
     for (const b of this.pressers) {
       if (!b.rb.isValid()) continue;
       world.contactPair(this.plate, b.collider, (manifold) => {
