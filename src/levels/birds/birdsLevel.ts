@@ -410,8 +410,8 @@ export class BirdsLevel implements Level {
   private starsLit = 0;
   private starPop = [0, 0, 0];
 
-  private nameLabel: WorldLabel = { pos: [0, 0, 0], text: '', size: 1.1, color: '#fff' };
-  private quipLabel: WorldLabel = { pos: [0, 0, 0], text: '', size: 0.55, color: '#fff' };
+  private nameLabel: WorldLabel = { pos: [0, 0, 0], text: '', size: 1.7, color: '#fff' };
+  private quipLabel: WorldLabel = { pos: [0, 0, 0], text: '', size: 0.85, color: '#fff' };
   private alertLabel: WorldLabel = { pos: [0, 0, 0], text: '', size: 2.4, color: '#ffd84a' };
   private labelList: WorldLabel[] = [];
   private breakSounds = 0;
@@ -677,11 +677,11 @@ export class BirdsLevel implements Level {
     const showName = this.loaded && (this.phase === 'load' || this.phase === 'aim' || this.phase === 'hold');
     if (showName) {
       const shot = SHOTS[this.loaded!.shot];
-      const top = add(this.sling.restPouch(), [0, 4.6, 0]);
+      const top = add(this.sling.restPouch(), [0, 5.2, 0]);
       this.nameLabel.pos = top;
       this.nameLabel.text = shot.name;
       this.nameLabel.color = shot.color;
-      this.quipLabel.pos = add(top, [0, -1.25, 0]);
+      this.quipLabel.pos = add(top, [0, -1.7, 0]);
       this.quipLabel.text = shot.quip;
     } else {
       this.nameLabel.text = this.quipLabel.text = '';
@@ -957,12 +957,11 @@ export class BirdsLevel implements Level {
         f.landed += dt;
       }
 
-      // Hitting the pig: tested along the whole step, fast birds skip a lot.
-      // Deadly in flight; once they've hit something they only knock you about (the engine does
-      // that), except Terence, who flattens whatever he rolls over.
+      // Hitting the pig, tested along the whole step (fast birds skip a lot). Deadly in flight
+      // (including the frame it first hits something: that may be the pig), at the speed it came
+      // in with, not the bounce; after that birds only knock you about (the engine does that),
+      // except Terence, who flattens whatever he rolls over.
       f.grace = Math.max(0, f.grace - dt);
-      // (The frame it first hits something still counts: that something may be the pig.)
-      // Speed going in, not bouncing off.
       const hitSpeed = Math.max(speed, f.prevSpeed);
       f.prevSpeed = speed;
       const lethal = f.grace <= 0 && (f.bird === 'terence' ? hitSpeed > TERENCE_LETHAL_SPEED : f.landed < 0.1 && hitSpeed > LETHAL_SPEED);
