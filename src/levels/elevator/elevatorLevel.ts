@@ -197,6 +197,10 @@ const SHAFT_ENV: Environment = {
 };
 /** The red of the alarm, mixed into the lights in the last seconds. */
 const ALARM_SUN: Vec3 = [1.6, 0.25, 0.18];
+const DUST = [0.42, 0.39, 0.35];
+const SPARK = [6, 2.2, 0.35];
+/** The car's strip lights at full glow. */
+const STRIP_LIGHT = [2.4, 2.4, 2.2];
 
 type Stage = 'arrive' | 'ride' | 'fall' | 'landed';
 
@@ -281,6 +285,9 @@ export class ElevatorLevel implements Level {
   private signs: WorldLabel[];
   private brace: WorldLabel[];
   private landingLabels: WorldLabel[] = [];
+  /** The car's fixed fittings (crosshead, grate, lights, rails, signs), and its strip lights' glow. */
+  private fittings: DrawItem[] = [];
+  private glow = [...STRIP_LIGHT];
   /** The weightless player's position and velocity after the last update (to spot bumping into things). */
   private lastPos: Vec3 = [0, 0, 0];
   private lastVel: Vec3 = [0, 0, 0];
@@ -328,6 +335,10 @@ export class ElevatorLevel implements Level {
       { pos: [-CHAMBER_HALF + 0.3, 8.3, 0], text: 'BRACE FOR IMPACT', size: 0.7, color: '#ff3b2f' },
     ];
     for (let i = 0; i < 12; i++) this.landingLabels.push({ pos: [0, 0, 0], text: '', size: 1.3, color: '#d9d3bf' });
+
+    drawCarTop(this.fittings, this.glow);
+    drawRails(this.fittings, this.rails);
+    this.drawSigns(this.fittings);
 
     this.lastPos = [...ctx.player.pos];
   }
@@ -413,14 +424,14 @@ export class ElevatorLevel implements Level {
     if (this.once(`hum${Math.floor((t - 1) / 3.5)}`, t > 1 && t < RIDE_TIME - GROAN_BEFORE - 1)) {
       this.say('~ hmmmmmmmm ~', [rand(-3, 3), WALL_HEIGHT - 0.8, rand(-3, 3)], 0.3, 'rgba(230,230,230,0.55)', 2.6, [0, 0.15, 0]);
     }
-    if (this.once('creak', t > CREAK_AT)) this.say('*creak*', [2, 11.5, 0], 0.45, '#cfcfcf', 1.5);
+    if (this.once('creak', t > CREAK_AT)) this.say('*creak*', this.inView(7, 2.5), 0.45, '#cfcfcf', 1.5);
     if (this.once('ping', t > RIDE_TIME - PING_BEFORE)) {
       this.pinged = 0;
-      this.say('*PING*', [0.4, 13.5, 0.3], 0.55, '#ffffff', 1.4, [0, 1.2, 0]);
+      this.say('*PING*', this.inView(6, 2.2), 0.6, '#ffffff', 1.4, [0, 1, 0]);
       this.ctx.camera.addShake(0.25);
     }
     if (this.once('groan', t > RIDE_TIME - GROAN_BEFORE)) {
-      this.say('*groooan*', [-1, 12, 0], 0.5, '#cfcfcf', 1.3);
+      this.say('*groooan*', this.inView(7, 1.8), 0.5, '#cfcfcf', 1.3);
       this.ctx.camera.addShake(0.3);
     }
     if (t > RIDE_TIME) this.snap();
@@ -432,7 +443,7 @@ export class ElevatorLevel implements Level {
     this.setStage('fall');
     this.snapped = 0;
     this.flickerT = 0;
-    this.say('TWANG!', [0, 14, 0], 1.6, '#ffe066', 1.8, [0, 2, 0]);
+    this.say('TWANG!', this.inView(8, 1.5), 1.6, '#ffe066', 1.8, [0, 1.2, 0]);
     camera.addShake(1);
     for (const d of this.indicators) {
       d.setMessage('UH OH');
@@ -486,7 +497,7 @@ export class ElevatorLevel implements Level {
     this.alarm = 0;
     this.flickerT = 0;
     camera.addShake(1.8);
-    this.say('KA-RUNCH!', [0, 3.6, 0], 1.3, '#ffffff', 1.6);
+    this.say('KA-RUNCH!', this.inView(8, 0.5), 1.4, '#ffffff', 1.6);
     physics.world.gravity = { x: 0, y: -GRAVITY * SLAM_GRAVITY, z: 0 };
     for (const c of this.cargo) {
       const rb = c.body.rb;
@@ -660,6 +671,12 @@ export class ElevatorLevel implements Level {
 
   // --- Weightless ------------------------------------------------------------------------------
 
+  /** A point `dist` ahead of the camera and `up` above that: where a sound effect gets written so you see it. */
+  private inView(dist: number, up: number): Vec3 {
+    const cam = this.ctx.camera;
+    return add(add(cam.pos, scale(this.lookDir(), dist)), [0, up, 0]);
+  }
+
   private lookDir(): Vec3 {
     const cam = this.ctx.camera;
     return normalize(sub(cam.target, cam.pos));
@@ -813,16 +830,20 @@ export class ElevatorLevel implements Level {
       p[1] += (s.vel[1] + (s.bob ? Math.cos((s.life - s.ttl) * s.bob * 2) * 0.9 : 0)) * dt;
       p[2] += s.vel[2] * dt;
     }
+    const drag = Math.exp(-dt * 1.8);
     for (const p of this.puffs) {
       p.age += dt;
-      p.pos = add(p.pos, scale(p.vel, dt));
-      p.vel = scale(p.vel, Math.exp(-dt * 1.8));
+      for (let i = 0; i < 3; i++) {
+        p.pos[i] += p.vel[i] * dt;
+        p.vel[i] *= drag;
+      }
       p.vel[1] += dt * 0.15;
     }
+    // (Puffs and sparks die in the order they were made, near enough.)
     while (this.puffs.length && this.puffs[0].age > this.puffs[0].life) this.puffs.shift();
     for (const s of this.sparks) {
       s.age += dt;
-      s.pos = add(s.pos, scale(s.vel, dt));
+      for (let i = 0; i < 3; i++) s.pos[i] += s.vel[i] * dt;
     }
     while (this.sparks.length && this.sparks[0].age > this.sparks[0].life) this.sparks.shift();
     if (this.pinged >= 0) this.pinged += dt;
@@ -887,24 +908,27 @@ export class ElevatorLevel implements Level {
   draw(out: DrawItem[], time: number) {
     this.arrival.draw(out);
     drawShaft(out, this.depth, Math.min(this.speed, 45));
-    drawCarTop(out, this.light);
-    drawRails(out, this.rails);
+    // The car's fixed fittings are built once; the strip lights dim through the shared glow colour.
+    for (let i = 0; i < 3; i++) this.glow[i] = STRIP_LIGHT[i] * this.light + 0.03;
+    for (const item of this.fittings) out.push(item);
     drawDoors(out, this.doorOpen);
     if (this.doorOpen > 0.3) drawPortal(out, this.exit.centre, [-1, 0, 0], 1.2 * clamp((this.doorOpen - 0.3) / 0.4, 0, 1), true);
     for (const d of this.indicators) d.draw(out);
     this.drawCables(out, time);
-    this.drawSigns(out);
     for (const p of this.puffs) {
       const k = p.age / p.life;
+      if (k >= 1) continue;
       const size = p.size * (1 + k * 2.5);
-      out.push({ mesh: 'sphere', model: mul(translation(p.pos), scaling([size, size * 0.8, size])), color: [0.42, 0.39, 0.35], opacity: 0.75 * (1 - k) * (1 - k), shadow: false });
+      out.push({ mesh: 'sphere', model: mul(translation(p.pos), scaling([size, size * 0.8, size])), color: DUST, opacity: 0.75 * (1 - k) * (1 - k), shadow: false });
     }
     for (const s of this.sparks) {
+      if (s.age >= s.life) continue;
       const tail = sub(s.pos, scale(s.vel, 0.02));
-      out.push({ mesh: 'box', model: segment(tail, s.pos, 0.05), color: [6, 2.2, 0.35], pattern: Pattern.emissive, shadow: false });
+      out.push({ mesh: 'box', model: segment(tail, s.pos, 0.05), color: SPARK, pattern: Pattern.emissive, shadow: false });
     }
   }
 
+  /** Sign plates and the speaker the muzak comes out of. */
   private drawSigns(out: DrawItem[]) {
     const e = CHAMBER_HALF - 0.02, n = -CHAMBER_HALF + 0.02;
     out.push({ mesh: 'box', model: mul(translation([e, 2.45, 4.9]), scaling([0.03, 0.95, 2.6])), color: [0.12, 0.1, 0.08], spec: 0.6 });

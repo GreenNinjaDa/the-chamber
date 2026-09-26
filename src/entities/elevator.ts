@@ -133,9 +133,10 @@ export function drawDoors(out: DrawItem[], open: number) {
 
 /**
  * The top of the car: a yellow steel crosshead from wall to wall with the cable hitch in the
- * middle, a grate of thin bars, and strip lights hanging under it (`light` 0-1 dims them).
+ * middle, a grate of thin bars, and strip lights hanging under it. It never moves, so build it once;
+ * the lights glow `glow` (an emissive colour the caller can change in place to dim them).
  */
-export function drawCarTop(out: DrawItem[], light: number) {
+export function drawCarTop(out: DrawItem[], glow: number[]) {
   const y = WALL_HEIGHT, span = CHAMBER_HALF * 2 + 1.2;
   // I-beam: flanges and web.
   out.push({ mesh: 'box', model: mul(translation([0, y + 0.13, 0]), scaling([span, 0.06, 0.5])), color: BEAM, spec: 0.3 });
@@ -153,7 +154,6 @@ export function drawCarTop(out: DrawItem[], light: number) {
     out.push({ mesh: 'box', model: mul(translation([0, y + 0.02, c]), scaling([CHAMBER_HALF * 2, 0.06, 0.06])), color: GRATE, spec: 0.4 });
   }
   // Strip lights hanging under the grate.
-  const glow = [2.4 * light + 0.03, 2.4 * light + 0.03, 2.2 * light + 0.03];
   for (const x of [-6.8, 6.8]) {
     for (const z of [-6.8, 6.8]) {
       out.push({ mesh: 'box', model: mul(translation([x, y - 0.12, z]), scaling([3.4, 0.08, 0.4])), color: [0.2, 0.2, 0.22] });
