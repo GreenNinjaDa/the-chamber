@@ -36,6 +36,11 @@ export interface DrawItem {
   clip?: { min: Vec3; max: Vec3 };
   /** Set false to keep the item out of the shadow map. */
   shadow?: boolean;
+  /**
+   * See-through-ness, 0-1 (1 = solid, the default). Rendered with alpha-to-coverage (MSAA sample
+   * masking), so it's a fine screen-door rather than true blending, and still casts a shadow.
+   */
+  opacity?: number;
 }
 
 export interface Environment {
@@ -275,7 +280,7 @@ export class Renderer {
       od[o + 32] = d.color[0];
       od[o + 33] = d.color[1];
       od[o + 34] = d.color[2];
-      od[o + 35] = 1;
+      od[o + 35] = d.opacity ?? 1;
       od[o + 36] = d.pattern ?? Pattern.plain;
       od[o + 37] = d.param ?? 0;
       od[o + 38] = d.spec ?? 0.08;

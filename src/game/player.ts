@@ -175,6 +175,8 @@ export class Player {
   hanging = false;
   /** Holding a torch up and ahead in the right hand (the level draws the torch). */
   torchArm = false;
+  /** How solid the player is drawn (1 = solid; less is see-through). */
+  opacity = 1;
   /** Torso fatness for this life only (1 = normal); reset() puts it back. */
   girth = 1;
   /** Multiplies walking / sprinting speed and acceleration, for this life only. */
@@ -207,6 +209,7 @@ export class Player {
     this.up = [0, 1, 0];
     this.hanging = false;
     this.torchArm = false;
+    this.opacity = 1;
   }
 
   /**
@@ -752,6 +755,7 @@ export class Player {
     } else {
       drawBody(out, poseFrames(this.scriptedRoot(), this.pose), this.girth);
     }
+    if (this.opacity < 1) for (let i = start; i < out.length; i++) out[i].opacity = this.opacity;
     // Going through a portal: squeeze everything toward the portal's centre.
     if (this.portalScale < 0.999) {
       const p = this.portalPivot, s = this.portalScale;

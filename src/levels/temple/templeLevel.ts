@@ -132,6 +132,14 @@ const ROCK_CLEAR = 4.5;
 const LUMP_MAX_R = 0.45;
 const ROCK_MASS: [number, number] = [70, 140];
 const DEATH_SCREEN_DELAY = 1.6;
+/**
+ * See-through-ness: boulders when the camera is inside one, and the player from when the first
+ * boulder starts rolling until just before the last jump (over the shaft, on the way back), when
+ * the torch also goes out. 0.3 = 70% transparent.
+ */
+const SEE_THROUGH = 0.3;
+/** The player turns solid (and the torch goes out) this far before the shaft's edge on the way back. */
+const LAST_JUMP_LEAD = 5;
 
 // --- Looks ---------------------------------------------------------------------------------------
 const STONE_FLOOR = [0.3, 0.25, 0.19];
@@ -220,6 +228,10 @@ export class TempleLevel implements Level {
   /** Seconds since the player reached the end (-1: not yet). */
   private sinceEnd = -1;
   private boulders: Body[] = [];
+  private boulderOpacity: number[] = [];
+  /** The player is see-through (see SEE_THROUGH) while this is 'on'; it only happens once. */
+  private ghost: 'before' | 'on' | 'done' = 'before';
+  private torchOut = false;
   /** Boulders parked (kinematic) at a position until they're let go. */
   private parked: (Vec3 | null)[] = [];
   private chasing: Body | null = null;
@@ -259,7 +271,7 @@ export class TempleLevel implements Level {
 
     // Boulder 1 waits at the top of the shaft; boulder 2 behind the dead-end wall.
     this.parked = [[0, H + SHAFT_DEPTH - BOULDER_R - 0.3, LAND_Z], [0, BOULDER_R, BOULDER2_Z]];
-    this.boulders = this.parked.map((p) => this.makeBoulder(p!));
+    this.boulders = this.parked.map((p, i) => this.makeBoulder(p!, i));
     for (const b of this.boulders) b.rb.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
     this.placeParked();
 
@@ -469,13 +481,21 @@ export class TempleLevel implements Level {
     }
   }
 
-  private makeBoulder(pos: Vec3): Body {
+  private makeBoulder(pos: Vec3, i: number): Body {
+    const rock = boulderModel(BOULDER_R, BOULDER_COLOR);
+    this.boulderOpacity[i] = 1;
     const body = this.ctx.physics.addBall(pos, BOULDER_R, {
       mass: 3000,
       friction: 1,
       restitution: 0.05,
       grabbable: false,
-      model: boulderModel(BOULDER_R, BOULDER_COLOR),
+      // See-through while the camera is inside it.
+      model: (out, m) => {
+        const start = out.length;
+        rock(out, m);
+        const opacity = this.boulderOpacity[i];
+        if (opacity < 1) for (let k = start; k < out.length; k++) out[k].opacity = opacity;
+      },
     });
     body.collider.setCollisionGroups(GROUPS_BOULDER);
     body.rb.setAngularDamping(0);
@@ -589,6 +609,7 @@ export class TempleLevel implements Level {
     this.checkSpikes(dt);
     this.checkDeaths();
     this.checkExit(dt);
+    this.updateSeeThrough(me);
     this.updateTorch();
 
     const death = this.death;
@@ -823,10 +844,28 @@ export class TempleLevel implements Level {
     return basis(x, y, z, hand);
   }
 
+  /** Boulders go see-through with the camera inside them; the player for most of the chase. */
+  private updateSeeThrough(me: Vec3) {
+    const cam = this.ctx.camera.pos;
+    this.boulders.forEach((b, i) => {
+      const c = b.rb.translation();
+      this.boulderOpacity[i] = length(sub(cam, [c.x, c.y, c.z])) < BOULDER_R + 0.15 ? SEE_THROUGH : 1;
+    });
+    // From the moment the first boulder starts rolling at you...
+    if (this.ghost === 'before' && this.stage === 'chase' && this.chaseDelay <= 0) this.ghost = 'on';
+    // ...until you're about to make the last jump, over the shaft: then you're solid again, and
+    // the torch goes out, leaving the portal glowing in the dark.
+    if (this.ghost === 'on' && this.flipped && me[2] < SHAFT[1] + LAST_JUMP_LEAD) {
+      this.ghost = 'done';
+      this.torchOut = true;
+    }
+    this.ctx.player.opacity = this.ghost === 'on' ? SEE_THROUGH : 1;
+  }
+
   private updateTorch() {
     const light = this.env.pointLight!;
     const f = this.torchFrame();
-    if (!f) {
+    if (!f || this.torchOut) {
       light.range = 0;
       return;
     }
@@ -896,8 +935,10 @@ export class TempleLevel implements Level {
     const f = this.torchFrame();
     if (!f) return;
     // Shaft through the fist (a little below it, most above), a wrapped head, and the flame.
-    out.push({ mesh: 'cylinder', model: mul(f, translation([0, 0.12, 0]), scaling([0.03, 0.62, 0.03])), color: [0.3, 0.18, 0.08] });
-    out.push({ mesh: 'cylinder', model: mul(f, translation([0, 0.4, 0]), scaling([0.05, 0.12, 0.05])), color: [0.12, 0.08, 0.05] });
+    const opacity = this.ctx.player.opacity;
+    out.push({ mesh: 'cylinder', model: mul(f, translation([0, 0.12, 0]), scaling([0.03, 0.62, 0.03])), color: [0.3, 0.18, 0.08], opacity });
+    out.push({ mesh: 'cylinder', model: mul(f, translation([0, 0.4, 0]), scaling([0.05, 0.12, 0.05])), color: this.torchOut ? [0.04, 0.03, 0.03] : [0.12, 0.08, 0.05], opacity });
+    if (this.torchOut) return;
     const flicker = 1 + Math.sin(time * 23) * 0.15 + Math.sin(time * 41) * 0.1;
     out.push({ mesh: 'cone', model: mul(f, translation([0, 0.55, 0]), scaling([0.07, 0.2 * flicker, 0.07])), color: [6, 2.6, 0.5], pattern: Pattern.emissive, shadow: false });
     out.push({ mesh: 'sphere', model: mul(f, translation([0, 0.5, 0]), scaling([0.06, 0.08, 0.06])), color: [8, 4.5, 1.2], pattern: Pattern.emissive, shadow: false });

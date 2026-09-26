@@ -235,7 +235,7 @@ fn fs(in: VsOut) -> @location(0) vec4f {
   }
   if (pattern == PAT_EMISSIVE) {
     // Unlit glow (lights, explosion flashes); values above 1 bloom into white through the tonemap.
-    return vec4f(tonemap(obj.color.rgb), 1.0);
+    return vec4f(tonemap(obj.color.rgb), obj.color.a);
   }
   if (pattern == PAT_BLOB) {
     // Soft disk (alpha-to-coverage): contact shadows and scorch marks. Decals are clipped to
@@ -298,5 +298,5 @@ fn fs(in: VsOut) -> @location(0) vec4f {
   let dist = length(camPos - in.worldPos);
   let fog = 1.0 - exp(-dist * frame.fogColor.w);
   col = mix(col, frame.fogColor.rgb, fog);
-  return vec4f(tonemap(col), 1.0);
+  return vec4f(tonemap(col), obj.color.a); // a < 1: see-through (alpha-to-coverage)
 }

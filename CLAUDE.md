@@ -82,7 +82,9 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   and spikes; the new boulder chases, the first rolls off from rest and drops into its shaft (12 m deep, so both
   boulders fit with room to spare), crossed on a second vine to the portal. Vines are physical ropes: hold E or left
   mouse near one to hang on at that length (`player.hanging` for the pose); let go to fly on; each snaps after one
-  use. Boulders kill on contact with a small push. The map is one fixed body (not kinematic: Rapier's character
+  use. Boulders kill on contact with a small push. Boulders go 70% see-through with the camera inside them, and so
+  does the player from when the first boulder starts rolling until 5 m before the last jump (over the shaft), when the
+  torch also goes out. The map is one fixed body (not kinematic: Rapier's character
   controller won't climb slopes on kinematic colliders).
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
@@ -157,6 +159,8 @@ Shared mechanics available to levels (via `ctx`):
 - `player.setGravity(rotation)` turns the player's gravity (from their frame, up = +y, to the world): movement,
   jumping, the capsule, the ragdoll's pose and the camera's up all follow; they pivot about their middle. Turn the
   physics world's gravity to match with `physics.setGravityDirection(down)`. `player.up` is their current up.
+- `DrawItem.opacity` (0-1) and `player.opacity` draw things see-through (alpha-to-coverage screen-door, still
+  casting shadows).
 - `player.torchArm` raises the right arm up and ahead as if holding a torch (the level draws the torch).
 - `player.resume(velocity)` puts the player back in normal control after a scripted mode; `player.partFrames()`
   gives each body part's frame (e.g. to put a torch in the right hand, `foreArmR`).
