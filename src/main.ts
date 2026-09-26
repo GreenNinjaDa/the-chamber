@@ -30,6 +30,7 @@ import { LaserLevel } from './levels/lasers/laserLevel';
 import { GnomeLevel } from './levels/gnomes/gnomeLevel';
 import { SnakeLevel } from './levels/snake/snakeLevel';
 import { PacmanLevel } from './levels/pacman/pacmanLevel';
+import { BowlingLevel } from './levels/bowling/bowlingLevel';
 import type { Level, LevelContext, TrackedTarget, WorldLabel } from './levels/level';
 import { LobbyLevel } from './levels/lobby/lobbyLevel';
 
@@ -59,6 +60,7 @@ const LEVELS: ((ctx: LevelContext) => Level)[] = [
   (ctx) => new PacmanLevel(ctx),
   (ctx) => new MicrowaveLevel(ctx),
   (ctx) => new ClawLevel(ctx),
+  (ctx) => new BowlingLevel(ctx),
 ];
 const params = new URLSearchParams(location.search);
 /** `?sandbox` opens the mechanics test room; `?level=N` skips the lobby and starts at level N. */

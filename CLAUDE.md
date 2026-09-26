@@ -223,6 +223,20 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   (landing speed; ~3 m just knocks you down). Grabbed without holding on, you always slip at the jiggle. Out of
   credits, the lights go out and every alien turns to stare at you, eyes glowing. The aliens chant ("Ooooh...
   the claaaw!") as world labels.
+- **Level 6 — Bowling** (`src/levels/bowling/`; map in `lane.ts`): its own map (`none`), with the chamber's footprint so
+  the camera keeps its usual chamber confinement: a honey-wood lane
+  (boards, arrows, dots, pin spots), sunken gutters (2.7 m wide, 0.7 m deep) along the east and west walls, a dark pit
+  across the north end, a scoreboard on the north wall (and a small one over the hatch) with sarcastic verdicts
+  ("STRIKE! (NOT YOU)", "7-10 SPLIT", "MARK IT ZERO", "TURKEY!"...). You arrive among ten 2 m pins (27 kg): you're the
+  eleventh. A launcher behind a hatch in the south wall fires 1.25 m kinematic balls at you (contact kills, violence
+  20; pins fly for real and can knock you over): 1) straight at where you were, 2) a hook down a line 4 m to the
+  side that curves at you from 11 m out (run away from the curve), 3) two at once that close in either side of you
+  (stand dead centre), 4) a 6 m giant dropped from the sky that steers at you (only a gutter is safe; it pops and
+  flies off like a balloon at the back wall). Lane balls never enter gutters, but whoever is in a gutter when a
+  ball is fired gets a gutter ball down it. After each frame a hazard-striped sweep bar drops in front of the deck
+  and pushes everything into the pit (jump it; swept = "CLEARED"), then ten pins come down on strings onto their
+  spots (standing on one = "PINNED"). After the giant, the last ball is fired 0.8 s after the exit (east wall, in
+  the gutter halfway down the lane) opens, and more keep coming until you leave.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -262,7 +276,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   `BodySlicer` to test beams against the player's body parts, `LaserPylon`), `gnome.ts` (big garden gnome:
   `spawnGnome(physics, feet, look)`, arm poses in `GNOME_POSES`, glowing eyes, and `drawGnomeHat(out, headFrame)` for
   anyone else's head), `snake.ts` (grid snake: movement, AI, colliders, model), `pixelText.ts` (5x7
-  dot-matrix text built from blocks), `apple.ts`, `ghost.ts` (arcade ghost: `drawGhost`, normal / scared / flashing / eyes only), `plush.ts` (plush toys: `spawnPlush(physics, 'alien', pos, look)`), `claw.ts` (claw-machine claw and gantry: `driveTo`, hub height `y`, prong `angle`, `distanceTo` for grabbing it). Put new
+  dot-matrix text built from blocks), `apple.ts`, `ghost.ts` (arcade ghost: `drawGhost`, normal / scared / flashing / eyes only), `plush.ts` (plush toys: `spawnPlush(physics, 'alien', pos, look)`), `claw.ts` (claw-machine claw and gantry: `driveTo`, hub height `y`, prong `angle`, `distanceTo` for grabbing it), `bowling.ts` (2 m bowling pins: `spawnPin`, `pinSpots`, `uprightness`; `drawBowlingBall` with finger holes). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`

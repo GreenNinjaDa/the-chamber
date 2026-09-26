@@ -195,7 +195,7 @@ const pick = <T>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
 export class ClawLevel implements Level {
-  readonly number = 6;
+  readonly number: number;
   readonly title = 'The Claw';
   status: LevelStatus = 'playing';
   private arrival: PortalArrival;
@@ -253,6 +253,7 @@ export class ClawLevel implements Level {
   private statusShown = -1;
 
   constructor(private ctx: LevelContext) {
+    this.number = ctx.number;
     const { physics, hud, camera, player } = ctx;
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);
