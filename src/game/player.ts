@@ -715,17 +715,19 @@ export class Player {
         // Ducking: looking down while standing still (no movement keys at all) also bends the knees.
         const crouch = this.moveInput ? 0 : AIM_MAX_CROUCH * clamp(-this.aimBend / AIM_MAX_BEND, 0, 1) * (1 - a);
         const legs = crouchLegs(crouch);
+        // Crouching also bends the arms a little, bringing the hands up in front.
+        const tuck = crouch / AIM_MAX_CROUCH;
         return {
           crouch,
           lean: -0.12 * a + this.aimBend,
           twist: this.aimTwist,
           // Keep the head following the view rather than the bent-over chest.
           headPitch: clamp(this.aimPitch * 0.6 - this.aimBend, -0.5, 0.6) + 0.1 * a,
-          shoulderL: s * 0.55 * a,
-          shoulderR: -s * 0.55 * a,
+          shoulderL: s * 0.55 * a + 0.25 * tuck,
+          shoulderR: -s * 0.55 * a + 0.25 * tuck,
           armOut: 0.08,
-          elbowL: 0.2 + 0.45 * a,
-          elbowR: 0.2 + 0.45 * a,
+          elbowL: 0.2 + 0.45 * a + 0.6 * tuck,
+          elbowR: 0.2 + 0.45 * a + 0.6 * tuck,
           hipL: -s * 0.6 * a + legs.hip,
           hipR: s * 0.6 * a + legs.hip,
           kneeL: -0.05 - (0.1 + 1.0 * Math.max(0, -c)) * a + legs.knee,
