@@ -32,6 +32,8 @@ const CAPSULE_HALF = 0.55; // + radius = 0.9 = half the player's height
 const WALK_SPEED = 5;
 const SPRINT_SPEED = 8.5;
 const JUMP_SPEED = 7.5;
+/** A jump pressed this long before you can jump (still in the air, getting up...) happens as soon as you can. */
+const JUMP_BUFFER = 0.1;
 const GRAVITY = 22;
 /** How quickly the player reaches their target speed on the ground / in the air (higher = snappier). */
 const GROUND_ACCEL = 8;
@@ -131,6 +133,8 @@ export class Player {
   gettingUp = false;
   private getUpTime = 0;
   private knockGrace = 0;
+  /** Seconds left on a buffered jump press. */
+  private jumpBuffer = 0;
   private physics: Physics | null = null;
   private controller: RAPIER.KinematicCharacterController | null = null;
   private walk = 0;
@@ -184,6 +188,7 @@ export class Player {
     this.stun = 0;
     this.gettingUp = false;
     this.knockGrace = 0;
+    this.jumpBuffer = 0;
     this.pose = REST_POSE;
     this.portalScale = this.portalFrom = this.portalTo = 1;
     this.portalTime = 0;
@@ -325,9 +330,11 @@ export class Player {
     this.vel[0] += (mx * speed - this.vel[0]) * k;
     this.vel[2] += (mz * speed - this.vel[2]) * k;
 
-    if (this.onGround && !stunned && !this.gettingUp && input.wasPressed('Space')) {
+    this.jumpBuffer = input.wasPressed('Space') ? JUMP_BUFFER : Math.max(0, this.jumpBuffer - dt);
+    if (this.onGround && !stunned && !this.gettingUp && this.jumpBuffer > 0) {
       this.vel[1] = JUMP_SPEED;
       this.onGround = false;
+      this.jumpBuffer = 0;
     }
     this.vel[1] -= GRAVITY * dt;
 

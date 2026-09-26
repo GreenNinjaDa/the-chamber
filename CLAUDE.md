@@ -145,6 +145,8 @@ Shared mechanics available to levels (via `ctx`):
   Hits do this automatically (thresholds at the top of player.ts): the head needs 6 m/s and 40 kg·m/s, the rest
   of the body 1.5× the speed and 5× the momentum. Loose objects count with their mass, walls/bars/scripted
   things as 50 kg, nothing heavier than 50 kg. Only head, chest and pelvis count against non-physics things.
+- Jumps are buffered: pressing Space up to 0.1 s before the player can jump (`JUMP_BUFFER` in player.ts) jumps as soon
+  as they can.
 - The player's movement capsule is wider than the body and never pushes things itself: walking pushes loose
   objects by hand (heavier = slower), and flying objects pass through the capsule to hit the real body.
 - The upper body aims at the camera: the torso twists toward where you look and looking down bends you over
