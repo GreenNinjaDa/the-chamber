@@ -148,6 +148,22 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   walls, rafts included, which don't stop for you (`player.platformVel` carries you). Cars, carts, forklifts and the
   steamroller kill (ROADKILL, PANCAKED); vacuums and chairs just knock you over (jump them); the goo dissolves you.
   The strip along each lane line is clear of everything but the steamroller.
+- **Level 6 — Snake** (`src/levels/snake/`): you are the apple. After the arrival the floor boots up row by row
+  into an old phone LCD (pale olive, 16 x 16 grid of 1.5 m cells), "NOKLA — Connecting people." appears on the north
+  wall, a panel there slides open and the phone-game snake (`entities/snake.ts`) comes out: dark pixel blocks 1.35 m
+  wide and 1.6 m tall (too tall to jump), each a static collider moved one cell per step (60 ms slide), head with
+  cube eyes (pupils follow its target) and a flicking forked tongue. Starts 5 long at 0.32 s/step, speeds up to
+  0.2 s over 80 s (always slower than sprinting), grows one block every 7 steps. AI: greedy toward the target cell
+  (Manhattan, prefers straight on; you with a 0.25 s lead, or the apple if that's nearer), never reverses, never steps
+  into a wall or itself (the leaving tail cell is free), 10% blunders; it looks ahead for dead ends (time-aware flood
+  fill, pockets under 10 cells) always for its first 20 s, then 70% of steps, but only 10% with its target within
+  4 cells (tunnel vision: lure it close to make it coil; test bots circling it at ~5 m crash it about half the time,
+  after ~30-45 s). No safe move = crash: lurch, the classic blink, blocks pop away from the head in pixel crumbs,
+  pixel-block "GAME OVER" (`entities/pixelText.ts`) plus a quip on the north wall, exit opens. An apple
+  (`entities/apple.ts`, 1 kg, carry / throw it as a decoy; `?noApple` leaves it out) pops up on a free cell; eaten = +3 blocks, a new one 3 s
+  later. Caught (it enters your cell, you're right in front of its mouth, or its head pushes into you) = swallowed
+  whole (shrink into its mouth, gulp, +3 blocks, a bulge runs down to the tail), then GAME OVER with the snake's
+  length as SCORE. The score also shows in pixel digits on the north wall.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -186,7 +202,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   `laser.ts` (`drawBeam` / `drawBeamDot` / `drawFloorGlow`,
   `BodySlicer` to test beams against the player's body parts, `LaserPylon`), `gnome.ts` (big garden gnome:
   `spawnGnome(physics, feet, look)`, arm poses in `GNOME_POSES`, glowing eyes, and `drawGnomeHat(out, headFrame)` for
-  anyone else's head). Put new
+  anyone else's head), `snake.ts` (grid snake: movement, AI, colliders, model), `pixelText.ts` (5x7
+  dot-matrix text built from blocks), `apple.ts`. Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
