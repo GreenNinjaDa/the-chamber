@@ -571,6 +571,14 @@ export class MolesLevel implements Level {
     if (pop.holding) {
       this.stash++;
       noise(0.08, { freq: 900, to: 300, vol: 0.2 });
+      // The count, once you're safely back down (not while you need to see the mallet).
+      const quips = [
+        'Eh... what’s up, doc?',
+        'Crunchy. Nutritious. Stolen.',
+        'Timmy is starting to suspect something.',
+        'One more and it’s a balanced diet.',
+      ];
+      if (this.collected < CARROTS_NEEDED) this.ctx.hud.show(`${this.collected} / ${CARROTS_NEEDED}`, quips[Math.min(quips.length - 1, this.collected - 1)], 1.6);
     }
     this.pop = null;
   }
@@ -588,18 +596,11 @@ export class MolesLevel implements Level {
     const fan = this.moles.find((n) => n.m.pos[1] < 0.5 && n.state !== 'dazed');
     if (fan && this.collected < CARROTS_NEEDED) this.moleSay(fan, pick(['Nice one!', 'Share it!', 'Legend.', 'Mole of the year!', 'Do another!']), 1.4);
     const { hud } = this.ctx;
-    const quips = [
-      'Eh... what’s up, doc?',
-      'Crunchy. Nutritious. Stolen.',
-      'Timmy is starting to suspect something.',
-      'One more and it’s a balanced diet.',
-    ];
     if (this.collected >= CARROTS_NEEDED) {
       hud.show('TILT!', 'The machine has detected an unauthorised mole.', 2.4);
       this.win();
     } else {
       if (!this.death) this.timmySay(this.collected === 1 ? 'HEY! MY CARROT!' : pick(['THIEF!', 'MOM! A MOLE TOOK A CARROT!', 'HEY!!', 'GIVE IT BACK!']), 1.8);
-      hud.show(`${this.collected} / ${CARROTS_NEEDED}`, quips[Math.min(quips.length - 1, this.collected - 1)], 1.4);
       if (this.collected + this.carrots.length < CARROTS_NEEDED) this.carrotRespawn = 1.1;
     }
   }
@@ -718,7 +719,10 @@ export class MolesLevel implements Level {
           m.yaw = turnTo(m.yaw, Math.sin(m.time * 0.7 + i) * 2, dt * 2);
           if (n.t >= n.dur && this.phase !== 'ready') {
             const playerNear = Math.hypot(player.pos[0] - hc[0], player.pos[2] - hc[2]) < 1.0 && player.pos[1] < 1;
-            if (playerNear || this.pop?.hole === n.hole) this.moleGoSomewhere(n, i);
+            const ms = this.ms;
+            const malletHere = ms.hole === n.hole && ms.state !== 'idle' && ms.state !== 'rest' && ms.state !== 'away';
+            if (malletHere) n.dur = n.t + 0.4; // not daft enough to pop up into it
+            else if (playerNear || this.pop?.hole === n.hole) this.moleGoSomewhere(n, i);
             else {
               n.state = 'rise';
               n.t = 0;

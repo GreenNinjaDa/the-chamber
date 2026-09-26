@@ -169,11 +169,15 @@ export class Cabinet {
     const r = rng(7);
     // Dirt floor and dirt-faced walls up to the deck.
     s.push({ mesh: 'box', model: mul(translation([0, 0.0, 0]), scaling([H * 2, 0.06, H * 2])), color: DIRT, pattern: Pattern.rock, param: 14 });
-    const wall = (pos: Vec3, size: Vec3) => s.push({ mesh: 'box', model: mul(translation(pos), scaling(size)), color: WALL_DIRT, pattern: Pattern.rock, param: 9 });
-    wall([0, UNDER / 2, -H + 0.03], [H * 2, UNDER, 0.06]);
-    wall([0, UNDER / 2, H - 0.03], [H * 2, UNDER, 0.06]);
-    wall([-H + 0.03, UNDER / 2, 0], [0.06, UNDER, H * 2]);
-    wall([H - 0.03, UNDER / 2, 0], [0.06, UNDER, H * 2]);
+    // (In 3 m panels: the rock pattern is in each box's own space, so one long box would smear it.)
+    const wall = (pos: Vec3, size: Vec3) => s.push({ mesh: 'box', model: mul(translation(pos), scaling(size)), color: WALL_DIRT, pattern: Pattern.rock, param: 1.2 });
+    for (let k = 0; k < 8; k++) {
+      const c = -H + 1.5 + k * 3;
+      wall([c, UNDER / 2, -H + 0.03], [3, UNDER, 0.06]);
+      wall([c, UNDER / 2, H - 0.03], [3, UNDER, 0.06]);
+      wall([-H + 0.03, UNDER / 2, c], [0.06, UNDER, 3]);
+      wall([H - 0.03, UNDER / 2, c], [0.06, UNDER, 3]);
+    }
     // Pit props with a beam under the deck.
     for (const [x, z] of POSTS) {
       s.push({ mesh: 'cylinder', model: mul(translation([x, UNDER / 2, z]), scaling([POST_R, UNDER, POST_R])), color: WOOD, spec: 0.1 });
