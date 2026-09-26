@@ -100,6 +100,7 @@ export class ButtonLevel implements Level {
   private main: RedButton;
   private plates: PressurePlate[] = [];
   private plateSigns: WorldLabel[] = [];
+  private plateArming: (() => void)[] = [];
   private t = -1;
   private death: Death | null = null;
   private labelList: WorldLabel[] = [];
@@ -188,6 +189,7 @@ export class ButtonLevel implements Level {
     this.exit.update(dt, player);
     if (this.exit.entered && this.status === 'playing') this.status = 'exited';
     for (const p of this.plates) p.update(dt);
+    for (const arm of this.plateArming) arm();
     if (this.arrival.done && this.t < 0) this.t = 0;
     if (this.t >= 0) this.t += dt;
     this.updateFate(dt);
@@ -221,9 +223,16 @@ export class ButtonLevel implements Level {
     // DO NOT STEP plates appear across the way to the exit.
     if (t > EXIT_AT - 8 && !this.plates.length) {
       for (const z of [-1.7, 0, 1.7]) {
-        this.plates.push(new PressurePlate(this.ctx.physics, [10.2, 0, EXIT_Z + z], [], player, (down) => {
-          if (down) this.doom('YOU STEPPED ON IT', pick<Fate>(['glove', 'anvil', 'trapdoor']));
-        }, { radius: 0.75 }));
+        // A plate that comes up under you only counts once you've stepped off it.
+        let armed = false;
+        const plate = new PressurePlate(this.ctx.physics, [10.2, 0, EXIT_Z + z], [], player, (down) => {
+          if (down && armed) this.doom('YOU STEPPED ON IT', pick<Fate>(['glove', 'anvil', 'trapdoor']));
+          if (!down) armed = true;
+        }, { radius: 0.75 });
+        this.plates.push(plate);
+        this.plateArming.push(() => {
+          if (!plate.pressed) armed = true;
+        });
         const sign: WorldLabel = { pos: [10.2, 0.8, EXIT_Z + z], text: 'DO NOT STEP', size: 0.2, color: '#ffd166' };
         this.plateSigns.push(sign);
         this.labelList.push(sign);
