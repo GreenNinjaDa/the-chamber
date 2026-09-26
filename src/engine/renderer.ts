@@ -24,6 +24,8 @@ export const Pattern = {
   portal: 7,
   lava: 8,
   rock: 9,
+  /** Wood grain round the object's longest axis (end grain darker); `param` is a per-piece seed. */
+  wood: 10,
 } as const;
 
 export interface DrawItem {

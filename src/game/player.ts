@@ -290,6 +290,24 @@ export class Player {
     return transformDir(this.gravity, v);
   }
 
+  /**
+   * Moves the player by `delta` along with something they're standing on that the level moves
+   * itself (a lift, a rising tower): the feet, the capsule and the physical body all come along,
+   * rather than the body being left behind to be dragged through the floor.
+   */
+  carry(delta: Vec3) {
+    this.pos = add(this.pos, delta);
+    this.driveFeet = add(this.driveFeet, delta);
+    const body = this.body;
+    if (body && body.isEnabled && this.mode === 'control') {
+      for (const name of PART_NAMES) {
+        const t = body.parts[name].translation();
+        body.parts[name].setTranslation({ x: t.x + delta[0], y: t.y + delta[1], z: t.z + delta[2] }, true);
+      }
+    }
+    this.syncCollider();
+  }
+
   /** Forgets a buffered jump press (e.g. a Space the level used for something else, like climbing). */
   cancelJump() {
     this.jumpBuffer = 0;
