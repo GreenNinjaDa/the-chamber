@@ -533,6 +533,8 @@ export class TamagotchiLevel implements Level {
     const foodOut = this.foods.filter((f) => f.eaten < 0).length;
     // Even Timmy notices a starving pet, or a miserable one.
     if (this.hunger <= 2.0 && foodOut === 0 && fits('feed')) return 'feed';
+    const drain = HUNGER_DRAIN * (1 + DRAIN_RAMP * clamp(this.lifeT / LIFE, 0, 1)) * (this.sick ? SICK_DRAIN : 1);
+    if (foodOut === 0 && fits('feed') && this.hunger - drain * (KIND_TIME.play + 8) < 0.6) return 'feed';
     if (this.happy <= 1.6 && this.lastKind !== 'play' && fits('play')) return 'play';
     if (this.sick && this.sickT > 2 && fits('med')) return 'med';
     if (this.poops.some((p) => !p.gone && !p.carried && p.age > this.flushDelay) && fits('flush')) return 'flush';
@@ -587,7 +589,8 @@ export class TamagotchiLevel implements Level {
         const toggles = (snack ? 1 : 0) + (dither ? 2 : 0);
         for (let i = 0; i < toggles; i++) {
           this.later(d, () => {
-            this.press(0);
+            this.buttonT[0] = 0;
+            sound.a();
             if (this.foodMenu) this.foodMenu.choice = 1 - this.foodMenu.choice;
           });
           d += rand(0.35, 0.5);
@@ -608,7 +611,7 @@ export class TamagotchiLevel implements Level {
       case 'flush': {
         const p = this.ctx.player.pos[0];
         // From the wall further from you, mostly (more time to see it coming).
-        const far = p > 0 ? -1 : 1;
+        const far = p > 0 ? 1 : -1;
         this.wave = { dir: Math.random() < 0.7 ? far : -far, t: 0, x: 0, phase: 'build' };
         this.wave.x = -this.wave.dir * (CHAMBER_HALF - 0.4);
         sound.gurgle();
@@ -1059,7 +1062,6 @@ export class TamagotchiLevel implements Level {
           sfx.thud(0.3);
           const aim = add(player.pos, scale([player.vel[0], 0, player.vel[2]], LETTER_LEAD));
           l.dir = normalize([aim[0] - l.pos[0], 0, aim[2] - l.pos[2]]);
-          if (l.dir[2] < 0.25) l.dir = normalize([l.dir[0], 0, 0.25]);
         }
         continue;
       }
@@ -1279,7 +1281,7 @@ export class TamagotchiLevel implements Level {
       const ramp = 1 + DRAIN_RAMP * clamp(this.lifeT / LIFE, 0, 1);
       const sickK = this.sick ? SICK_DRAIN : 1;
       const asleep = this.night?.asleep ?? false;
-      this.hunger -= HUNGER_DRAIN * ramp * sickK * dt;
+      if (!asleep) this.hunger -= HUNGER_DRAIN * ramp * sickK * dt;
       if (!asleep) this.happy -= HAPPY_DRAIN * ramp * sickK * dt;
       if (this.sick) this.sickT += dt;
       if (this.hunger <= 0 && this.alive()) {
@@ -1810,7 +1812,7 @@ export class TamagotchiLevel implements Level {
 
   private drawPlayerExtras(out: DrawItem[], time: number) {
     const { player } = this.ctx;
-    if (player.mode === 'hidden') return;
+    if (player.mode === 'hidden' || player.inPortal) return;
     // Sick: a little green skull over your head.
     if (this.sick && !this.death) {
       const { right, normal } = this.billboard();
