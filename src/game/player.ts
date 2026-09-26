@@ -90,6 +90,12 @@ const RECOVER_TIME = 1;
  */
 const GETUP_SPEED = 1.6;
 const GETUP_SPIN = 4;
+/**
+ * The rest of the time body parts still can't correct faster than this (m/s, rad/s) on top of
+ * the character's own motion, so nothing ever snaps back into pose.
+ */
+const CATCH_UP_SPEED = 3;
+const CATCH_UP_SPIN = 8;
 /** You can move while getting up, at this fraction of your normal speed (no jumping). */
 const GETUP_MOVE_SCALE = 0.2;
 /** Getting up is done once the pelvis is back within this distance (m) of where it belongs. */
@@ -148,6 +154,8 @@ export class Player {
   private aimBend = 0;
   private aimPitch = 0;
   private moveAmount = 0;
+  /** Any movement keys held this frame. */
+  private moveInput = false;
   private time = 0;
   private pose: Pose = REST_POSE;
   // The pelvis target advances smoothly through the physics substeps of each frame.
@@ -335,6 +343,7 @@ export class Player {
     }
     const len = Math.hypot(mx, mz);
     if (len > 0) { mx /= len; mz /= len; }
+    this.moveInput = len > 0;
 
     const sprint = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
     const speed = (sprint ? SPRINT_SPEED : WALK_SPEED) * (this.gettingUp ? GETUP_MOVE_SCALE : 1) * this.speedScale;
@@ -467,8 +476,8 @@ export class Player {
     // through an obstacle doesn't register as a fast impact.
     this.recordIncoming();
     body.strength = MUSCLE_STRENGTH;
-    body.catchUpSpeed = this.gettingUp ? GETUP_SPEED : Infinity;
-    body.catchUpSpin = this.gettingUp ? GETUP_SPIN : Infinity;
+    body.catchUpSpeed = this.gettingUp ? GETUP_SPEED : CATCH_UP_SPEED;
+    body.catchUpSpin = this.gettingUp ? GETUP_SPIN : CATCH_UP_SPIN;
     // Limbs collide with each other only while the body is limp (dead or knocked loose).
     body.setSelfCollision(this.mode === 'ragdoll' || body.muscle < 0.3);
     if (this.mode === 'ragdoll') {
@@ -703,8 +712,8 @@ export class Player {
           };
         }
         const a = this.moveAmount, s = Math.sin(this.walk), c = Math.cos(this.walk);
-        // Ducking: looking down while standing still also bends the knees.
-        const crouch = AIM_MAX_CROUCH * clamp(-this.aimBend / AIM_MAX_BEND, 0, 1) * (1 - a);
+        // Ducking: looking down while standing still (no movement keys at all) also bends the knees.
+        const crouch = this.moveInput ? 0 : AIM_MAX_CROUCH * clamp(-this.aimBend / AIM_MAX_BEND, 0, 1) * (1 - a);
         const legs = crouchLegs(crouch);
         return {
           crouch,
