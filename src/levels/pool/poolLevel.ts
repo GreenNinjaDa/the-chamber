@@ -280,7 +280,7 @@ interface Death {
 
 type CursorTask =
   | 'hidden' | 'intro' | 'fetch' | 'ladder-bring' | 'ladder-hover' | 'ladder-grab' | 'ladder-lift'
-  | 'decor-up' | 'decor-bring' | 'decor-away' | 'idle' | 'door' | 'leave';
+  | 'decor-up' | 'decor-bring' | 'decor-away' | 'idle' | 'panel' | 'door' | 'leave';
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const pick = <T>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
@@ -1006,11 +1006,40 @@ export class PoolLevel implements Level {
         break;
       case 'idle': {
         if (!cursor.arrived) break;
+        // Getting low on energy? The cursor goes and taps the gauge.
+        if (this.swimming && this.energy < 0.42 && !this.death && this.decor.length === 0 && this.once('tapPanel')) {
+          this.task = 'panel';
+          this.taskT = 0;
+          cursor.flyTo(add(this.panelTap(), [0, 0.5, 0.35]), 1.4, 1);
+          break;
+        }
         // Circling over the pool, watching.
         this.idleAngle += dt * 0.35;
         const p = player.pos;
         const around: Vec3 = [clamp(p[0] + Math.cos(this.idleAngle) * 6.5, -X_HALF, X_HALF), 3.4 + Math.sin(this.time * 0.8) * 0.4, clamp(p[2] + Math.sin(this.idleAngle) * 6.5, -Z_HALF, Z_HALF)];
         cursor.follow(around, dt, 0.8);
+        break;
+      }
+      case 'panel': {
+        // Tap, tap. Hm.
+        if (!cursor.arrived && this.taskT < 1.5) break;
+        const tt = this.taskT - 1.4;
+        const at = this.panelTap();
+        cursor.tip = add(at, [0, 0.5 - 0.45 * Math.max(0, Math.sin(Math.max(0, tt) * Math.PI * 4)) * (tt < 0.5 ? 1 : 0), 0.35]);
+        if (this.once('tap1', tt > 0.1)) SOUND.click();
+        if (this.once('tap2', tt > 0.35)) {
+          SOUND.click();
+          this.say('*tap tap*', add(at, [0.8, 0.9, 0.3]), 0.36, '#ffffff', 1.4, [0, 0.3, 0]);
+        }
+        if (this.once('tapHm', tt > 1.1)) {
+          SOUND.hmm();
+          this.say('Hm. Still going down.', add(at, [0.8, 1.5, 0.3]), 0.36, '#ffffff', 2.2, [0, 0.2, 0]);
+        }
+        if (tt > 2.2) {
+          this.task = 'idle';
+          this.taskT = 0;
+          cursor.flyTo(add(player.pos, [4, 5, 4]), 1.6);
+        }
         break;
       }
       case 'door': {
@@ -1044,6 +1073,12 @@ export class PoolLevel implements Level {
         break;
     }
     cursor.update(dt);
+  }
+
+  /** The end of the ENERGY bar on the needs panel (where the cursor taps it). */
+  private panelTap(): Vec3 {
+    const e = this.needs.barEnd(0);
+    return [e[0], e[1] + 0.2, e[2]];
   }
 
   /** Somewhere in the pool, `min`-`max` m from the Sim, not too near a side. */

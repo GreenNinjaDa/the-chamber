@@ -263,6 +263,14 @@ export class NeedsPanel {
     });
   }
 
+  /** Where the fill of need `i`'s bar ends, just in front of the panel. */
+  barEnd(i: number): Vec3 {
+    const barW = this.width * 0.36;
+    const barX = -this.width / 2 + 2.6 + barW / 2;
+    const x = barX - barW / 2 + barW * clamp(this.needs[i].value, 0, 1);
+    return add(add(add(this.centre, scale(this.right, x)), [0, this.rowY(i), 0]), scale(this.normal, 0.2));
+  }
+
   labels(): WorldLabel[] {
     const list = this.labelList;
     list.length = 0;
