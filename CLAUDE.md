@@ -182,6 +182,12 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   along each ball's path) and you're out through a trapdoor. Balls pile up everywhere: carry one, aim, right-click
   to throw it back; a fast ball hitting a turret knocks it over (with a helping shove), and tipped past ~50° it's
   down for good ("I don't blame you."). All four down: the exit opens.
+- **Big Red Button** (`src/levels/button/`): a big red button on a pedestal, DO NOT PRESS. The level is doing nothing
+  for 45 s while it escalates: the sign pleads (PLEASE DO NOT PRESS, IT'S JUST A BUTTON...), the button hums and
+  whispers ("psst", "no one will know"), follows you from 22 s, four more rise out of the floor at 30 s and follow too,
+  and at 37 s three DO NOT STEP plates come up across the way to the exit (jump them). At 45 s the exit opens under a
+  PRESS E TO ENTER sign (pressing E near it is also fatal). Pressing any button or stepping on a plate brings a random
+  fate: an anvil or a piano from the sky, a boxing glove from the nearest wall, the trapdoor, or the self-destruct.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
