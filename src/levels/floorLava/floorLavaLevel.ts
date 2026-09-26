@@ -246,6 +246,7 @@ interface Particle {
 }
 
 const PARTICLES = 220;
+const EMBERS_PER_SECOND = 45;
 const DOWN: Vec3 = [0, -1, 0];
 /** Where the feet rays start around the player's feet (the capsule is 0.35 m in radius). */
 const FEET: [number, number][] = [[0, 0], [0.26, 0], [-0.26, 0], [0, 0.26], [0, -0.26]];
@@ -310,6 +311,8 @@ export class FloorLavaLevel implements Level {
   private tags: (WorldLabel & { ttl: number })[] = [];
   private particles: Particle[] = [];
   private nextParticle = 0;
+  /** Embers owed to the lava floor (fractions carry over between frames). */
+  private emberDue = 0;
   private countShown = -1;
 
   constructor(private ctx: LevelContext) {
@@ -657,7 +660,11 @@ export class FloorLavaLevel implements Level {
         duck.squash = 0.35;
         camera.addShake(0.45);
         this.tag(add(duck.pos, [0, DUCK_BACK + 1.6, 0]), 'SQUEAK.');
-        this.sparks(add(duck.pos, [0, 0.2, 0]), 0);
+        // A ring of dust where it hit the floor.
+        for (let i = 0; i < 12; i++) {
+          const a = (i / 12) * Math.PI * 2;
+          this.puff([duck.pos[0] + Math.cos(a) * DUCK_HALF[0], 0.1, duck.pos[2] + Math.sin(a) * DUCK_HALF[1]], 1, -0.6);
+        }
         this.show('RULE #8', 'EVERYTHING IS LAVA', 'EXCEPT THE DUCK.');
       }
       return;
@@ -878,11 +885,9 @@ export class FloorLavaLevel implements Level {
 
   /** Embers rising off everything that's lava right now. */
   private embers(dt: number) {
-    const lavaFloor = this.floorMolten || this.tide > 0.02;
-    if (lavaFloor) {
-      const n = dt * 38;
-      for (let i = 0; i < n || Math.random() < n - i; i++) {
-        if (i >= n) break;
+    if (this.floorMolten || this.tide > 0.02) {
+      this.emberDue += dt * EMBERS_PER_SECOND;
+      for (; this.emberDue >= 1; this.emberDue--) {
         const x = (Math.random() * 2 - 1) * (CHAMBER_HALF - 0.3), z = (Math.random() * 2 - 1) * (CHAMBER_HALF - 0.3);
         if (!this.floorLavaAt(x, z) && this.tide <= 0.02) continue;
         this.particle([x, Math.max(0.02, this.tide), z], [(Math.random() - 0.5) * 0.3, 0.6 + Math.random() * 1.4, (Math.random() - 0.5) * 0.3], 1.2 + Math.random() * 1.4, 0.02 + Math.random() * 0.035, false);
