@@ -6,7 +6,7 @@ import { GROUPS_BOULDER, GROUPS_BOULDER_BRIDGE, GROUPS_DEBRIS, RAPIER, type Body
 import { Pattern, type DrawItem, type Environment } from '../../engine/renderer';
 import { drawPortal, PORTAL_SQUEEZE_TIME, PortalArrival } from '../../entities/portal';
 import { PressurePlate } from '../../entities/pressurePlate';
-import { boulderModel, chunkModel, STONE_COLORS } from '../../entities/rock';
+import { boulderModel, chunkModel, clusterModel, shardModel, slabModel, STONE_COLORS } from '../../entities/rock';
 import { DEFAULT_ENV, type CameraShot, type Level, type LevelContext, type LevelStatus } from '../level';
 
 /*
@@ -107,11 +107,12 @@ const WALL_SPIKES: [number, number, number][] = [
 ];
 
 /**
- * Loose rocks all along the tunnel: heavy enough that you can barely shove them, but they fall when
- * gravity turns. Boulders roll straight through them.
+ * Loose rocks all along the tunnel, of every shape: heavy enough that you shove them rather than
+ * kick them (walking pushes a 100 kg rock at a fifth of your speed), and they fall when gravity
+ * turns. Boulders roll straight through them.
  */
 const ROCKS = 60;
-const ROCK_MASS = 400;
+const ROCK_MASS: [number, number] = [70, 140];
 const DEATH_SCREEN_DELAY = 1.6;
 
 // --- Looks ---------------------------------------------------------------------------------------
@@ -360,20 +361,40 @@ export class TempleLevel implements Level {
 
   private scatterRocks() {
     const { physics } = this.ctx;
+    const yaw = (i: number) => ({ x: 0, y: Math.sin(i * 1.7), z: 0, w: Math.cos(i * 1.7) });
     for (let i = 0; i < ROCKS; i++) {
       const z = Z_START + 3 + Math.random() * (END_Z - Z_START - 5);
       const x = (Math.random() * 2 - 1) * (W / 2 - 0.5);
-      const s = 0.3 + Math.random() * 0.45;
-      const size: Vec3 = [s * (0.9 + Math.random() * 0.8), s * (0.5 + Math.random() * 0.4), s * (0.8 + Math.random() * 0.7)];
-      const color = STONE_COLORS[Math.floor(Math.random() * STONE_COLORS.length)];
-      const body = physics.addBox([x, size[1] / 2 + 0.02, z], size, {
-        mass: ROCK_MASS,
-        grabbable: false,
-        friction: 1,
-        rotation: { x: 0, y: Math.sin(i), z: 0, w: Math.cos(i) },
-        model: chunkModel(size, color),
-      });
+      const s = 0.25 + Math.random() * 0.5; // overall size
+      const color = STONE_COLORS[Math.floor(Math.random() * STONE_COLORS.length)].map((c) => c * (0.85 + Math.random() * 0.3));
+      const mass = ROCK_MASS[0] + (ROCK_MASS[1] - ROCK_MASS[0]) * clamp((s - 0.25) / 0.5, 0, 1);
+      const opts = { mass, grabbable: false, friction: 1, rotation: yaw(i) };
+      let body: Body;
+      switch (Math.floor(Math.random() * 5)) {
+        case 0: // a chipped lump
+          body = physics.addBall([x, s + 0.02, z], s, { ...opts, model: boulderModel(s, color, 9 + Math.floor(Math.random() * 5)) });
+          break;
+        case 1: { // a flat slab
+          const size: Vec3 = [s * (1.4 + Math.random() * 0.8), s * (0.35 + Math.random() * 0.25), s * (1.1 + Math.random() * 0.7)];
+          body = physics.addBox([x, size[1] / 2 + 0.02, z], size, { ...opts, model: slabModel(size, color) });
+          break;
+        }
+        case 2: { // a pointed shard, lying on its side
+          const r = s * 0.6, h = s * (1.6 + Math.random() * 0.8);
+          const lie = { x: Math.sin(0.8) * Math.cos(i), y: 0, z: Math.sin(0.8) * Math.sin(i), w: Math.cos(0.8) };
+          body = physics.addCone([x, r + 0.05, z], r, h, { ...opts, rotation: lie, model: shardModel(r, h, color) });
+          break;
+        }
+        case 3: // a lumpy cluster
+          body = physics.addBall([x, s + 0.02, z], s, { ...opts, model: clusterModel(s, color) });
+          break;
+        default: { // a knobbly chunk
+          const size: Vec3 = [s * (0.9 + Math.random() * 0.8), s * (0.6 + Math.random() * 0.5), s * (0.8 + Math.random() * 0.7)];
+          body = physics.addBox([x, size[1] / 2 + 0.02, z], size, { ...opts, model: chunkModel(size, color) });
+        }
+      }
       body.collider.setCollisionGroups(GROUPS_DEBRIS);
+      body.rb.setAngularDamping(2); // rough stones don't roll far
     }
   }
 
