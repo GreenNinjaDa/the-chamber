@@ -63,6 +63,8 @@ export class PlinkoLevel implements Level {
   /** 'shelf' (walking about up top), 'drop' (bouncing down), 'spring' (thrown back up), 'done'. */
   private phase: 'shelf' | 'drop' | 'spring' | 'done' = 'shelf';
   private hatchT = 0;
+  /** Hatches work once you've been off them (so landing on one from the portal doesn't drop you in). */
+  private armed = false;
   private hatch = -1;
   /** In the board's plane: position (z, y) and velocity while dropping. */
   private cz = 0;
@@ -95,6 +97,7 @@ export class PlinkoLevel implements Level {
     physics.addStaticBox([10.95, SHELF_Y - 0.2, 0], [2.1, 0.4, HALF * 2 + 0.3]);
     physics.addStaticBox([9.85, SHELF_Y + 0.85, 0], [0.12, 1.7, HALF * 2 + 0.3]);
     for (const s of [-1, 1]) physics.addStaticBox([10.95, SHELF_Y + 0.85, s * (HALF + 0.2)], [2.1, 1.7, 0.12]);
+    physics.addStaticBox([CHAMBER_HALF + 0.1, SHELF_Y + 1, 0], [0.2, 2, HALF * 2 + 0.3]);
 
     for (let r = 0; r < ROWS; r++) {
       const y = TOP_ROW - r * ROW_GAP;
@@ -160,6 +163,8 @@ export class PlinkoLevel implements Level {
         const p = player.pos;
         let on = -1;
         for (let i = 0; i < SLOTS.length; i++) if (player.onGround && p[1] > SHELF_Y - 0.3 && Math.abs(p[2] - this.hatchZ(i)) < 0.75) on = i;
+        if (on < 0) this.armed = true;
+        if (!this.armed) break;
         if (on !== this.hatch) {
           this.hatch = on;
           this.hatchT = 0;
@@ -182,6 +187,7 @@ export class PlinkoLevel implements Level {
         player.flightDir = [0, Math.cos(this.spin), Math.sin(this.spin)];
         if (k >= 1) {
           this.spring = null;
+          this.trapdoor = null;
           this.phase = 'shelf';
           player.emerge([sp.to[0], sp.to[1] + 0.95, sp.to[2]], -Math.PI / 2, [0, 0, 0], 0.4);
         }
@@ -274,7 +280,7 @@ export class PlinkoLevel implements Level {
       this.phase = 'done';
       this.trapdoor = { pos: [BX, 0.02, z], t: 0 };
       player.emerge([BX, 0.95, z], -Math.PI / 2, [0, 0, 0], 0.1);
-      player.kill([-7, 17, (Math.random() - 0.5) * 3], { violence: 12 });
+      player.kill([-2, 16, (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random() * 3)], { violence: 12 });
       tone(note('C3'), 0.3, { to: note('A2'), wave: 'sawtooth', vol: 0.15 });
       this.hostLabel.text = 'OHHHHH...';
       this.death = {

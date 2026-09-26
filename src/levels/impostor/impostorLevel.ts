@@ -579,9 +579,11 @@ export class ImpostorLevel implements Level {
         const vp = v === 'player' ? this.player.pos : v.c.pos;
         n.target = [vp[0], 0, vp[2]];
         const d = flat(c.pos, vp);
-        n.speed = d > KILL_RANGE * 0.8 ? HUNT_SPEED : 0;
+        // (Up on the table is no hiding place: it leans in from the edge.)
+        const reach = v === 'player' && this.player.pos[1] > 0.5 ? KILL_RANGE + TABLE_RADIUS + 0.2 : KILL_RANGE;
+        n.speed = d > reach * 0.8 ? HUNT_SPEED : 0;
         this.huntT += dt;
-        if (d < KILL_RANGE && this.unwitnessed(v)) {
+        if (d < reach && this.unwitnessed(v)) {
           this.startLunge(n, v);
         } else if (this.huntT > 9) {
           this.victim = this.pickVictim();
@@ -990,6 +992,10 @@ export class ImpostorLevel implements Level {
       top = pv;
       tie = false;
     }
+    if (top === 'player' && pv === this.impostor) {
+      top = pv;
+      tie = false;
+    }
     m.tie = tie;
     m.ejected = tie || !top || top === 'skip' ? null : top;
   }
@@ -1031,6 +1037,9 @@ export class ImpostorLevel implements Level {
     this.phase = 'won';
     this.phaseT = 0;
     this.lunge = null;
+    const ic = this.impostor.c;
+    ic.mouth = ic.tongue = 0;
+    ic.lift = 0;
     const imp = this.impostor;
     if (how === 'vote') {
       hud.show('VICTORY', pick([`${imp.c.color.name} was the impostor. The crew celebrates by going straight back to work.`, 'Crewmates win. The cafeteria is safe. The food is still terrible.']), 4);
@@ -1388,7 +1397,7 @@ export class ImpostorLevel implements Level {
           this.phaseT = 0;
           // (What they said stays up a moment longer; their VOTED badges come after.)
           for (const n of this.npcs) n.voteAt = rand(2.5, VOTE_TIME - 1.5);
-          hud.show('WHO IS THE IMPOSTOR?', 'Stand next to your suspect and press E. Or stand on SKIP. No pressure.', 3.5);
+          hud.show('WHO IS THE IMPOSTOR?', 'Walk up to whoever looks sus and make it official (E). Or SKIP, and let democracy fail.', 3.5);
           tone(note('A4'), 0.15, { wave: 'square', vol: 0.08 });
           tone(note('E5'), 0.3, { wave: 'square', vol: 0.08, at: 0.15 });
         }
@@ -1489,7 +1498,7 @@ export class ImpostorLevel implements Level {
       this.win('vote');
       return;
     }
-    if (e && e !== 'player' && m.playerVote === e) {
+    if (e && e !== 'player' && m.locked && m.playerVote === e) {
       this.startDark('wrongVote', e);
       return;
     }
@@ -1667,7 +1676,7 @@ export class ImpostorLevel implements Level {
     list.push(this.buttonLabel, this.barLabel);
     if (this.phase === 'vote') {
       this.wallLabel.text = `VOTING ENDS IN ${Math.max(0, Math.ceil(VOTE_TIME - this.phaseT))}`;
-      this.wallSub.text = 'stand next to a suspect, press E';
+      this.wallSub.text = 'point fingers (E)';
       list.push(this.wallLabel, this.wallSub, this.skipLabel);
     } else if (this.phase === 'discuss') {
       this.wallLabel.text = 'DISCUSS!';
