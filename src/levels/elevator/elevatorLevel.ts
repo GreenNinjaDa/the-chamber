@@ -33,13 +33,13 @@ const DING_DELAY = 0.8;
 /** Riding down normally: top speed (m/s), time to reach it (s), and how long until the cable snaps (s after the ding). */
 const RIDE_SPEED = 2.5;
 const RIDE_ACCEL_TIME = 1.5;
-const RIDE_TIME = 11;
+const RIDE_TIME = 13;
 /** Foreshadowing: a creak, then one cable pinging off (s before the snap), then a groan. */
 const CREAK_AT = 4.5;
 const PING_BEFORE = 3.2;
 const GROAN_BEFORE = 1.2;
 /** The fall: seconds from the snap to the bottom, how hard it speeds up (m/s²), and the floor it ends at (B7). */
-const FALL_TIME = 12;
+const FALL_TIME = 13;
 const FALL_ACCEL = 9;
 const IMPACT_FLOOR = -7;
 /** The last seconds of the fall count down on the indicator (and flash BRACE FOR IMPACT). */
@@ -89,28 +89,32 @@ const DEATH_SCREEN_DELAY = 1.8;
 const CABLE_BREAK_Y = 16.5;
 const STUB_Y = HITCH[1] + 1.1;
 
-/** What's in the car: junk name, where (x, extra height, z), and which way it faces. */
+/**
+ * What's in the car: junk name, where (x, extra height, z), and which way it faces. The heavy
+ * things stand against the walls in front of the handrails, so once they float up, the rail under
+ * them looks nice and free.
+ */
 const CARGO: [string, number, number, number, number][] = [
-  ['piano', 1.5, 0, -7.2, 0.1],
-  ['fridge', -9.2, 0, -8.6, 0.6],
-  ['vending machine', 7.2, 0, -9.2, -0.25],
-  ['safe', -2.6, 0, -3.2, 0.4],
-  ['anvil', 4.2, 0, 2.6, 1.2],
-  ['bathtub', -7.4, 0, 7.6, 0.3],
-  ['couch', 1.2, 0, 8.6, Math.PI],
-  ['CRT TV', 1.4, 0.85, 8.7, Math.PI + 0.2],
-  ['washing machine', 7.2, 0, 6.2, 0.8],
-  ['filing cabinet', -10.4, 0, 2.2, 1.2],
-  ['crate', -8.6, 0, -2.2, 0.2],
-  ['crate', -8.6, 0.82, -2.2, 0.9],
+  ['piano', -3, 0, -11.4, Math.PI],
+  ['couch', 5, 0, -11.3, Math.PI],
+  ['CRT TV', 5.3, 0.85, -11.2, Math.PI - 0.2],
+  ['vending machine', 6, 0, 11.35, 0],
+  ['bathtub', -5, 0, 11.35, 0],
+  ['fridge', -11.35, 0, -6, -Math.PI / 2],
+  ['safe', -11.45, 0, 5.5, -Math.PI / 2 + 0.2],
+  ['washing machine', 11.4, 0, -6.5, Math.PI / 2],
+  ['filing cabinet', 11.45, 0, 6.5, Math.PI / 2],
+  ['anvil', 2.5, 0, 3, 1.2],
+  ['crate', -7, 0, -2.5, 0.2],
+  ['crate', -7, 0.82, -2.5, 0.9],
   ['small crate', 5.6, 0, -2.6, 0.5],
-  ['potted plant', -3.2, 0, -9.6, 0],
+  ['potted plant', -9.5, 0, -10, 0],
   ['rubber duck', 0.6, 0, 1, 2],
   ['traffic cone', 4.6, 0, -5.2, 0],
-  ['garden gnome', -6, 0, -5.6, 0.5],
+  ['garden gnome', -2, 0, -5.6, 0.5],
   ['beach ball', 2.6, 0, -2.2, 0],
-  ['tire', -3.6, 0, 9, 0],
-  ['cardboard box', 6.2, 0, 9.6, 0.4],
+  ['tire', -1.5, 0, 8, 0],
+  ['cardboard box', 8, 0, 3.5, 0.4],
 ];
 
 /** How each heavy thing kills you (by junk name). */
@@ -461,7 +465,7 @@ export class ElevatorLevel implements Level {
     this.alarm = 0;
     this.flickerT = 0;
     camera.addShake(1.8);
-    this.say('KA-RUNCH!', [0, 5, 0], 1.8, '#ffffff', 1.6);
+    this.say('KA-RUNCH!', [0, 3.6, 0], 1.3, '#ffffff', 1.6);
     physics.world.gravity = { x: 0, y: -GRAVITY * SLAM_GRAVITY, z: 0 };
     for (const c of this.cargo) {
       const rb = c.body.rb;
@@ -679,6 +683,7 @@ export class ElevatorLevel implements Level {
     if (input.wasPressed('Space')) {
       const touch = this.touching();
       if (touch) this.pushOff(look, touch.normal, touch.body);
+      else this.say(pick(['*flails*', '*swims at nothing*', '*paddles*', '*flaps*']), add(player.pos, [0, 2.3, 0]), 0.28, '#ffffff', 0.9, [0, 0.5, 0]);
     }
   }
 
@@ -819,7 +824,7 @@ export class ElevatorLevel implements Level {
     let light = 1;
     if (this.stage === 'fall') {
       const f = this.flickerT;
-      light = f < 1 ? [1, 0.1, 0.8, 0.05, 0.05, 0.9, 0.3, 1, 0.6, 1][Math.floor(f * 10)] : Math.random() < dt * 1.2 ? 0.25 : 0.8;
+      light = f < 1 ? [1, 0.1, 0.8, 0.05, 0.05, 0.9, 0.3, 1, 0.6, 1][Math.floor(f * 10)] : Math.random() < dt * 1.2 ? 0.2 : 0.72;
       if (f >= 1 && light < 0.5) this.flickerT = 0.9; // a short dip
     } else if (this.stage === 'landed') {
       const f = this.stageT;
@@ -855,11 +860,11 @@ export class ElevatorLevel implements Level {
     for (const p of this.puffs) {
       const k = p.age / p.life;
       const size = p.size * (1 + k * 2.5);
-      out.push({ mesh: 'sphere', model: mul(translation(p.pos), scaling([size, size * 0.8, size])), color: [0.5, 0.47, 0.42], opacity: 0.42 * (1 - k) * (1 - k), shadow: false });
+      out.push({ mesh: 'sphere', model: mul(translation(p.pos), scaling([size, size * 0.8, size])), color: [0.42, 0.39, 0.35], opacity: 0.75 * (1 - k) * (1 - k), shadow: false });
     }
     for (const s of this.sparks) {
       const tail = sub(s.pos, scale(s.vel, 0.02));
-      out.push({ mesh: 'box', model: segment(tail, s.pos, 0.03), color: [7, 3.5, 0.9], pattern: Pattern.emissive, shadow: false });
+      out.push({ mesh: 'box', model: segment(tail, s.pos, 0.05), color: [6, 2.2, 0.35], pattern: Pattern.emissive, shadow: false });
     }
   }
 
