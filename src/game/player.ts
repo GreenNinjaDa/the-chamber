@@ -663,6 +663,7 @@ export class Player {
    * moving at `velocity`, with the physical body switched back on in a standing pose.
    */
   resume(velocity: Vec3 = [0, 0, 0]) {
+    this.endPuppet();
     this.mode = 'control';
     this.vel = [...velocity];
     this.onGround = false;
@@ -711,6 +712,13 @@ export class Player {
   }
 
   /** Back to normal control from puppet mode: the body scrambles up from however it ended up. */
+  /** Undoes puppet mode's body lock and capsule switch-off (for any way out of it). */
+  private endPuppet() {
+    if (this.mode !== 'puppet') return;
+    this.body?.setPlanar(false);
+    this.collider?.setEnabled(true);
+  }
+
   stopPuppet() {
     const body = this.body;
     if (this.mode !== 'puppet' || !body) return;
@@ -741,6 +749,7 @@ export class Player {
    * `velocity` limp and stunned for `stunSeconds`, facing `facing`.
    */
   emerge(centre: Vec3, facing: number, velocity: Vec3, stunSeconds: number) {
+    this.endPuppet();
     this.mode = 'control';
     this.facing = facing;
     this.pos = sub(centre, scale(this.up, 0.95));

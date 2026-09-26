@@ -229,6 +229,8 @@ export class QwopLevel implements Level {
   update(dt: number) {
     const { player, hud } = this.ctx;
     this.t += dt;
+    // (The pistol's smoke and arm keep going even if you fall over straight away.)
+    if (this.bang >= 0) this.bang += dt;
     const death = this.death;
     if (death && this.status === 'playing') {
       death.t += dt;
@@ -405,7 +407,6 @@ export class QwopLevel implements Level {
     const body = player.body;
     if (player.mode !== 'puppet' || !body) return;
     this.runTime += dt;
-    if (this.bang >= 0) this.bang += dt;
     this.drive(dt);
     this.wasdJoke();
     this.footfalls(body);
