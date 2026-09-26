@@ -297,7 +297,29 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   not, and every noise shows as a ring. Balloons drift toward you and pop when they touch you (or when anything
   flies through them); more keep coming. After 60 s he finds the real piñata (candy everywhere), it's CAKE TIME,
   and the exit opens.
-- **Level 30 — Hex-A-Gone** (`src/levels/hexagone/`; Fall Guys' disappearing floor): no test chamber but an 18 m white shaft
+- **Level 30 — Among Us** (`src/levels/impostor/`): the chamber is a spaceship cafeteria open to space (a steel deck,
+  stars): a round table with the big red EMERGENCY button (`entities/spaceship.ts`), eight task stations round the walls
+  (wiring, dials, card swipe, garbage chute, data terminals) and four floor vents. Six bean crewmates
+  (`entities/crewmate.ts`, colour-name labels; red always comes) waddle between stations doing tasks: the station's
+  screen lights up (and glows on the floor) and the task bar on the north wall fills. One of them (random; `?impostor=RED`
+  picks it) is the impostor: it fakes tasks (the screen stays dark), sometimes follows you standing ~1 m away, and from
+  10 s in, every 10-15 s, hunts someone nobody else can see it with (no crewmate within 5.5 m, shrinking as the hunt
+  drags on; you more than 8.5 m away, so kills can be watched from across the room; you only after the first kill, and
+  then a lone you, no crewmate within 7 m, is its favourite target): a lunge, its head flips open into a toothy mouth, a
+  tongue, and the victim's top half flies off in a red spray, leaving the bottom half with a bone in a puddle. Then it
+  hops down the nearest vent (the flap clanks open) and pops out of another (only when nobody is close, like the kill).
+  Crewmates who see a vent exit or a faked task remember it. Bodies are found by crewmates walking past (4.5 m) or
+  reported by you (E); the button (E) calls a meeting (2 per attempt, 8 s cooldown). Meetings: "EMERGENCY MEETING!" /
+  "DEAD BODY REPORTED" (world frozen, red alarm light), everyone warps round the table, bodies vanish, 6 s of speech
+  bubbles seen from above (dumb chatter, the impostor's lies, witnesses' true "RED VENTED" / "red was faking tasks" /
+  "VOTE RED!!", running on into the vote), then 10 s to vote: stand by someone (a purple ring) or on the SKIP pad and
+  press E (or just be there when time runs out). NPCs follow your vote 68% of the time (skip if you didn't vote),
+  witnesses vote what they saw, the impostor votes with you or for you; ties go your way. Vote chips pop over each
+  candidate, then the ejected bean is flung out of a trapdoor into space. Impostor out: VICTORY, cheering, the exit
+  opens; so does filling the task bar (your tasks count double). Lose: eject an innocent you voted for and the lights go
+  out, it walks up with its visor glowing red (a red point light) and eats you; be alone with it; get down to just you
+  and it; or be voted out yourself (you float off into space).
+- **Level 31 — Hex-A-Gone** (`src/levels/hexagone/`; Fall Guys' disappearing floor): no test chamber but an 18 m white shaft
   (`chamber: { none: true }`, same 24 x 24 footprint) with three floors of candy hex tiles (`entities/hexFloor.ts`,
   corner radius 0.95 m, 295 per floor, tops at 13.5 / 9 / 4.5 m: pink, yellow, blue) over glowing goo (1.2 m, with a
   green point light). You land on the top floor with six contestants; a 3-2-1-GO on the LED board on the north wall
@@ -313,7 +335,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   view, kept under the floor overhead and above the one underfoot wherever there are tiles (after a fall it follows
   you down through your hole); dissolved, it looks down at the splash. `?hexTime=N` sets the round length, `?hexSolo`
   leaves the contestants out.
-- **Level 31 — The Pool** (`src/levels/pool/`; The Sims' pool-ladder prank): its own room (`none`: the walls, and a
+- **Level 32 — The Pool** (`src/levels/pool/`; The Sims' pool-ladder prank): its own room (`none`: the walls, and a
   deck round an 18 x 16 pool, 4.2 m deep, the water 1.7 m under the deck). Once the Sim is up after the arrival a
   green plumbob pops over their head ("Sul sul!"), a needs panel lights up on the north wall (ENERGY, FUN "Very high",
   HYGIENE, SOCIAL "The cursor is your friend", BLADDER "Don't. Just don't."), and the camera swings up into a
@@ -332,7 +354,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   scribble*", "Drowned. Classic.") and it's SIM DIED. Way out: a crate (or the couch) pushed against the side and
   jumped from (a pallet or the air mattress alone is too low; a crate on the pallet works in two jumps). Out on
   the deck, the cursor flies to the exit, "DELETE DOOR?", hesitates... "...nah." and the exit opens.
-- **Level 32 — The Floor Is Lava** (`src/levels/floorLava/`): the kids' game, taken literally, in a living room (red and blue
+- **Level 33 — The Floor Is Lava** (`src/levels/floorLava/`): the kids' game, taken literally, in a living room (red and blue
   sofas, blue and mustard armchairs, coffee table, beanbags, a blue rug, piano and bench, fridge, washing machine,
   bathtub, mattress, bookcase, crates, pillows; `entities/livingRoom.ts` plus junk). A host on four wall TVs announces
   rules ("RULE #n"), each with a 3-2-1 countdown (the digit also big on the HUD with the rule under it); meanwhile
@@ -348,7 +370,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   marker; landing on you is QUACKED), 5 s to get on it; everything else melts and sinks into lava rising to 0.55 m,
   "THE DUCK IS A BOAT NOW." and it sails you to the exit ("THE EXIT IS NOT LAVA. PROBABLY."). ~95 s in all.
   `?lavaStep=N` starts at step N of the script (8 = the duck).
-- **Level 33 — Pinball** (`src/levels/pinball/`): you are the ball. The chamber is a pinball table (`entities/pinball.ts`):
+- **Level 34 — Pinball** (`src/levels/pinball/`): you are the ball. The chamber is a pinball table (`entities/pinball.ts`):
   one fixed slab sloping 10° down to the south (surface 2 m up at the drain edge, z = 9.9, ~5.9 m at the north wall),
   a glossy navy playfield with a sunburst, stars and lamp inserts, cabinet side art and GI bulbs on the walls, a
   backglass on the north wall (orange dot-matrix display with score and messages, E X I T lamps, "SPACE CADAVER") and a
@@ -367,7 +389,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   get BALL SAVED back into the lane; the plunger fires every ball in the lane at once, but holds while you're in it;
   a ball sitting still 3 s gets a BALL SEARCH kick. Every jump nudges the table: DANGER after ~6 quick hops, TILT after
   ~9 (flippers, bumpers and lights dead for 6 s; drain meanwhile = TILT). Hum, music, chimes, BONGs, knocker.
-- **Level 34 — Bowling** (`src/levels/bowling/`; map in `lane.ts`): its own map (`none`), with the chamber's footprint so
+- **Level 35 — Bowling** (`src/levels/bowling/`; map in `lane.ts`): its own map (`none`), with the chamber's footprint so
   the camera keeps its usual chamber confinement: a honey-wood lane
   (boards, arrows, dots, pin spots), sunken gutters (2.7 m wide, 0.7 m deep) along the east and west walls, a dark pit
   across the north end, a scoreboard on the north wall (and a small one over the hatch) with sarcastic verdicts
@@ -381,12 +403,12 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   and pushes everything into the pit (jump it; swept = "CLEARED"), then ten pins come down on strings onto their
   spots (standing on one = "PINNED"). After the giant, the last ball is fired 0.8 s after the exit (east wall, in
   the gutter halfway down the lane) opens, and more keep coming until you leave.
-- **Level 35 — Falling Blocks** (`src/levels/tetris/`): a glass-fronted well one cell deep and ten wide against the east wall,
+- **Level 36 — Falling Blocks** (`src/levels/tetris/`): a glass-fronted well one cell deep and ten wide against the east wall,
   seen side-on (the level's camera shot; A / D move along it). Tetrominoes fall a row at a time, steering toward
   wherever you stand (a column every other row) and committing 4 rows up (a ghost shows where they'll land); what
   lands is what you climb, up to the exit (open from the start, 5 m up the east wall). Full rows clear and drop
   everything above. Crushed = GAME OVER; the stack reaching the top of the well = TOPPED OUT.
-- **Level 36 — Laser Show** (`src/levels/lasers/`; Fall Guys' Jump Club meets the Resident Evil laser hallway): the
+- **Level 37 — Laser Show** (`src/levels/lasers/`; Fall Guys' Jump Club meets the Resident Evil laser hallway): the
   lights go down (dark red) and an emitter pylon (`entities/laser.ts`, `LaserPylon`) rises out of a floor hatch.
   A low beam (0.35 m) grows out opposite the player and sweeps round, speeding up from 5 s to 2.5 s a turn: jump it.
   Then a mast rises and a high beam (1.6 m) joins, turning the other way at a different speed: duck it (stand still and
@@ -397,7 +419,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   4.2 m/s. Any beam touching a body part (`BodySlicer`: the real part frames as slightly shrunk capsules/boxes, swept
   in 4 cm steps so fast beams can't skip a limb) slices you: `player.kill` with violence 30 (42 for the grid) at the
   cut. One red point light rides with the pylon, then with each wall. `?laserSkip=N` starts the show N s in.
-- **Level 37 — Going Down** (`src/levels/elevator/`): the chamber is an elevator car (`entities/elevator.ts`: sliding doors in
+- **Level 38 — Going Down** (`src/levels/elevator/`): the chamber is an elevator car (`entities/elevator.ts`: sliding doors in
   the east wall, brass handrails round the walls at 1 m, a yellow crosshead and grate over the top (it stops anything
   floating out) with the hoist cables up to a sheave on the roof, two amber LED floor indicators (`FloorIndicator`),
   and the shaft, drawn sliding up past the wall tops by `drawShaft(depth, speed)`: landing doors, slabs, streaking
@@ -419,7 +441,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   sarcastic remarks. Sound: dings, a muzak `Tune` (record-scratches off at the TWANG), motor hum, creak / ping /
   groan, brake screech, rushing wind, countdown beeps, the crash, thuds, a rail clink. `?quickRide` snaps the cable
   4 s after the ding.
-- **Level 38 — Pac-Man** (`src/levels/pacman/`): after the arrival the floor goes dark navy, the sun dims to a moon
+- **Level 39 — Pac-Man** (`src/levels/pacman/`): after the arrival the floor goes dark navy, the sun dims to a moon
   and a 13×13-cell maze (`maze.ts`: black blocks outlined in glowing arcade blue, 1.5 m tall so you can't jump
   onto them but the camera sees over; 2.25 m corridors; a ghost house with a pink door in the middle) rises out of
   the floor, shoving the player out of its way, while the camera shows the whole board from above (READY!). 81
@@ -500,7 +522,12 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   show; pool toys `spawnPoolFloat` (ring, noodle, air mattress, pallet), `spawnFloatingCouch`, `drawPoolLadder`,
   `drawLounger`, `drawParasol`), `sims.ts` (The Sims: `drawPlumbob` in a mood colour, `CursorHand` (the giant
   build-mode glove: `flyTo`, `follow`, `pinch`), `drawBubble` (camera-facing speech / thought bubble; the text is
-  a world label), `NeedsPanel`, `drawGrimReaper`). Put new
+  a world label), `NeedsPanel`, `drawGrimReaper`),
+  `crewmate.ts` (bean crewmate
+  in `CREW_COLORS`: set `vel` and it waddles; `lift` hops / sinks down a vent, `mouth` / `tongue` / `tongueTo` the
+  impostor's flip-top bite, `glow` a red visor, `kill(from)` leaves the bottom half with a bone while the top flies off,
+  `eject()` tumbles it up into space, `opacity` / `highlight`), `spaceship.ts` (`TaskStation` on a chamber wall with a
+  screen that lights while `lit`, `Vent` with a flap, `addMeetingTable` / `drawMeetingTable` with the EMERGENCY button). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`

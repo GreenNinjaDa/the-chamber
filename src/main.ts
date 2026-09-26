@@ -49,6 +49,7 @@ import { PlinkoLevel } from './levels/plinko/plinkoLevel';
 import { PinballLevel } from './levels/pinball/pinballLevel';
 import { KatamariLevel } from './levels/katamari/katamariLevel';
 import { PoolLevel } from './levels/pool/poolLevel';
+import { ImpostorLevel } from './levels/impostor/impostorLevel';
 import type { Level, LevelContext, TrackedTarget, WorldLabel } from './levels/level';
 import { LobbyLevel } from './levels/lobby/lobbyLevel';
 
@@ -87,6 +88,7 @@ const LEVELS: [string, (ctx: LevelContext) => Level][] = [
   ['microwave', (ctx) => new MicrowaveLevel(ctx)],
   ['katamari', (ctx) => new KatamariLevel(ctx)],
   ['pinata', (ctx) => new PinataLevel(ctx)],
+  ['impostor', (ctx) => new ImpostorLevel(ctx)],
   ['hexagone', (ctx) => new HexagoneLevel(ctx)],
   ['pool', (ctx) => new PoolLevel(ctx)],
   ['floorlava', (ctx) => new FloorLavaLevel(ctx)],
