@@ -32,6 +32,8 @@ export class Giant {
   rightCurl = 0;
   lookTarget: Vec3 = [0, 0, 0];
   headShake = 0;
+  /** A party blindfold over his eyes (and a party hat). */
+  blindfold = false;
   time = 0;
 
   graspPoint: Vec3 = [0, 0, 0];
@@ -109,6 +111,11 @@ export class Giant {
     }
     push('sphere', mul(head, translation([0, -0.6, -8.2]), scaling([1.3, 1.8, 1.5])), SKIN, Pattern.skin);
     push('box', mul(head, translation([0, -4.2, -7.0]), scaling([4, 0.5, 0.6])), [0.35, 0.08, 0.08]);
+    if (this.blindfold) {
+      push('cylinder', mul(head, translation([0, 1.9, 0]), scaling([8.25, 2.6, 8.25])), [0.12, 0.1, 0.35]);
+      push('cone', mul(head, translation([0, 12.5, 0.5]), rotationX(-0.12), scaling([4.2, 7, 4.2])), [0.95, 0.3, 0.55]);
+      push('sphere', mul(head, translation([0, 16.2, 0.1]), scaling([1.2, 1.2, 1.2])), [1, 0.9, 0.3]);
+    }
 
     for (const arm of this.arms) {
       push('sphere', mul(translation(arm.shoulder), scaling([4.5, 4.5, 4.5])), SHIRT);

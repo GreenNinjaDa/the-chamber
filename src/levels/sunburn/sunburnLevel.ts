@@ -179,6 +179,8 @@ export class SunburnLevel implements Level {
       const model = duck.model!;
       duck.model = (out, m) => model(out, mul(m, translation([0, -0.18, 0]), scaling([1.5, 0.3, 1.5])));
       this.tag(this.bodyCentre(duck), 'RIP');
+      this.things = this.things.filter((th) => th !== this.duckCentre);
+      this.duckCentre = () => [0, -50, 0];
     });
     const ball = place('beach ball', 9, -9);
     this.addBurnable([ball.collider], 0.5, () => this.bodyCentre(ball), () => {

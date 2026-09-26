@@ -199,13 +199,20 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   later. Caught (it enters your cell, you're right in front of its mouth, or its head pushes into you) = swallowed
   whole (shrink into its mouth, gulp, +3 blocks, a bulge runs down to the tail), then GAME OVER with the snake's
   length as SCORE. The score also shows in pixel digits on the north wall.
-- **Level 19 — Microwave** (`src/levels/microwave/`): the chamber is the inside of one. A 45 s cook (a green display and keypad on
+- **Level 19 — Piñata** (`src/levels/pinata/`): Timmy's 8th birthday (the magnifying-glass giant, `giant.blindfold`: a
+  blindfold and a party hat) and he has a baseball bat. He swings at the loudest noise he heard in the last 1.2 s
+  (wind-up 0.5 s with a shadow on the floor, smash, 2 m kill radius; bored after 7 s of quiet: a wild swing).
+  Walking is silent; sprinting, landing a jump, things crashing down (thrown or knocked) and popping balloons are
+  not, and every noise shows as a ring. Balloons drift toward you and pop when they touch you (or when anything
+  flies through them); more keep coming. After 60 s he finds the real piñata (candy everywhere), it's CAKE TIME,
+  and the exit opens.
+- **Level 20 — Microwave** (`src/levels/microwave/`): the chamber is the inside of one. A 45 s cook (a green display and keypad on
   the north wall): the floor is a glass turntable that carries you round (`player.platformVel`; loose things ride it
   too), and standing-wave hot spots on a hex grid glow on it without turning, bigger on HIGH power from 20 s: 1.4 s
   in them cooks you (COOKED, `player.char`). Popcorn kernels pop from 12 s (knocking you about), and the fork left
   on the plate sparks from 18 s and arcs every 1-2.5 s, zapping anyone within 4.2 m of its tines (ZAPPED). DING: the
   door (exit) opens.
-- **Level 20 — Bowling** (`src/levels/bowling/`; map in `lane.ts`): its own map (`none`), with the chamber's footprint so
+- **Level 21 — Bowling** (`src/levels/bowling/`; map in `lane.ts`): its own map (`none`), with the chamber's footprint so
   the camera keeps its usual chamber confinement: a honey-wood lane
   (boards, arrows, dots, pin spots), sunken gutters (2.7 m wide, 0.7 m deep) along the east and west walls, a dark pit
   across the north end, a scoreboard on the north wall (and a small one over the hatch) with sarcastic verdicts
@@ -219,12 +226,12 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   and pushes everything into the pit (jump it; swept = "CLEARED"), then ten pins come down on strings onto their
   spots (standing on one = "PINNED"). After the giant, the last ball is fired 0.8 s after the exit (east wall, in
   the gutter halfway down the lane) opens, and more keep coming until you leave.
-- **Level 21 — Falling Blocks** (`src/levels/tetris/`): a glass-fronted well one cell deep and ten wide against the east wall,
+- **Level 22 — Falling Blocks** (`src/levels/tetris/`): a glass-fronted well one cell deep and ten wide against the east wall,
   seen side-on (the level's camera shot; A / D move along it). Tetrominoes fall a row at a time, steering toward
   wherever you stand (a column every other row) and committing 4 rows up (a ghost shows where they'll land); what
   lands is what you climb, up to the exit (open from the start, 5 m up the east wall). Full rows clear and drop
   everything above. Crushed = GAME OVER; the stack reaching the top of the well = TOPPED OUT.
-- **Level 22 — Laser Show** (`src/levels/lasers/`; Fall Guys' Jump Club meets the Resident Evil laser hallway): the
+- **Level 23 — Laser Show** (`src/levels/lasers/`; Fall Guys' Jump Club meets the Resident Evil laser hallway): the
   lights go down (dark red) and an emitter pylon (`entities/laser.ts`, `LaserPylon`) rises out of a floor hatch.
   A low beam (0.35 m) grows out opposite the player and sweeps round, speeding up from 5 s to 2.5 s a turn: jump it.
   Then a mast rises and a high beam (1.6 m) joins, turning the other way at a different speed: duck it (stand still and
@@ -235,7 +242,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   4.2 m/s. Any beam touching a body part (`BodySlicer`: the real part frames as slightly shrunk capsules/boxes, swept
   in 4 cm steps so fast beams can't skip a limb) slices you: `player.kill` with violence 30 (42 for the grid) at the
   cut. One red point light rides with the pylon, then with each wall. `?laserSkip=N` starts the show N s in.
-- **Level 23 — Pac-Man** (`src/levels/pacman/`): after the arrival the floor goes dark navy, the sun dims to a moon
+- **Level 24 — Pac-Man** (`src/levels/pacman/`): after the arrival the floor goes dark navy, the sun dims to a moon
   and a 13×13-cell maze (`maze.ts`: black blocks outlined in glowing arcade blue, 1.5 m tall so you can't jump
   onto them but the camera sees over; 2.25 m corridors; a ghost house with a pink door in the middle) rises out of
   the floor, shoving the player out of its way, while the camera shows the whole board from above (READY!). 81

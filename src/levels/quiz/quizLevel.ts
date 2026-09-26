@@ -79,6 +79,7 @@ export class QuizLevel implements Level {
   private heldFor = 0;
   /** The pad you were already on when the question came up: it can't lock in until you step off it. */
   private stale = -1;
+  private questionStatus = '';
 
   constructor(private ctx: LevelContext) {
     this.number = ctx.number;
@@ -118,7 +119,8 @@ export class QuizLevel implements Level {
     this.questionLabel.text = q.q;
     this.questionLabel.size = Math.min(0.8, 20 / (0.72 * q.q.length));
     q.answers.forEach((a, k) => (this.answerLabels[k].text = `${LETTERS[k]}: ${a}`));
-    this.statusLabel.text = i === this.questions.length - 1 ? 'FOR ALL THE MARBLES' : `QUESTION ${i + 1} OF ${this.questions.length}`;
+    this.questionStatus = i === this.questions.length - 1 ? 'FOR ALL THE MARBLES' : `QUESTION ${i + 1} OF ${this.questions.length}`;
+    this.statusLabel.text = this.questionStatus;
     this.held = -1;
     this.heldFor = 0;
     this.stale = this.padUnder();
@@ -169,6 +171,7 @@ export class QuizLevel implements Level {
         if (on !== this.stale) this.stale = -2;
         if (on === this.held && on >= 0 && on !== this.stale) this.heldFor += dt;
         else {
+          if (this.heldFor > 1.2) this.statusLabel.text = this.questionStatus;
           this.held = on;
           this.heldFor = 0;
         }

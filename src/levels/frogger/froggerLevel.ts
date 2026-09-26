@@ -185,16 +185,21 @@ export class FroggerLevel implements Level {
     for (const b of this.bubbles) b.age += dt;
     this.bubbles = this.bubbles.filter((b) => b.age < 1.2);
 
-    // Riding a raft: carried along with it (the player adds this to their own movement).
-    player.platformVel = [0, 0, 0];
+    // Riding a raft: carried along with it (the player adds this to their own movement), and
+    // a jump off it keeps that speed until you land.
     const alive = player.mode === 'control' && !this.death && !player.inPortal && this.arrival.done;
-    if (!alive) return;
+    if (!alive) {
+      player.platformVel = [0, 0, 0];
+      return;
+    }
     const p = player.pos;
     const under = physics.raycast([p[0], p[1] + 0.3, p[2]], [0, -1, 0], 0.5, player.collider ?? undefined);
     const raft = under ? this.raftByCollider.get(under.collider.handle) : undefined;
     if (raft) {
       player.platformVel = [0, 0, raft.vz];
       this.lastRaft = raft;
+    } else if (player.onGround) {
+      player.platformVel = [0, 0, 0];
     }
 
     // Into the goo.

@@ -61,7 +61,8 @@ export class MicrowaveLevel implements Level {
   status: LevelStatus = 'playing';
   private arrival: PortalArrival;
   private exit = new ExitPortal(0);
-  private t = -1;
+  /** Seconds into the cook (negative: the pre-roll); NaN until the arrival is done. */
+  private t = NaN;
   private angle = 0;
   private heat = 0;
   private kernels: Kernel[] = [];
@@ -83,7 +84,7 @@ export class MicrowaveLevel implements Level {
     hud.setLevel(`The Chamber · Level ${this.number}`);
     hud.show(`LEVEL ${this.number}`, '', 2.5);
     hud.hint('');
-    this.arrival = new PortalArrival(ctx, [0, 0, 8]);
+    this.arrival = new PortalArrival(ctx, [2.6, 0, 7.5]); // between hot spots
     this.labelList = [
       this.clock,
       this.mode,
@@ -105,6 +106,8 @@ export class MicrowaveLevel implements Level {
   private cooking() {
     return this.t >= 0 && this.t < COOK_TIME && !this.done;
   }
+
+  // (NaN compares false with everything, so before the arrival nothing above counts as cooking.)
 
   private hotR() {
     return this.t >= HIGH_AT ? HOT_R_HIGH : HOT_R_LOW;
@@ -132,14 +135,14 @@ export class MicrowaveLevel implements Level {
     this.arrival.update(dt);
     this.exit.update(dt, player);
     if (this.exit.entered && this.status === 'playing') this.status = 'exited';
-    if (this.arrival.done && this.t < 0) this.t = -START_AFTER;
-    if (this.t > -10) this.t += dt;
+    if (this.arrival.done && Number.isNaN(this.t)) this.t = -START_AFTER;
+    if (!Number.isNaN(this.t)) this.t += dt;
     const t = this.t;
     const cooking = this.cooking();
     const alive = player.mode === 'control' && !this.death;
 
     // The display.
-    if (t < 0 && t > -10) {
+    if (t < 0) {
       this.clock.text = '0:45';
       this.mode.text = 'POPCORN · HIGH · START';
     } else if (cooking) {
@@ -159,7 +162,9 @@ export class MicrowaveLevel implements Level {
     const spin = cooking ? SPIN : 0;
     this.angle += spin * dt;
     const onPlate = Math.hypot(player.pos[0], player.pos[2]) < PLATE_R;
-    player.platformVel = alive && onPlate && player.onGround ? [-spin * player.pos[2], 0, spin * player.pos[0]] : [0, 0, 0];
+    // (In the air you keep the plate's speed you jumped with.)
+    if (!alive || !onPlate) player.platformVel = [0, 0, 0];
+    else if (player.onGround) player.platformVel = [-spin * player.pos[2], 0, spin * player.pos[0]];
     // Loose things ride the plate too (friction, near enough).
     for (const b of physics.bodies) {
       const p = b.rb.translation();
@@ -171,7 +176,7 @@ export class MicrowaveLevel implements Level {
     }
 
     // Hot spots.
-    if (alive && cooking && t > 0) {
+    if (alive && cooking && t > 1) {
       const r = this.hotR();
       const inSpot = HOT_SPOTS.some(([x, z]) => Math.hypot(player.pos[0] - x, player.pos[2] - z) < r);
       this.heat = inSpot ? this.heat + dt : Math.max(0, this.heat - dt * 0.6);
@@ -243,11 +248,12 @@ export class MicrowaveLevel implements Level {
       const a = this.angle + (k * Math.PI) / 3;
       out.push({ mesh: 'box', model: mul(translation([0, 0.028, 0]), rotationY(-a), translation([PLATE_R * 0.55, 0, 0]), scaling([PLATE_R * 0.9, 0.006, 0.08])), color: [0.8, 0.88, 0.92], shadow: false });
     }
-    // The hot spots, glowing, pulsing (they stay put).
-    if (cooking && t > 0) {
+    // The hot spots, glowing, pulsing (they stay put); faint while it warms up.
+    if (cooking || (t < 0 && t > -START_AFTER)) {
       const r = this.hotR();
+      const warm = t < 1 ? 0.35 + 0.35 * Math.abs(Math.sin(t * 5)) : 1;
       for (const [x, z] of HOT_SPOTS) {
-        const pulse = 0.75 + 0.25 * Math.sin(this.t * 6 + x);
+        const pulse = (0.75 + 0.25 * Math.sin(this.t * 6 + x)) * warm;
         out.push({ mesh: 'cylinder', model: mul(translation([x, 0.035, z]), scaling([r * pulse, 0.01, r * pulse])), color: [3.2, 0.55, 0.06], pattern: Pattern.emissive, opacity: 0.72, shadow: false });
         out.push({ mesh: 'cylinder', model: mul(translation([x, 0.034, z]), scaling([r, 0.008, r])), color: [1.6, 0.22, 0.03], pattern: Pattern.emissive, opacity: 0.45, shadow: false });
       }
