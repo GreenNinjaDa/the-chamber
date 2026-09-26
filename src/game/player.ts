@@ -136,6 +136,8 @@ export class Player {
   gettingUp = false;
   private getUpTime = 0;
   private knockGrace = 0;
+  /** Seconds during which nothing can knock the player loose (set by levels, e.g. after a scripted fall). */
+  stunImmunity = 0;
   /** Seconds left on a buffered jump press. */
   private jumpBuffer = 0;
   private physics: Physics | null = null;
@@ -193,6 +195,7 @@ export class Player {
     this.stun = 0;
     this.gettingUp = false;
     this.knockGrace = 0;
+    this.stunImmunity = 0;
     this.jumpBuffer = 0;
     this.pose = REST_POSE;
     this.portalScale = this.portalFrom = this.portalTo = 1;
@@ -304,6 +307,7 @@ export class Player {
     const stunned = this.stun > 0;
     this.stun = Math.max(0, this.stun - dt);
     this.knockGrace = Math.max(0, this.knockGrace - dt);
+    this.stunImmunity = Math.max(0, this.stunImmunity - dt);
     if (this.body && this.stun <= 0 && this.body.muscle < 1) {
       this.body.muscle = Math.min(1, this.body.muscle + dt / RECOVER_TIME);
     }
@@ -553,7 +557,7 @@ export class Player {
     }
 
     // Non-physics things the body ran into (not while scrambling back up, or just after).
-    const canBump = !this.gettingUp && this.knockGrace <= 0;
+    const canBump = !this.gettingUp && this.knockGrace <= 0 && this.stunImmunity <= 0;
     PART_NAMES.forEach((name, i) => {
       if (!canBump) return;
       if (name !== 'head' && name !== 'chest' && name !== 'pelvis') return;
@@ -633,7 +637,7 @@ export class Player {
    * `velocity` (m/s), then the player pulls themselves together.
    */
   knock(velocity: Vec3, stunSeconds: number) {
-    if (this.mode !== 'control' || !this.body || this.inPortal) return;
+    if (this.mode !== 'control' || !this.body || this.inPortal || this.stunImmunity > 0) return;
     this.body.muscle = STUNNED_MUSCLE;
     this.stun = stunSeconds;
     this.gettingUp = true;

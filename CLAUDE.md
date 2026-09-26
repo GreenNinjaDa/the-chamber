@@ -76,7 +76,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   gravity flips; debris, so boulders roll straight through them).
   A pressure plate at the end (the boulder keeps coming) sinks the end wall 1 s later to reveal a second boulder; the
   world freezes as soon as the first boulder is within 1 m of the plate or 2 s have passed (`Level.freezeWorld`) while only the camera turns upside down (`camera.turnTarget`), and 0.5 s after
-  it settles gravity snaps over: everything, the player included (stunned 0.1 s, then gets up), falls to the ceiling.
+  it settles gravity snaps over: everything, the player included (stunned 0.1 s, then immune to knocks for 1 s so landing head first doesn't
+  stun them again), falls to the ceiling.
   The map never moves. The way back has the ceiling's own pits
   and spikes; the new boulder chases, the first rolls off from rest and drops into its shaft (12 m deep, so both
   boulders fit with room to spare), crossed on a second vine to the portal. Vines are physical ropes: hold E or left
@@ -141,6 +142,7 @@ Shared mechanics available to levels (via `ctx`):
   it for Darts). Violent deaths (violence = launch speed by default; ≥18 starts tearing joints, ~40 rips most of
   them) permanently dismember the body; `origin` makes parts nearer it more likely to come off.
   `player.tearApart(violence, origin)` does the same to an existing corpse.
+- `player.stunImmunity` (seconds) — nothing knocks the player loose meanwhile (bumps or `knock`).
 - `player.knock(velocity, stunSeconds)` — shove the player loose; they go limp, tumble, then get back up.
   Hits do this automatically (thresholds at the top of player.ts): the head needs 6 m/s and 40 kg·m/s, the rest
   of the body 1.5× the speed and 5× the momentum. Loose objects count with their mass, walls/bars/scripted

@@ -91,6 +91,8 @@ const ROLL_TIME = 4;
 /** ...and holds there this long after it's caught up; then gravity snaps over and the player falls, limp for a moment. */
 const ROLL_HOLD = 0.5;
 const FALL_STUN = 0.1;
+/** After the fall starts, the player can't be knocked loose again for this long. */
+const FALL_IMMUNITY = 1;
 
 // Spikes: rows across the floor (the way out) and the ceiling (the way back), and spikes sticking
 // out of the walls. They're not solid: touching one knocks you loose for a moment.
@@ -669,6 +671,8 @@ export class TempleLevel implements Level {
     this.setStage('chaseBack');
     // Everything falls to the ceiling, the player too: limp for a moment, then back on their feet.
     this.ctx.player.knock([0, 0, 0], FALL_STUN);
+    // ...and nothing knocks them again while they land (e.g. head first on the new floor).
+    this.ctx.player.stunImmunity = FALL_IMMUNITY;
     // Both boulders fall to the new floor. The first starts rolling off toward the start from rest
     // (if it's close, that's your problem); the second chases you home.
     this.release(0);
