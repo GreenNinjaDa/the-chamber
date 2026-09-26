@@ -177,7 +177,7 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   rules ("RULE #n"), each with a 3-2-1 countdown (the digit also big on the HUD with the rule under it); meanwhile
   whatever is about to turn blinks molten, faster and faster (the floor: its panel seams glow), then it's lava
   (`Pattern.lava` param 2 on things; the floor goes tile by tile in a quick ripple; the room glows warm). Standing on
-  lava (5 rays down from the feet; any safe surface under you wins) for 0.25 s in all burns you up (`player.char`,
+  lava (9 rays down round the feet; any safe surface under you wins) for 0.25 s in all burns you up (`player.char`,
   smoke, flames); every new touch costs at least 0.05 s, so hopping across only goes so far. Rules: the floor (the
   rug is floor); the couches (armchairs aren't; a pillow on a couch isn't a couch); the floor and the crates; the
   ceiling (there isn't one); everything blue, and the floor; the floor and whatever you're standing on; the floor,

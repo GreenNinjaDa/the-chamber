@@ -249,7 +249,7 @@ const PARTICLES = 220;
 const EMBERS_PER_SECOND = 45;
 const DOWN: Vec3 = [0, -1, 0];
 /** Where the feet rays start around the player's feet (the capsule is 0.35 m in radius). */
-const FEET: [number, number][] = [[0, 0], [0.26, 0], [-0.26, 0], [0, 0.26], [0, -0.26]];
+const FEET: [number, number][] = [[0, 0], [0.28, 0], [-0.28, 0], [0, 0.28], [0, -0.28], [0.2, 0.2], [-0.2, 0.2], [0.2, -0.2], [-0.2, -0.2]];
 
 const FLOOR_SURFACE: Surface = { kind: 'floor' };
 const RUG_SURFACE: Surface = { kind: 'rug' };
@@ -772,20 +772,21 @@ export class FloorLavaLevel implements Level {
     let safe = false;
     // Rising lava: anything under its surface is in it, whatever it stands on.
     if (this.tide > 0.05 && p[1] < this.tide - 0.03) lava = TIDE_SURFACE;
-    if (player.onGround || p[1] < 0.06) {
-      for (const [ox, oz] of FEET) {
-        const x = p[0] + ox, z = p[2] + oz;
-        const hit = physics.raycast([x, p[1] + 0.35, z], DOWN, 0.6, player.collider ?? undefined);
-        if (!hit || hit.point[1] < p[1] - 0.22) continue;
-        const s = this.classify(hit);
-        if (!this.standing || (ox === 0 && oz === 0)) this.standing = s;
-        if (this.isLava(s, hit.point[0], hit.point[2])) lava ??= s;
-        else safe = true;
-      }
-      if (!this.standing && p[1] < 0.06) {
-        this.standing = this.onRug(p[0], p[2]) ? RUG_SURFACE : FLOOR_SURFACE;
-        if (this.isLava(this.standing, p[0], p[2])) lava ??= this.standing;
-      }
+    // Whatever is right under the feet counts (a bit further down while standing, as the capsule's
+    // round bottom can rest on an edge; not so far while in the air, or jumping over lava would burn).
+    const reach = player.onGround ? 0.22 : 0.08;
+    for (const [ox, oz] of FEET) {
+      const x = p[0] + ox, z = p[2] + oz;
+      const hit = physics.raycast([x, p[1] + 0.35, z], DOWN, 0.6, player.collider ?? undefined);
+      if (!hit || hit.point[1] < p[1] - reach) continue;
+      const s = this.classify(hit);
+      if (!this.standing || (ox === 0 && oz === 0)) this.standing = s;
+      if (this.isLava(s, hit.point[0], hit.point[2])) lava ??= s;
+      else safe = true;
+    }
+    if (!this.standing && p[1] < 0.06) {
+      this.standing = this.onRug(p[0], p[2]) ? RUG_SURFACE : FLOOR_SURFACE;
+      if (this.isLava(this.standing, p[0], p[2])) lava ??= this.standing;
     }
     if (this.standing) this.lastStanding = this.standing;
     if (lava === TIDE_SURFACE) return lava;
