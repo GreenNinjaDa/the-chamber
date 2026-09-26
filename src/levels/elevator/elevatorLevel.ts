@@ -526,7 +526,7 @@ export class ElevatorLevel implements Level {
       const v = rb.linvel();
       rb.setLinvel({ x: v.x * 0.5, y: Math.min(v.y, 0) - SLAM_SPEED, z: v.z * 0.5 }, true);
       rb.wakeUp();
-      c.body.grabbable = c.mass < CRUSH_MASS;
+      c.body.grabbable = true;
     }
     for (const d of this.indicators) {
       d.alarm = false;
