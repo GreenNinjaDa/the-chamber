@@ -119,6 +119,17 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   the player's body via `drawBody` colours, numbers floating overhead) run on green and freeze on red; 324 keeps
   running into the first red light, 101 wobbles and steps (3rd), 212 panics and runs back (4th), 218 sneezes (5th),
   067 makes it and cheers, and old 001 shuffles, stops bothering to freeze from the 5th red light and is never shot.
+- **Level 6 — Laser Show** (`src/levels/lasers/`; Fall Guys' Jump Club meets the Resident Evil laser hallway): the
+  lights go down (dark red) and an emitter pylon (`entities/laser.ts`, `LaserPylon`) rises out of a floor hatch.
+  A low beam (0.35 m) grows out opposite the player and sweeps round, speeding up from 5 s to 2.5 s a turn: jump it.
+  Then a mast rises and a high beam (1.6 m) joins, turning the other way at a different speed: duck it (stand still and
+  look down; a full duck tops out at 1.43 m, standing reaches 1.9 m, walking or half-looking down still gets hit).
+  Where the two cross you can't do both, so move. Then three laser walls (grids to ~3.9 m) sweep across from the side
+  further from you, each with a 2–2.4 m full-height gap you can walk to in time (the last one faster, with a low beam in
+  the gap to jump, and its gap in the west half); then the exit opens and a gapless grid comes from the west wall at
+  4.2 m/s. Any beam touching a body part (`BodySlicer`: the real part frames as slightly shrunk capsules/boxes, swept
+  in 4 cm steps so fast beams can't skip a limb) slices you: `player.kill` with violence 30 (42 for the grid) at the
+  cut. One red point light rides with the pylon, then with each wall. `?laserSkip=N` starts the show N s in.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
@@ -153,7 +164,8 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   `pressurePlate.ts` (round button, or `{ stone: [w, d] }` for a rock slab), `uselessBox.ts`, `rock.ts` (textured stone: `boulderModel`, `chunkModel`, `slabModel`, `shardModel`, `clusterModel`; `Pattern.rock`),
   `doll.ts` (the giant doll with a swivelling head and glowing eyes, plus a `BareTree`), `contestant.ts` (scripted
   NPC in a tracksuit: walk/run, freeze, wobble/sneeze/cheer, dramatic death fall; `drawBody` takes a `BodyColors`
-  to dress the player's body as someone else). Put new
+  to dress the player's body as someone else), `laser.ts` (`drawBeam` / `drawBeamDot` / `drawFloorGlow`,
+  `BodySlicer` to test beams against the player's body parts, `LaserPylon`). Put new
   entities here unless they are truly one-off; level folders keep only the level logic.
 - `src/dev/sandbox.ts` — mechanics test room, opened with `?sandbox` (not a game level)
 - `src/levels/level.ts` — the `Level` interface; each level gets its own folder under `src/levels/`
