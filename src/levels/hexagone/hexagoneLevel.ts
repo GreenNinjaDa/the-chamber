@@ -27,7 +27,10 @@ const GOO_TOP = 1.2;
 const WALL_H = 18;
 /** Thick enough to hide the edge tiles poking into them. */
 const WALL_T = 2.5;
-const ROUND_TIME = 60;
+const params = new URLSearchParams(location.search);
+/** `?hexTime=N` changes the round's length (s); `?hexSolo` leaves the other contestants out. */
+const ROUND_TIME = Number(params.get('hexTime')) || 60;
+const SOLO = params.has('hexSolo');
 const COUNTDOWN = 3;
 const DEATH_SCREEN_DELAY = 1.8;
 const SPAWN: Vec3 = [0, TOPS[0], 5];
@@ -192,12 +195,12 @@ export class HexagoneLevel implements Level {
     this.floors = TOPS.map((top, i) => new HexFloor(physics, { top, radius: TILE_R, thickness: TILE_T, half: H, colors: LAYER_COLORS[i], armTime: ARM_TIME }));
     for (const f of this.floors) f.canRegrow = (tile) => this.clearOf(f, tile);
 
-    this.board = new PixelText({ centre: [-4.6, 15.9, -H + 0.08], right: [1, 0, 0], up: [0, 1, 0], pixel: 0.34, color: this.boardColor, depth: 0.06 }, '1:00');
-    this.countBoard = new PixelText({ centre: [5.4, 15.9, -H + 0.08], right: [1, 0, 0], up: [0, 1, 0], pixel: 0.2, color: this.countColor, depth: 0.06 }, '7 LEFT');
+    this.board = new PixelText({ centre: [-4.6, 15.9, -H + 0.08], right: [1, 0, 0], up: [0, 1, 0], pixel: 0.34, color: this.boardColor, depth: 0.06 }, clock(ROUND_TIME));
+    this.countBoard = new PixelText({ centre: [5.4, 15.9, -H + 0.08], right: [1, 0, 0], up: [0, 1, 0], pixel: 0.2, color: this.countColor, depth: 0.06 }, `${(SOLO ? 0 : CAST.length) + 1} LEFT`);
 
     // The others spread out over the top floor, away from you and each other.
     const spots: [number, number][] = [[SPAWN[0], SPAWN[2]]];
-    for (const p of CAST) {
+    for (const p of SOLO ? [] : CAST) {
       let x = 0, z = 0;
       for (let tries = 0; tries < 80; tries++) {
         x = rand(-9, 9);
@@ -326,7 +329,7 @@ export class HexagoneLevel implements Level {
     if (!this.playerAlive || player.inPortal) return;
     const left = this.stillIn();
     const timeUp = this.roundT >= ROUND_TIME;
-    if (left > 0 && !timeUp) return;
+    if ((left > 0 || SOLO) && !timeUp) return;
     // Still on (or over) a floor: falling into the goo when the clock stops doesn't count.
     const layer = this.floorBelow(player.pos[1]);
     if (layer < 0) return;
@@ -674,7 +677,7 @@ export class HexagoneLevel implements Level {
   private updateBoards(dt: number) {
     let text: string;
     let color = LED;
-    if (this.phase === 'arrive') text = '1:00';
+    if (this.phase === 'arrive') text = clock(ROUND_TIME);
     else if (this.phase === 'ready') {
       const n = Math.ceil(COUNTDOWN - this.phaseT);
       text = `${n}`;
@@ -685,11 +688,11 @@ export class HexagoneLevel implements Level {
         color = LED_GREEN;
       } else {
         const left = Math.max(0, Math.ceil(ROUND_TIME - this.roundT));
-        text = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+        text = clock(left);
         if (left <= 10) color = Math.floor(this.roundT * 4) % 2 ? LED_RED : LED;
       }
     } else {
-      text = Math.floor(this.phaseT * 2) % 2 ? 'WIN!' : `${Math.floor(Math.max(0, ROUND_TIME - this.roundT) / 60)}:${String(Math.max(0, Math.ceil(ROUND_TIME - this.roundT)) % 60).padStart(2, '0')}`;
+      text = Math.floor(this.phaseT * 2) % 2 ? 'WIN!' : clock(Math.max(0, Math.ceil(ROUND_TIME - this.roundT)));
       color = LED_GREEN;
     }
     for (let i = 0; i < 3; i++) this.boardColor[i] = color[i];
@@ -836,6 +839,11 @@ export class HexagoneLevel implements Level {
   obstacles() {
     return [];
   }
+}
+
+/** Seconds as M:SS. */
+function clock(seconds: number) {
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
 function hash(n: number) {

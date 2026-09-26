@@ -184,8 +184,9 @@ A level-based 3D survival game in the browser, built directly on WebGPU + WGSL w
   OUT! label (most are out by 25-45 s). Last one standing, or still up when the 60 s clock runs out, wins: the floor
   stops dropping, your floor grows back in a ripple and the exit opens in the east wall at its height (it moves if
   you still fall to another floor). The level places the camera itself (`cameraShot`): the usual over-the-shoulder
-  view, kept under the floor overhead and above the one underfoot wherever there are tiles; dissolved, it looks down
-  at the splash.
+  view, kept under the floor overhead and above the one underfoot wherever there are tiles (after a fall it follows
+  you down through your hole); dissolved, it looks down at the splash. `?hexTime=N` sets the round length, `?hexSolo`
+  leaves the contestants out.
 - Levels can tweak the chamber via `Level.chamber` (`ChamberOptions` in chamber.ts), e.g. a hole in the north wall,
   `litFromBelow` (the floor casts no shadows), or `none` (no chamber at all: the level builds its own map, and should
   set `camera.confine = false` so the camera isn't kept inside the chamber, and `camera.bounds` to keep it inside its own). `Environment.pointLight` adds one
