@@ -18,9 +18,9 @@ export const KATAMARI_START_RADIUS = 0.31;
 /** The pink core is drawn at this fraction of the collision radius; the knobs and the junk make up the rest. */
 const CORE = 0.9;
 /**
- * Stuck things sit on the pink core: small ones sunk to 70% of their reach (so 30% of it stays
- * out, plus the rest of them), and nothing pokes out past the core by more than this share of the
- * radius (plus 3 cm); big things are buried deeper instead.
+ * Stuck things sit on the pink core with their centre (1 - EMBED) × their reach outside it (so a
+ * small thing sticks out 1.3 × its reach), but nothing pokes out past the core by more than
+ * PROTRUDE × the radius (plus 3 cm): big things are sunk deeper instead.
  */
 const EMBED = 0.7;
 const PROTRUDE = 0.34;
